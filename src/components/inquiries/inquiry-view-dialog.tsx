@@ -33,6 +33,9 @@ interface Inquiry {
   registerNow?: boolean
   consent: boolean
   createdAt: string
+  createdBy?: {
+    name: string
+  }
   programInterest?: {
     id: string
     name: string
@@ -452,6 +455,21 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
                         <p className="font-medium text-sm sm:text-base break-all">{inquiry.guardianPhone}</p>
                       </div>
                     )}
+                    {inquiry.createdBy?.name && (
+                      <div>
+                        <p className="text-xs sm:text-sm text-gray-600 mb-1">Created By</p>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <p className="font-medium text-sm sm:text-base">{inquiry.createdBy.name}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs sm:text-sm text-gray-600 mb-1">Created Date</p>
+                      <p className="font-medium text-sm sm:text-base">
+                        {new Date(inquiry.createdAt).toLocaleString()}
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

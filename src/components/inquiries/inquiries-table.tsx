@@ -386,6 +386,7 @@ export function InquiriesTable() {
                     <TableHead className="font-semibold text-gray-900 min-w-[150px]">Campaign</TableHead>
                     <TableHead className="font-semibold text-gray-900 min-w-[120px]">Stage</TableHead>
                     <TableHead className="font-semibold text-gray-900 min-w-[120px]">Source</TableHead>
+                    <TableHead className="font-semibold text-gray-900 min-w-[130px]">Created By</TableHead>
                     <TableHead className="font-semibold text-gray-900 min-w-[100px]">Created</TableHead>
                     <TableHead className="font-semibold text-gray-900 min-w-[200px]">Actions</TableHead>
                   </TableRow>
@@ -542,6 +543,16 @@ export function InquiriesTable() {
                         <Badge className={`${getSourceColor(inquiry.marketingSource)} text-xs font-medium px-2 py-0.5 shadow-sm`}>
                           {inquiry.marketingSource.replace(/_/g, ' ')}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-700 whitespace-nowrap">
+                        {inquiry.createdBy?.name ? (
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-gray-400" />
+                            <span className="text-sm font-medium">{inquiry.createdBy.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-gray-700 text-sm whitespace-nowrap">
                         {new Date(inquiry.createdAt).toLocaleDateString()}
@@ -758,6 +769,17 @@ export function InquiriesTable() {
                       <Badge className={`${getSourceColor(inquiry.marketingSource)} text-xs font-medium px-2 py-0.5 shadow-sm ml-1`}>
                         {inquiry.marketingSource.replace(/_/g, ' ')}
                       </Badge>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Created By:</span>
+                      {inquiry.createdBy?.name ? (
+                        <span className="ml-1 text-gray-900 flex items-center gap-1">
+                          <User className="h-3 w-3 text-gray-400" />
+                          {inquiry.createdBy.name}
+                        </span>
+                      ) : (
+                        <span className="ml-1 text-gray-400">-</span>
+                      )}
                     </div>
                   </div>
 
