@@ -51,12 +51,14 @@ const inquirySchema = z.object({
     .refine((val) => !val || /^[0-9+\-\s()]+$/.test(val), 'Guardian phone can only contain numbers, +, -, spaces, and parentheses'),
   
   marketingSource: z.string()
-    .min(1, 'Marketing source is required')
-    .max(100, 'Marketing source must be less than 100 characters'),
+    .max(100, 'Marketing source must be less than 100 characters')
+    .optional(),
   
   campaignId: z.string().optional(),
   
-  preferredContactTime: z.string().optional(),
+  preferredContactTime: z.string()
+    .optional()
+    .refine((val) => !val || val.length <= 100, 'Preferred contact time must be less than 100 characters'),
   
   preferredStatus: z.number()
     .min(1, 'Preferred status must be at least 1')
@@ -75,6 +77,37 @@ const inquirySchema = z.object({
   consent: z.boolean().optional().default(false),
   
   stage: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Marketing source is required unless "Not Answering" is checked
+  if (!data.notAnswering && (!data.marketingSource || !data.marketingSource.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Marketing source is required',
+      path: ['marketingSource']
+    })
+  }
+  
+  // If follow-up is enabled, date and time are required
+  if (data.followUpAgain) {
+    const hasDate = data.followUpDate && data.followUpDate.trim().length > 0
+    const hasTime = data.followUpTime && data.followUpTime.trim().length > 0
+    
+    if (!hasDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Follow-up date is required when follow-up is enabled',
+        path: ['followUpDate']
+      })
+    }
+    
+    if (!hasTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Follow-up time is required when follow-up is enabled',
+        path: ['followUpTime']
+      })
+    }
+  }
 })
 
 type InquiryFormData = z.infer<typeof inquirySchema>
@@ -225,8 +258,8 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         preferredContactTime: inquiry.preferredContactTime || '',
         preferredStatus: inquiry.preferredStatus || undefined,
         followUpAgain: inquiry.followUpAgain || false,
-        followUpDate: '',
-        followUpTime: '',
+        followUpDate: inquiry.followUpDate || '',
+        followUpTime: inquiry.followUpTime || '',
         description: inquiry.description || '',
         whatsapp: inquiry.whatsapp || false,
         notAnswering: inquiry.notAnswering || false,
@@ -334,10 +367,22 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     const values = form.getValues()
     const errors = form.formState.errors
     
+    // If "Not Answering" is checked, allow submission with minimal requirements
+    if (values.notAnswering) {
+      // Still need at least full name and phone
+      const hasMinimalFields = values.fullName?.trim() && values.phone?.trim()
+      // Only check for errors on critical fields (fullName and phone)
+      // Ignore age, marketingSource, and other optional field errors
+      const hasCriticalErrors = errors.fullName || errors.phone
+      return hasMinimalFields && !hasCriticalErrors
+    }
+    
+    // Normal validation: Check required fields
     const hasRequiredFields = values.fullName?.trim() && 
                              values.phone?.trim() && 
                              values.marketingSource?.trim()
     
+    // Check if there are any validation errors
     const hasValidationErrors = Object.keys(errors).length > 0
     
     return hasRequiredFields && !hasValidationErrors
@@ -414,8 +459,8 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-2.5 sm:space-y-3 mt-2 sm:mt-3">
-          <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          <form ref={formRef} id="edit-inquiry-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 pb-4">
               {/* Full Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="fullName" className="text-xs sm:text-sm font-medium">Full Name *</Label>
@@ -488,10 +533,35 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                     checked={form.watch('notAnswering')}
                     onCheckedChange={(checked) => {
                       form.setValue('notAnswering', checked as boolean)
+                      // Clear errors for optional fields when checking "Not Answering"
+                      if (checked) {
+                        form.clearErrors('marketingSource')
+                        form.clearErrors('age')
+                      }
+                      // Trigger validation to update button state
+                      setTimeout(() => {
+                        form.trigger(['marketingSource', 'fullName', 'phone', 'age'])
+                      }, 100)
                     }}
                   />
                   <Label htmlFor="notAnswering" className="text-sm font-normal cursor-pointer">
                     Not Answering
+                  </Label>
+                </div>
+              </div>
+
+              {/* Email Not Answering checkbox */}
+              <div className="space-y-1.5 flex items-end">
+                <div className="flex items-center space-x-2 h-9 sm:h-10">
+                  <Checkbox
+                    id="emailNotAnswering"
+                    checked={form.watch('emailNotAnswering')}
+                    onCheckedChange={(checked) => {
+                      form.setValue('emailNotAnswering', checked as boolean)
+                    }}
+                  />
+                  <Label htmlFor="emailNotAnswering" className="text-sm font-normal cursor-pointer">
+                    Email Not Answering
                   </Label>
                 </div>
               </div>
@@ -830,6 +900,101 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                 </p>
               </div>
 
+              {/* Preferred Contact Time */}
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1">
+                <Label htmlFor="preferredContactTime" className="text-xs sm:text-sm font-medium">Preferred Contact Time</Label>
+                <Input
+                  id="preferredContactTime"
+                  {...form.register('preferredContactTime')}
+                  placeholder="e.g., Prefer morning calls, available weekends"
+                  onKeyDown={handleEnterAdvance}
+                  className="w-full"
+                />
+                {form.formState.errors.preferredContactTime && (
+                  <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.preferredContactTime.message}</p>
+                )}
+              </div>
+
+              {/* Follow Up Section */}
+              <div className="space-y-2 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1 border-t border-gray-100">
+                <div className="flex items-center space-x-2 pt-1">
+                  <Checkbox
+                    id="followUpAgain"
+                    checked={form.watch('followUpAgain')}
+                    onCheckedChange={(checked) => {
+                      form.setValue('followUpAgain', !!checked)
+                      // Trigger validation after checkbox change
+                      setTimeout(() => {
+                        form.trigger(['followUpDate', 'followUpTime'])
+                      }, 100)
+                    }}
+                  />
+                  <Label htmlFor="followUpAgain" className="text-sm font-medium cursor-pointer">Follow up again?</Label>
+                </div>
+                {form.watch('followUpAgain') && (
+                  <div className="space-y-2.5 mt-2 pl-3 sm:pl-4 border-l-2 border-blue-200 bg-blue-50/30 rounded-r-md p-2.5 sm:p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="followUpDate" className="text-xs sm:text-sm font-medium">Follow-up Date</Label>
+                        <Input
+                          id="followUpDate"
+                          type="date"
+                          {...form.register('followUpDate', {
+                            onChange: () => {
+                              // Re-validate both fields when date changes
+                              setTimeout(() => {
+                                form.trigger(['followUpDate', 'followUpTime'])
+                              }, 100)
+                            }
+                          })}
+                          min={new Date().toISOString().split('T')[0]}
+                          onKeyDown={handleEnterAdvance}
+                          className="w-full"
+                        />
+                        {form.formState.errors.followUpDate && (
+                          <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.followUpDate.message}</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <Label htmlFor="followUpTime" className="text-xs sm:text-sm font-medium">Follow-up Time</Label>
+                        <Input
+                          id="followUpTime"
+                          type="time"
+                          {...form.register('followUpTime', {
+                            onChange: () => {
+                              // Re-validate both fields when time changes
+                              setTimeout(() => {
+                                form.trigger(['followUpDate', 'followUpTime'])
+                              }, 100)
+                            }
+                          })}
+                          onKeyDown={handleEnterAdvance}
+                          className="w-full"
+                        />
+                        {form.formState.errors.followUpTime && (
+                          <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.followUpTime.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Consent checkbox */}
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1 border-t border-gray-100">
+                <div className="flex items-center space-x-2 pt-1">
+                  <Checkbox
+                    id="consent"
+                    checked={form.watch('consent')}
+                    onCheckedChange={(checked) => {
+                      form.setValue('consent', checked as boolean)
+                    }}
+                  />
+                  <Label htmlFor="consent" className="text-sm font-medium cursor-pointer">Consent</Label>
+                </div>
+              </div>
+
               {/* Description */}
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1 border-t border-gray-100">
                 <Label htmlFor="description" className="text-xs sm:text-sm font-medium">Description</Label>
@@ -843,28 +1008,32 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                 />
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 pt-2.5 sm:pt-3 border-t border-gray-200 mt-2.5 sm:mt-3 sticky bottom-0 bg-white z-10">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="w-full sm:w-auto order-2 sm:order-1"
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading || !isFormValid()}
-                className={`w-full sm:w-auto order-1 sm:order-2 relative group ${!isFormValid() ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? 'Updating...' : 'Update Inquiry'}
-              </Button>
-            </div>
           </form>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 pt-2.5 sm:pt-3 border-t border-gray-200 mt-2.5 sm:mt-3 bg-white">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto order-2 sm:order-1"
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              form.handleSubmit(onSubmit)()
+            }}
+            disabled={isLoading || !isFormValid()}
+            className={`w-full sm:w-auto order-1 sm:order-2 relative group ${!isFormValid() ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading ? 'Updating...' : 'Update Inquiry'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
