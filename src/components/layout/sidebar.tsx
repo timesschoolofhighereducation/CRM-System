@@ -28,7 +28,8 @@ import {
   ChevronRight,
   FileText,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Gamepad2
 } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -145,6 +146,12 @@ const navigation: NavigationItem[] = [
     name: 'AI Chat', 
     href: '/chat', 
     icon: Sparkles,
+    permissions: [] // Available to all authenticated users
+  },
+  { 
+    name: 'Mini Games', 
+    href: '/games', 
+    icon: Gamepad2,
     permissions: [] // Available to all authenticated users
   },
   { 

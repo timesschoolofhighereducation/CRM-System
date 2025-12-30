@@ -82,56 +82,108 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     setNotifications(prev => [newNotification, ...prev])
 
-    // Show browser notification if permission is granted (only in browser environment)
+    // Show browser notification when side panel shows notification (only in browser environment)
     if (isClient && isNotificationSupported) {
-      // Check permission and request if needed
-      const currentPermission = SafeNotification.permission
-      
-      if (currentPermission === 'granted') {
-        const browserNotification = SafeNotification.create(notification.title, {
-          body: notification.message,
-          icon: '/fav.png',
-          badge: '/fav.png',
-          tag: newNotification.id,
-          requireInteraction: notification.type === 'error' || notification.type === 'warning',
-          data: {
-            url: notification.actionUrl,
-            notificationId: newNotification.id
-          }
-        })
+      // Always try to show browser notification when notification appears
+      const showBrowserNotification = async () => {
+        const currentPermission = SafeNotification.permission
+        
+        // If permission is granted, show notification immediately
+        if (currentPermission === 'granted') {
+          const browserNotification = SafeNotification.create(notification.title, {
+            body: notification.message,
+            icon: '/fav.png',
+            badge: '/fav.png',
+            tag: newNotification.id,
+            requireInteraction: notification.type === 'error' || notification.type === 'warning',
+            data: {
+              url: notification.actionUrl,
+              notificationId: newNotification.id
+            }
+          })
 
-        // Auto-close after 5 seconds unless it's an error or warning
-        if (browserNotification && notification.type !== 'error' && notification.type !== 'warning') {
-          setTimeout(() => {
-            try {
-              browserNotification.close()
-            } catch (e) {
-              // Ignore errors when closing
-            }
-          }, 5000)
-        }
+          // Auto-close after 5 seconds unless it's an error or warning
+          if (browserNotification && notification.type !== 'error' && notification.type !== 'warning') {
+            setTimeout(() => {
+              try {
+                browserNotification.close()
+              } catch (e) {
+                // Ignore errors when closing
+              }
+            }, 5000)
+          }
 
-        // Handle click on browser notification
-        if (browserNotification && notification.actionUrl) {
-          browserNotification.onclick = (event) => {
-            event.preventDefault()
-            window.focus()
-            if (notification.actionUrl) {
-              window.location.href = notification.actionUrl
-            }
-            try {
-              browserNotification.close()
-            } catch (e) {
-              // Ignore errors when closing
+          // Handle click on browser notification
+          if (browserNotification && notification.actionUrl) {
+            browserNotification.onclick = (event) => {
+              event.preventDefault()
+              window.focus()
+              if (notification.actionUrl) {
+                window.location.href = notification.actionUrl
+              }
+              try {
+                browserNotification.close()
+              } catch (e) {
+                // Ignore errors when closing
+              }
             }
           }
+        } else if (currentPermission === 'default') {
+          // Request permission and show notification if granted
+          try {
+            const permission = await SafeNotification.requestPermission()
+            if (permission === 'granted') {
+              // Show notification after permission is granted
+              const browserNotification = SafeNotification.create(notification.title, {
+                body: notification.message,
+                icon: '/fav.png',
+                badge: '/fav.png',
+                tag: newNotification.id,
+                requireInteraction: notification.type === 'error' || notification.type === 'warning',
+                data: {
+                  url: notification.actionUrl,
+                  notificationId: newNotification.id
+                }
+              })
+
+              // Auto-close after 5 seconds unless it's an error or warning
+              if (browserNotification && notification.type !== 'error' && notification.type !== 'warning') {
+                setTimeout(() => {
+                  try {
+                    browserNotification.close()
+                  } catch (e) {
+                    // Ignore errors when closing
+                  }
+                }, 5000)
+              }
+
+              // Handle click on browser notification
+              if (browserNotification && notification.actionUrl) {
+                browserNotification.onclick = (event) => {
+                  event.preventDefault()
+                  window.focus()
+                  if (notification.actionUrl) {
+                    window.location.href = notification.actionUrl
+                  }
+                  try {
+                    browserNotification.close()
+                  } catch (e) {
+                    // Ignore errors when closing
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Permission denied or error - ignore
+            console.warn('Could not show browser notification:', e)
+          }
         }
-      } else if (currentPermission === 'default') {
-        // Silently request permission (won't show popup if user already denied)
-        SafeNotification.requestPermission().catch(() => {
-          // Permission denied or error - ignore
-        })
       }
+
+      // Show browser notification (async, don't block)
+      showBrowserNotification().catch(() => {
+        // Ignore errors
+      })
     }
   }, [isClient, isNotificationSupported])
 

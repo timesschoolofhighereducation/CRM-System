@@ -382,10 +382,11 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                              values.phone?.trim() && 
                              values.marketingSource?.trim()
     
-    // Check if there are any validation errors
-    const hasValidationErrors = Object.keys(errors).length > 0
+    // Only check for critical validation errors (required fields)
+    // Allow optional fields like age to be empty
+    const hasCriticalErrors = errors.fullName || errors.phone || errors.marketingSource
     
-    return hasRequiredFields && !hasValidationErrors
+    return hasRequiredFields && !hasCriticalErrors
   }
 
   const onSubmit = async (data: InquiryFormData) => {
