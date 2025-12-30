@@ -40,10 +40,14 @@ const inquirySchema = z.object({
   
   district: z.string().optional(),
   
-  age: z.union([
-    z.number().min(1, 'Age must be at least 1').max(120, 'Age must be less than 120'),
-    z.literal('')
-  ]).optional(),
+  age: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined) return undefined
+      const num = typeof val === 'string' ? parseInt(val) : val
+      return isNaN(num as number) ? undefined : num
+    },
+    z.number().min(1, 'Age must be at least 1').max(120, 'Age must be less than 120').optional()
+  ),
   
   guardianPhone: z.string()
     .optional()
@@ -398,7 +402,7 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         phone: data.phone.trim(),
         email: data.email?.trim() || undefined,
         city: data.district?.trim() || undefined,
-        ageBand: data.age ? data.age.toString() : undefined,
+        ageBand: (data.age && typeof data.age === 'number' && data.age > 0) ? data.age.toString() : undefined,
         guardianPhone: data.guardianPhone?.trim() || undefined,
         marketingSource: data.marketingSource.trim(),
         campaignId: data.campaignId || undefined,
@@ -674,17 +678,29 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
 
               {/* Age */}
               <div className="space-y-1.5">
-                <Label htmlFor="age" className="text-xs sm:text-sm font-medium">Age</Label>
+                <Label htmlFor="age" className="text-xs sm:text-sm font-medium">Age (Optional)</Label>
                 <Input
                   id="age"
                   type="number"
                   min="1"
                   max="120"
-                  {...form.register('age', { valueAsNumber: true })}
-                  placeholder="Enter age"
+                  {...form.register('age', { 
+                    valueAsNumber: true,
+                    setValueAs: (value: string) => {
+                      if (value === '' || value === null || value === undefined) {
+                        return undefined
+                      }
+                      const num = parseInt(value)
+                      return isNaN(num) ? undefined : num
+                    }
+                  })}
+                  placeholder="Enter age (optional)"
                   onKeyDown={handleEnterAdvance}
                   className="w-full"
                 />
+                {form.formState.errors.age && (
+                  <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.age.message}</p>
+                )}
               </div>
 
               {/* Guardian Phone */}
