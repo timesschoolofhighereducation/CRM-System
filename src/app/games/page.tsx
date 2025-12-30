@@ -4,16 +4,17 @@ import { useState } from 'react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Gamepad2, Zap, Brain, Calculator, Scissors, Timer, Palette } from 'lucide-react'
+import { Gamepad2, Zap, Brain, Calculator, Scissors, Timer, Play, TreePine } from 'lucide-react'
 import { SnakeGame } from '@/components/games/snake-game'
 import { MemoryGame } from '@/components/games/memory-game'
 import { MathQuizGame } from '@/components/games/math-quiz'
 import { WordScrambleGame } from '@/components/games/word-scramble'
 import { ReactionGame } from '@/components/games/reaction-game'
-import { ColorMemoryGame } from '@/components/games/color-memory'
+import { SuperMarioRun } from '@/components/games/super-mario-run'
+import { DinosaurGame } from '@/components/games/dinosaur-game'
 import { cn } from '@/lib/utils'
 
-type GameType = 'snake' | 'memory' | 'math-quiz' | 'word-scramble' | 'reaction' | 'color-memory'
+type GameType = 'snake' | 'memory' | 'math-quiz' | 'word-scramble' | 'reaction' | 'super-mario' | 'dinosaur'
 
 const games = [
   {
@@ -57,12 +58,20 @@ const games = [
     bgColor: 'bg-red-50 hover:bg-red-100',
   },
   {
-    id: 'color-memory' as GameType,
-    name: 'Color Memory',
-    description: 'Remember the color sequence and repeat it!',
-    icon: Palette,
-    color: 'text-pink-600',
-    bgColor: 'bg-pink-50 hover:bg-pink-100',
+    id: 'super-mario' as GameType,
+    name: 'Super Mario Run',
+    description: 'Jump over obstacles like Mario!',
+    icon: Play,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50 hover:bg-red-100',
+  },
+  {
+    id: 'dinosaur' as GameType,
+    name: 'Dinosaur Game',
+    description: 'Jump over cacti in this endless runner!',
+    icon: TreePine,
+    color: 'text-yellow-600',
+    bgColor: 'bg-yellow-50 hover:bg-yellow-100',
   },
 ]
 
@@ -119,12 +128,13 @@ export default function GamesPage() {
             <div className="p-6">
               <Card>
                 <CardContent className="p-6">
-                  {currentGame === 'snake' && <SnakeGame />}
-                  {currentGame === 'memory' && <MemoryGame />}
-                  {currentGame === 'math-quiz' && <MathQuizGame />}
-                  {currentGame === 'word-scramble' && <WordScrambleGame />}
-                  {currentGame === 'reaction' && <ReactionGame />}
-                  {currentGame === 'color-memory' && <ColorMemoryGame />}
+                {currentGame === 'snake' && <SnakeGame />}
+                {currentGame === 'memory' && <MemoryGame />}
+                {currentGame === 'math-quiz' && <MathQuizGame />}
+                {currentGame === 'word-scramble' && <WordScrambleGame />}
+                {currentGame === 'reaction' && <ReactionGame />}
+                {currentGame === 'super-mario' && <SuperMarioRun />}
+                {currentGame === 'dinosaur' && <DinosaurGame />}
                 </CardContent>
               </Card>
             </div>
