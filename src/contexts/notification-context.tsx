@@ -83,33 +83,57 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications(prev => [newNotification, ...prev])
 
     // Show browser notification if permission is granted (only in browser environment)
-    if (isClient && isNotificationSupported && SafeNotification.permission === 'granted') {
-      const browserNotification = SafeNotification.create(notification.title, {
-        body: notification.message,
-        icon: '/favicon.ico',
-        tag: newNotification.id,
-        requireInteraction: notification.type === 'error' || notification.type === 'warning'
-      })
-
-      // Auto-close after 5 seconds unless it's an error
-      if (browserNotification && notification.type !== 'error') {
-        setTimeout(() => {
-          browserNotification.close()
-        }, 5000)
-      }
-
-      // Handle click on browser notification
-      if (browserNotification) {
-        browserNotification.onclick = () => {
-          window.focus()
-          if (notification.actionUrl) {
-            window.location.href = notification.actionUrl
+    if (isClient && isNotificationSupported) {
+      // Check permission and request if needed
+      const currentPermission = SafeNotification.permission
+      
+      if (currentPermission === 'granted') {
+        const browserNotification = SafeNotification.create(notification.title, {
+          body: notification.message,
+          icon: '/fav.png',
+          badge: '/fav.png',
+          tag: newNotification.id,
+          requireInteraction: notification.type === 'error' || notification.type === 'warning',
+          data: {
+            url: notification.actionUrl,
+            notificationId: newNotification.id
           }
-          browserNotification.close()
+        })
+
+        // Auto-close after 5 seconds unless it's an error or warning
+        if (browserNotification && notification.type !== 'error' && notification.type !== 'warning') {
+          setTimeout(() => {
+            try {
+              browserNotification.close()
+            } catch (e) {
+              // Ignore errors when closing
+            }
+          }, 5000)
         }
+
+        // Handle click on browser notification
+        if (browserNotification && notification.actionUrl) {
+          browserNotification.onclick = (event) => {
+            event.preventDefault()
+            window.focus()
+            if (notification.actionUrl) {
+              window.location.href = notification.actionUrl
+            }
+            try {
+              browserNotification.close()
+            } catch (e) {
+              // Ignore errors when closing
+            }
+          }
+        }
+      } else if (currentPermission === 'default') {
+        // Silently request permission (won't show popup if user already denied)
+        SafeNotification.requestPermission().catch(() => {
+          // Permission denied or error - ignore
+        })
       }
     }
-  }, [isNotificationSupported])
+  }, [isClient, isNotificationSupported])
 
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => 

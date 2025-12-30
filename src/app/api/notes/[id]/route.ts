@@ -193,6 +193,58 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await requireAuth(request)
+    const { id } = await params
+    const body = await request.json()
+
+    // Check if note exists and belongs to user
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        createdById: user.id
+      }
+    })
+
+    if (!existingNote) {
+      return NextResponse.json(
+        { error: 'Note not found' },
+        { status: 404 }
+      )
+    }
+
+    // Update only specific fields (for reminder status updates)
+    const note = await prisma.note.update({
+      where: { id },
+      data: {
+        ...(body.reminderSent !== undefined && { reminderSent: body.reminderSent }),
+        ...(body.hasReminder !== undefined && { hasReminder: body.hasReminder }),
+        ...(body.reminderDate !== undefined && { reminderDate: body.reminderDate ? new Date(body.reminderDate) : null })
+      },
+      include: {
+        createdBy: {
+          select: { id: true, name: true, email: true }
+        },
+        notebook: {
+          select: { id: true, title: true }
+        }
+      }
+    })
+
+    return NextResponse.json(note)
+  } catch (error) {
+    console.error('Error updating note reminder:', error)
+    return NextResponse.json(
+      { error: 'Failed to update note reminder' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       where.parentNoteId = null
     }
     
-    // Get notes
+    // Get notes (all fields including reminder fields are included by default)
     const notes = await prisma.note.findMany({
       where,
       include: {

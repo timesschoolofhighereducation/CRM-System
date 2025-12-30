@@ -3,7 +3,7 @@
 import { Sidebar } from './sidebar'
 import { HeaderSettings } from './header-settings'
 import { NotificationPanel } from '@/components/notifications/notification-panel'
-import { useMeetingReminderService } from '@/services/meeting-reminder-service'
+import { useUnifiedReminderService } from '@/services/unified-reminder-service'
 import { ClientOnly } from '@/components/ui/client-only'
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button'
 import { useTheme } from '@/lib/theme-provider'
 import { cn } from '@/lib/utils'
 
-// Component to initialize meeting reminder service
-function MeetingReminderService() {
-  useMeetingReminderService()
+// Component to initialize unified reminder service (meetings, tasks, notebooks)
+function UnifiedReminderService() {
+  useUnifiedReminderService()
   return null
 }
 
@@ -27,9 +27,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Initialize meeting reminder service only on client side */}
+      {/* Initialize unified reminder service (meetings, tasks, notebooks) only on client side */}
       <ClientOnly>
-        <MeetingReminderService />
+        <UnifiedReminderService />
       </ClientOnly>
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
