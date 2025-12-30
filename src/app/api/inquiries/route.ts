@@ -311,72 +311,78 @@ export async function POST(request: NextRequest) {
     }
 
     // Automatically create 2 follow-up tasks for new inquiries
-    try {
-      const now = new Date()
-      
-      // First follow-up: 3 days from now
-      const firstDueDate = new Date(now)
-      firstDueDate.setDate(firstDueDate.getDate() + 3)
-      firstDueDate.setHours(10, 0, 0, 0) // Set to 10 AM
-      
-      // Second follow-up: 7 days from now
-      const secondDueDate = new Date(now)
-      secondDueDate.setDate(secondDueDate.getDate() + 7)
-      secondDueDate.setHours(10, 0, 0, 0) // Set to 10 AM
-      
-      // Create first follow-up task
-      const firstFollowUpTask = await prisma.followUpTask.create({
-        data: {
-          seekerId: seeker.id,
-          assignedTo: _user.id,
-          dueAt: firstDueDate,
-          purpose: 'CALLBACK',
-          notes: `Automatic follow-up #1: Initial contact follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
-          status: 'OPEN',
-        },
-      })
-      
-      // Create second follow-up task
-      const secondFollowUpTask = await prisma.followUpTask.create({
-        data: {
-          seekerId: seeker.id,
-          assignedTo: _user.id,
-          dueAt: secondDueDate,
-          purpose: 'CALLBACK',
-          notes: `Automatic follow-up #2: Secondary follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
-          status: 'OPEN',
-        },
-      })
-      
-      // Create initial action history entries
-      await Promise.all([
-        prisma.taskActionHistory.create({
+    // BUT skip if registerNow is true (seeker is already registered)
+    const shouldCreateTasks = !body.registerNow
+    if (shouldCreateTasks) {
+      try {
+        const now = new Date()
+        
+        // First follow-up: 3 days from now
+        const firstDueDate = new Date(now)
+        firstDueDate.setDate(firstDueDate.getDate() + 3)
+        firstDueDate.setHours(10, 0, 0, 0) // Set to 10 AM
+        
+        // Second follow-up: 7 days from now
+        const secondDueDate = new Date(now)
+        secondDueDate.setDate(secondDueDate.getDate() + 7)
+        secondDueDate.setHours(10, 0, 0, 0) // Set to 10 AM
+        
+        // Create first follow-up task
+        const firstFollowUpTask = await prisma.followUpTask.create({
           data: {
-            taskId: firstFollowUpTask.id,
-            fromStatus: null,
-            toStatus: 'OPEN',
-            actionBy: _user.id,
-            notes: 'Task created automatically from new inquiry - First follow-up (3 days)',
+            seekerId: seeker.id,
+            assignedTo: _user.id,
+            dueAt: firstDueDate,
+            purpose: 'CALLBACK',
+            notes: `Automatic follow-up #1: Initial contact follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
+            status: 'OPEN',
           },
-        }),
-        prisma.taskActionHistory.create({
+        })
+        
+        // Create second follow-up task
+        const secondFollowUpTask = await prisma.followUpTask.create({
           data: {
-            taskId: secondFollowUpTask.id,
-            fromStatus: null,
-            toStatus: 'OPEN',
-            actionBy: _user.id,
-            notes: 'Task created automatically from new inquiry - Second follow-up (7 days)',
+            seekerId: seeker.id,
+            assignedTo: _user.id,
+            dueAt: secondDueDate,
+            purpose: 'CALLBACK',
+            notes: `Automatic follow-up #2: Secondary follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
+            status: 'OPEN',
           },
-        }),
-      ])
-      
-      console.log('Automatic follow-up tasks created:', {
-        first: firstFollowUpTask.id,
-        second: secondFollowUpTask.id,
-      })
-    } catch (taskError) {
-      console.error('Error creating automatic follow-up tasks:', taskError)
-      // Don't fail the inquiry creation if task creation fails
+        })
+        
+        // Create initial action history entries
+        await Promise.all([
+          prisma.taskActionHistory.create({
+            data: {
+              taskId: firstFollowUpTask.id,
+              fromStatus: null,
+              toStatus: 'OPEN',
+              actionBy: _user.id,
+              notes: 'Task created automatically from new inquiry - First follow-up (3 days)',
+            },
+          }),
+          prisma.taskActionHistory.create({
+            data: {
+              taskId: secondFollowUpTask.id,
+              fromStatus: null,
+              toStatus: 'OPEN',
+              actionBy: _user.id,
+              notes: 'Task created automatically from new inquiry - Second follow-up (7 days)',
+            },
+          }),
+        ])
+        
+        console.log('Automatic follow-up tasks created:', {
+          first: firstFollowUpTask.id,
+          second: secondFollowUpTask.id,
+        })
+      } catch (taskError) {
+        console.error('Error creating automatic follow-up tasks:', taskError)
+        // Don't fail the inquiry creation if task creation fails
+      }
+    } else {
+      console.log('Skipping follow-up task creation - seeker is already registered (registerNow=true)')
     }
 
     return NextResponse.json(seeker, { status: 201 })

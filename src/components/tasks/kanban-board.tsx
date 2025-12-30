@@ -636,24 +636,20 @@ export function KanbanBoard() {
       })
 
       if (response.ok) {
-        // Optimistically update the local state
-        setAllTasks(prev => prev.map(t => 
-          t.id === task.id && 'seeker' in t
-            ? { ...t, seeker: { ...t.seeker, registerNow } }
-            : t
-        ))
-        setFilteredTasks(prev => prev.map(t => 
-          t.id === task.id && 'seeker' in t
-            ? { ...t, seeker: { ...t.seeker, registerNow } }
-            : t
-        ))
+        if (registerNow) {
+          // If registering, all tasks for this seeker will be moved to COMPLETED
+          toast.success('Seeker Registered!', {
+            description: `All tasks for ${'seeker' in task ? task.seeker.fullName : 'this seeker'} have been automatically moved to Completed`,
+            duration: 4000,
+          })
+        } else {
+          toast.success('Registration updated', {
+            description: `${'seeker' in task ? task.seeker.fullName : 'Task'} marked as Not Registered`,
+            duration: 3000,
+          })
+        }
         
-        toast.success('Registration updated', {
-          description: `${'seeker' in task ? task.seeker.fullName : 'Task'} marked as ${registerNow ? 'Registered' : 'Not Registered'}`,
-          duration: 3000,
-        })
-        
-        // Refresh to get latest data
+        // Refresh to get latest data (tasks will be moved to COMPLETED if registerNow was true)
         await fetchTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))

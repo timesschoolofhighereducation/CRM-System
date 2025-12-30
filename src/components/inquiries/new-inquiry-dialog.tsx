@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { StatusBar } from '@/components/ui/status-bar'
-import { MessageSquare, FileText, X } from 'lucide-react'
+import { MessageSquare, FileText, X, User, Phone, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation'
 import { QAQuickViewDialog } from './qa-quick-view-dialog'
@@ -195,6 +195,16 @@ export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) 
   const [campaignsLoading, setCampaignsLoading] = useState(false)
   const [showQAQuickView, setShowQAQuickView] = useState(false)
   const [showProgramDetails, setShowProgramDetails] = useState(false)
+  
+  // Auto-suggest states
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [autoFilled, setAutoFilled] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const phoneInputRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -431,6 +441,141 @@ export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) 
     }
   }, [form.watch('marketingSource')])
 
+  // Search for existing seekers
+  const searchSeekers = async (query: string) => {
+    if (!query || query.length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/seekers/search?q=${encodeURIComponent(query)}&limit=5`)
+      if (response.ok) {
+        const data = await response.json()
+        setSuggestions(data.seekers || [])
+        setShowSuggestions(data.seekers && data.seekers.length > 0)
+      }
+    } catch (error) {
+      console.error('Error searching seekers:', error)
+      setSuggestions([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Handle phone number change with debounce
+  const handlePhoneChange = (value: string) => {
+    form.setValue('phone', value)
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Only search if not auto-filled and value is long enough
+    if (!autoFilled && value.length >= 3) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchSeekers(value)
+      }, 500) // 500ms debounce
+    } else if (value.length < 3) {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  // Handle name change with debounce
+  const handleNameChange = (value: string) => {
+    form.setValue('fullName', value)
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Only search if not auto-filled and value is long enough
+    if (!autoFilled && value.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchSeekers(value)
+      }, 500) // 500ms debounce
+    } else if (value.length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  // Auto-fill form with seeker data
+  const fillSeekerData = (seeker: any) => {
+    setAutoFilled(true)
+    setShowSuggestions(false)
+    
+    // Fill all available fields
+    form.setValue('fullName', seeker.fullName || '')
+    form.setValue('phone', seeker.phone || '')
+    form.setValue('whatsapp', seeker.whatsapp || false)
+    form.setValue('whatsappNumber', seeker.whatsappNumber || '')
+    form.setValue('email', seeker.email || '')
+    form.setValue('district', seeker.city || '')
+    form.setValue('age', seeker.ageBand ? parseInt(seeker.ageBand) : undefined)
+    form.setValue('guardianPhone', seeker.guardianPhone || '')
+    form.setValue('marketingSource', seeker.marketingSource || '')
+    form.setValue('preferredContactTime', seeker.preferredContactTime || '')
+    form.setValue('preferredStatus', seeker.preferredStatus || undefined)
+    form.setValue('whatsapp', seeker.whatsapp || false)
+    form.setValue('notAnswering', seeker.notAnswering || false)
+    form.setValue('emailNotAnswering', seeker.emailNotAnswering || false)
+    form.setValue('consent', seeker.consent || false)
+    form.setValue('registerNow', seeker.registerNow || false)
+    
+    // Set selected programs
+    if (seeker.preferredPrograms && seeker.preferredPrograms.length > 0) {
+      const programIds = seeker.preferredPrograms.map((pp: any) => pp.program.id)
+      setSelectedProgramIds(programIds)
+    }
+    
+    // Set campaign if available
+    if (seeker.campaigns && seeker.campaigns.length > 0) {
+      form.setValue('campaignId', seeker.campaigns[0].campaign.id)
+      // Fetch campaigns for the marketing source
+      if (seeker.marketingSource) {
+        fetchCampaignsByType(seeker.marketingSource)
+      }
+    }
+    
+    // Set district search
+    setDistrictSearch(seeker.city || '')
+    
+    toast.success('Seeker details auto-filled', {
+      description: `Loaded details for ${seeker.fullName}`,
+      duration: 2000,
+    })
+    
+    // Reset auto-filled flag after a delay
+    setTimeout(() => setAutoFilled(false), 1000)
+  }
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        phoneInputRef.current &&
+        !phoneInputRef.current.contains(event.target as Node) &&
+        nameInputRef.current &&
+        !nameInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+
+    if (showSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSuggestions])
+
   const onSubmit = async (data: InquiryFormData) => {
     setIsLoading(true)
     try {
@@ -590,31 +735,88 @@ export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) 
         <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-2.5 sm:space-y-3 mt-2 sm:mt-3">
           <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label htmlFor="fullName" className="text-xs sm:text-sm font-medium">Full Name *</Label>
-              <Input
-                id="fullName"
-                {...form.register('fullName')}
-                placeholder="Enter full name"
-                onKeyDown={handleEnterAdvance}
-                className="w-full"
-              />
+              <div className="relative">
+                <Input
+                  id="fullName"
+                  ref={nameInputRef}
+                  {...form.register('fullName')}
+                  onChange={(e) => {
+                    form.register('fullName').onChange(e)
+                    handleNameChange(e.target.value)
+                  }}
+                  placeholder="Enter full name"
+                  onKeyDown={handleEnterAdvance}
+                  className="w-full"
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                )}
+              </div>
               {form.formState.errors.fullName && (
                 <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.fullName.message}</p>
               )}
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label htmlFor="phone" className="text-xs sm:text-sm font-medium">Phone Number *</Label>
-              <Input
-                id="phone"
-                {...form.register('phone')}
-                placeholder="Enter phone number"
-                onKeyDown={handleEnterAdvance}
-                className="w-full"
-              />
+              <div className="relative">
+                <Input
+                  id="phone"
+                  ref={phoneInputRef}
+                  {...form.register('phone')}
+                  onChange={(e) => {
+                    form.register('phone').onChange(e)
+                    handlePhoneChange(e.target.value)
+                  }}
+                  placeholder="Enter phone number"
+                  onKeyDown={handleEnterAdvance}
+                  className="w-full"
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                )}
+              </div>
               {form.formState.errors.phone && (
                 <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.phone.message}</p>
+              )}
+              
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                >
+                  {suggestions.map((seeker) => (
+                    <button
+                      key={seeker.id}
+                      type="button"
+                      onClick={() => fillSeekerData(seeker)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0">
+                          <User className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-gray-900 truncate">
+                            {seeker.fullName}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-1 text-xs text-gray-600">
+                              <Phone className="h-3 w-3" />
+                              <span>{seeker.phone}</span>
+                            </div>
+                            {seeker.city && (
+                              <span className="text-xs text-gray-500">• {seeker.city}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 

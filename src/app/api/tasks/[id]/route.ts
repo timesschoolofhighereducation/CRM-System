@@ -83,13 +83,51 @@ export async function PATCH(
 
     // Update seeker's registerNow field if registerNow is provided
     if (registerNow !== undefined && currentTask.seekerId) {
+      const isRegistering = registerNow === true || registerNow === 'true'
+      
       await prisma.seeker.update({
         where: { id: currentTask.seekerId },
-        data: { registerNow: registerNow === true || registerNow === 'true' }
+        data: { registerNow: isRegistering }
       })
       
       // Update the response to reflect the change
-      ;(updatedTask.seeker as any).registerNow = registerNow === true || registerNow === 'true'
+      ;(updatedTask.seeker as any).registerNow = isRegistering
+      
+      // If registering, automatically move this task and all other tasks for the same seeker to COMPLETED
+      if (isRegistering) {
+        // Find all tasks for this seeker
+        const allSeekerTasks = await prisma.followUpTask.findMany({
+          where: {
+            seekerId: currentTask.seekerId,
+            status: { not: 'COMPLETED' } // Only update tasks that aren't already completed
+          },
+          select: { id: true, status: true }
+        })
+        
+        // Update all tasks to COMPLETED
+        await Promise.all(
+          allSeekerTasks.map(async (task) => {
+            await prisma.followUpTask.update({
+              where: { id: task.id },
+              data: { status: 'COMPLETED' }
+            })
+            
+            // Create action history for each task
+            await prisma.taskActionHistory.create({
+              data: {
+                taskId: task.id,
+                fromStatus: task.status,
+                toStatus: 'COMPLETED',
+                actionBy: _user.id,
+                notes: `Task automatically completed - Seeker registered (registerNow=true)`
+              }
+            })
+          })
+        )
+        
+        // Update the current task status in the response
+        updatedTask.status = 'COMPLETED'
+      }
     }
 
     // Create action history entry
