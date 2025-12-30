@@ -4,88 +4,105 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { RotateCcw } from 'lucide-react'
 
-type Position = { x: number; y: number }
-type Cactus = { x: number; y: number; width: number; height: number }
+type Cactus = { x: number; width: number; height: number }
 
-const GRAVITY = 0.9
-const JUMP_STRENGTH = -18
-const GAME_SPEED = 6
-const GROUND_Y = 250
-const DINO_SIZE = 50
-const CACTUS_WIDTH = 25
-const CACTUS_HEIGHT = 60
+const GRAVITY = 0.8
+const JUMP_STRENGTH = -15
+const INITIAL_SPEED = 5
+const GROUND_Y = 200
+const DINO_X = 50
+const DINO_SIZE = 40
+const CACTUS_WIDTH = 20
+const CACTUS_HEIGHT = 50
+const GAME_WIDTH = 600
+const GAME_HEIGHT = 250
 
 export function DinosaurGame() {
-  const [dinoPos, setDinoPos] = useState<Position>({ x: 50, y: GROUND_Y })
+  const [dinoY, setDinoY] = useState(GROUND_Y)
   const [cacti, setCacti] = useState<Cactus[]>([])
   const [velocity, setVelocity] = useState(0)
   const [score, setScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [isJumping, setIsJumping] = useState(false)
   const [gameStarted, setGameStarted] = useState(false)
-  const [gameSpeed, setGameSpeed] = useState(GAME_SPEED)
+  const [gameSpeed, setGameSpeed] = useState(INITIAL_SPEED)
+  const [groundOffset, setGroundOffset] = useState(0)
   const gameLoopRef = useRef<number | null>(null)
   const cactusTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastCactusTimeRef = useRef<number>(0)
 
-  const checkCollision = (dino: Position, cactus: Cactus): boolean => {
+  const checkCollision = (dinoY: number, cactus: Cactus): boolean => {
+    const dinoBottom = GAME_HEIGHT - dinoY
+    const dinoTop = dinoBottom - DINO_SIZE
+    const cactusBottom = GROUND_Y
+    const cactusTop = cactusBottom - cactus.height
+
     return (
-      dino.x < cactus.x + cactus.width &&
-      dino.x + DINO_SIZE > cactus.x &&
-      dino.y < cactus.y + cactus.height &&
-      dino.y + DINO_SIZE > cactus.y
+      DINO_X < cactus.x + cactus.width &&
+      DINO_X + DINO_SIZE > cactus.x &&
+      dinoTop < cactusBottom &&
+      dinoBottom > cactusTop
     )
   }
 
   const jump = useCallback(() => {
-    if (!isJumping && !gameOver && gameStarted) {
+    if (!isJumping && !gameOver && gameStarted && dinoY >= GROUND_Y) {
       setIsJumping(true)
       setVelocity(JUMP_STRENGTH)
     }
-  }, [isJumping, gameOver, gameStarted])
+  }, [isJumping, gameOver, gameStarted, dinoY])
 
   const startGame = () => {
-    setDinoPos({ x: 50, y: GROUND_Y })
+    setDinoY(GROUND_Y)
     setCacti([])
     setVelocity(0)
     setScore(0)
     setGameOver(false)
     setIsJumping(false)
     setGameStarted(true)
-    setGameSpeed(GAME_SPEED)
+    setGameSpeed(INITIAL_SPEED)
+    setGroundOffset(0)
+    lastCactusTimeRef.current = Date.now()
   }
 
   useEffect(() => {
     if (!gameStarted || gameOver) return
 
-    // Create cacti periodically (frequency increases with score)
-    const interval = Math.max(1000, 2500 - Math.floor(score / 100) * 100)
-    
-    cactusTimerRef.current = setInterval(() => {
-      setCacti(prev => [...prev, {
-        x: 400,
-        y: GROUND_Y,
-        width: CACTUS_WIDTH,
-        height: CACTUS_HEIGHT
-      }])
-    }, interval)
+    const createCactus = () => {
+      const now = Date.now()
+      // Random interval between 1.5-3 seconds, decreases with score
+      const baseInterval = 2500 - Math.floor(score / 50) * 50
+      const interval = Math.max(1500, baseInterval)
+      
+      if (now - lastCactusTimeRef.current >= interval) {
+        lastCactusTimeRef.current = now
+        setCacti(prev => [...prev, {
+          x: GAME_WIDTH,
+          width: CACTUS_WIDTH,
+          height: CACTUS_HEIGHT
+        }])
+      }
+    }
+
+    const interval = setInterval(createCactus, 100)
+    cactusTimerRef.current = interval as any
 
     return () => {
-      if (cactusTimerRef.current) {
-        clearInterval(cactusTimerRef.current)
-      }
+      clearInterval(interval)
     }
   }, [gameStarted, gameOver, score])
 
   useEffect(() => {
     if (!gameStarted || gameOver) return
 
-    // Increase game speed with score
-    const newSpeed = GAME_SPEED + Math.floor(score / 200)
+    // Increase game speed gradually
+    const newSpeed = INITIAL_SPEED + Math.floor(score / 100) * 0.5
     setGameSpeed(newSpeed)
 
     const gameLoop = () => {
-      setDinoPos(prev => {
-        let newY = prev.y + velocity
+      // Update dinosaur position
+      setDinoY(prev => {
+        let newY = prev + velocity
         let newVelocity = velocity + GRAVITY
 
         // Ground collision
@@ -96,11 +113,10 @@ export function DinosaurGame() {
         }
 
         setVelocity(newVelocity)
-
-        return { x: prev.x, y: newY }
+        return newY
       })
 
-      // Move cacti
+      // Move cacti and check collisions
       setCacti(prev => {
         const updated = prev.map(cactus => ({
           ...cactus,
@@ -108,9 +124,8 @@ export function DinosaurGame() {
         })).filter(cactus => cactus.x > -CACTUS_WIDTH)
 
         // Check collisions
-        const dino = { x: dinoPos.x, y: dinoPos.y }
         for (const cactus of updated) {
-          if (checkCollision(dino, cactus)) {
+          if (checkCollision(dinoY, cactus)) {
             setGameOver(true)
             return updated
           }
@@ -118,14 +133,17 @@ export function DinosaurGame() {
 
         // Increase score when cactus passes
         const passedCacti = prev.filter(cactus => 
-          cactus.x < dinoPos.x && cactus.x + CACTUS_WIDTH >= dinoPos.x - gameSpeed
+          cactus.x < DINO_X && cactus.x + CACTUS_WIDTH >= DINO_X - gameSpeed
         )
         if (passedCacti.length > 0) {
-          setScore(prev => prev + 10)
+          setScore(prev => prev + 1)
         }
 
         return updated
       })
+
+      // Animate ground
+      setGroundOffset(prev => (prev - gameSpeed) % 20)
 
       gameLoopRef.current = requestAnimationFrame(gameLoop)
     }
@@ -137,19 +155,23 @@ export function DinosaurGame() {
         cancelAnimationFrame(gameLoopRef.current)
       }
     }
-  }, [gameStarted, gameOver, velocity, dinoPos, gameSpeed])
+  }, [gameStarted, gameOver, velocity, dinoY, gameSpeed])
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.key === ' ' || e.key === 'ArrowUp') {
+      if ((e.code === 'Space' || e.key === ' ' || e.key === 'ArrowUp') && !gameOver) {
         e.preventDefault()
-        jump()
+        if (!gameStarted) {
+          startGame()
+        } else {
+          jump()
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [jump])
+  }, [jump, gameStarted, gameOver])
 
   const resetGame = () => {
     if (gameLoopRef.current) {
@@ -161,84 +183,105 @@ export function DinosaurGame() {
     startGame()
   }
 
+  const dinoBottom = GAME_HEIGHT - dinoY
+  const dinoTop = dinoBottom - DINO_SIZE
+
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold mb-2">Dinosaur Game</h2>
         <div className="flex justify-center gap-6 text-lg">
           <div>Score: <span className="font-bold">{score}</span></div>
-          <div>Speed: <span className="font-bold">{gameSpeed}</span></div>
           {gameOver && (
             <div className="text-red-600 font-bold">Game Over!</div>
           )}
         </div>
       </div>
 
-      {!gameStarted ? (
-        <div className="text-center">
-          <Button onClick={startGame} size="lg">
-            Start Game
-          </Button>
-          <p className="text-sm text-gray-600 mt-4">
-            Press Space or Arrow Up to jump over cacti!
-          </p>
-        </div>
-      ) : (
-        <div className="flex justify-center">
-          <div
-            className="relative border-4 border-gray-800 bg-gradient-to-b from-yellow-100 to-yellow-300 rounded-lg overflow-hidden"
-            style={{ width: 400, height: 300 }}
-          >
-            {/* Ground */}
-            <div
-              className="absolute bottom-0 w-full bg-yellow-600"
-              style={{ height: 50 }}
-            />
+      <div className="flex justify-center">
+        <div
+          className="relative border-2 border-gray-300 bg-white rounded-lg overflow-hidden"
+          style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
+        >
+          {/* Sky/Background */}
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-100 to-white" />
 
-            {/* Dinosaur */}
+          {/* Ground line (animated) */}
+          <div
+            className="absolute bottom-0 w-full border-t-2 border-gray-400"
+            style={{
+              bottom: GROUND_Y,
+              backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 19px, #666 19px, #666 20px)',
+              backgroundPositionX: `${groundOffset}px`,
+              height: '2px',
+            }}
+          />
+
+          {/* Dinosaur (stationary on left, only moves up/down) */}
+          {gameStarted && (
             <div
-              className="absolute bg-green-600 rounded-lg"
+              className="absolute bg-gray-800"
               style={{
-                left: dinoPos.x,
-                bottom: 300 - dinoPos.y - DINO_SIZE,
+                left: DINO_X,
+                bottom: dinoTop,
                 width: DINO_SIZE,
                 height: DINO_SIZE,
-                transition: 'bottom 0.1s linear',
               }}
             >
-              <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs">
-                🦕
+              {/* Simple dinosaur shape */}
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-2xl">🦖</div>
               </div>
             </div>
+          )}
 
-            {/* Cacti */}
-            {cacti.map((cactus, index) => (
+          {/* Cacti */}
+          {cacti.map((cactus, index) => {
+            const cactusBottom = GROUND_Y
+            const cactusTop = cactusBottom - cactus.height
+            return (
               <div
                 key={index}
-                className="absolute bg-green-800"
+                className="absolute bg-green-700"
                 style={{
                   left: cactus.x,
-                  bottom: 300 - cactus.y - cactus.height,
+                  bottom: cactusTop,
                   width: cactus.width,
                   height: cactus.height,
-                  clipPath: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
                 }}
-              />
-            ))}
-
-            {/* Game Over Overlay */}
-            {gameOver && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                <div className="bg-white rounded-lg p-6 text-center">
-                  <h3 className="text-2xl font-bold mb-2">Game Over!</h3>
-                  <p className="text-lg mb-4">Final Score: {score}</p>
-                  <Button onClick={resetGame}>Play Again</Button>
+              >
+                {/* Simple cactus shape with branches */}
+                <div className="w-full h-full relative">
+                  <div className="absolute inset-0 bg-green-700" />
+                  <div className="absolute -left-2 top-1/3 w-2 h-4 bg-green-700" />
+                  <div className="absolute -right-2 top-1/2 w-2 h-4 bg-green-700" />
                 </div>
               </div>
-            )}
-          </div>
+            )
+          })}
+
+          {/* Start message */}
+          {!gameStarted && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
+              <div className="text-center">
+                <p className="text-lg font-semibold mb-2">Press Space to start</p>
+                <p className="text-sm text-gray-600">Jump over the cacti!</p>
+              </div>
+            </div>
+          )}
+
+          {/* Game Over Overlay */}
+          {gameOver && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-6 text-center">
+                <h3 className="text-2xl font-bold mb-2">Game Over!</h3>
+                <p className="text-lg mb-4">Final Score: {score}</p>
+                <Button onClick={resetGame}>Play Again</Button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {gameStarted && !gameOver && (
         <div className="flex justify-center">
@@ -263,4 +306,5 @@ export function DinosaurGame() {
     </div>
   )
 }
+
 
