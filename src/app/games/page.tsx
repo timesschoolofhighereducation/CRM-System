@@ -1,18 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { Gamepad2, Zap, Brain, Calculator, Scissors, Timer, Play, TreePine } from 'lucide-react'
-import { SnakeGame } from '@/components/games/snake-game'
-import { MemoryGame } from '@/components/games/memory-game'
-import { MathQuizGame } from '@/components/games/math-quiz'
-import { WordScrambleGame } from '@/components/games/word-scramble'
-import { ReactionGame } from '@/components/games/reaction-game'
-import { SuperMarioRun } from '@/components/games/super-mario-run'
-import { DinosaurGame } from '@/components/games/dinosaur-game'
 import { cn } from '@/lib/utils'
+
+// Dynamically import game components to prevent loading all at once
+const SnakeGame = dynamic(() => import('@/components/games/snake-game').then(mod => ({ default: mod.SnakeGame })), {
+  loading: () => <div className="text-center p-8">Loading Snake Game...</div>,
+  ssr: false
+})
+
+const MemoryGame = dynamic(() => import('@/components/games/memory-game').then(mod => ({ default: mod.MemoryGame })), {
+  loading: () => <div className="text-center p-8">Loading Memory Game...</div>,
+  ssr: false
+})
+
+const MathQuizGame = dynamic(() => import('@/components/games/math-quiz').then(mod => ({ default: mod.MathQuizGame })), {
+  loading: () => <div className="text-center p-8">Loading Math Quiz...</div>,
+  ssr: false
+})
+
+const WordScrambleGame = dynamic(() => import('@/components/games/word-scramble').then(mod => ({ default: mod.WordScrambleGame })), {
+  loading: () => <div className="text-center p-8">Loading Word Scramble...</div>,
+  ssr: false
+})
+
+const ReactionGame = dynamic(() => import('@/components/games/reaction-game').then(mod => ({ default: mod.ReactionGame })), {
+  loading: () => <div className="text-center p-8">Loading Reaction Game...</div>,
+  ssr: false
+})
+
+const SuperMarioRun = dynamic(() => import('@/components/games/super-mario-run').then(mod => ({ default: mod.SuperMarioRun })), {
+  loading: () => <div className="text-center p-8">Loading Super Mario Run...</div>,
+  ssr: false
+})
+
+const DinosaurGame = dynamic(() => import('@/components/games/dinosaur-game').then(mod => ({ default: mod.DinosaurGame })), {
+  loading: () => <div className="text-center p-8">Loading Dinosaur Game...</div>,
+  ssr: false
+})
 
 type GameType = 'snake' | 'memory' | 'math-quiz' | 'word-scramble' | 'reaction' | 'super-mario' | 'dinosaur'
 
@@ -128,13 +159,17 @@ export default function GamesPage() {
             <div className="p-6">
               <Card>
                 <CardContent className="p-6">
-                {currentGame === 'snake' && <SnakeGame />}
-                {currentGame === 'memory' && <MemoryGame />}
-                {currentGame === 'math-quiz' && <MathQuizGame />}
-                {currentGame === 'word-scramble' && <WordScrambleGame />}
-                {currentGame === 'reaction' && <ReactionGame />}
-                {currentGame === 'super-mario' && <SuperMarioRun />}
-                {currentGame === 'dinosaur' && <DinosaurGame />}
+                  <ErrorBoundary>
+                    <Suspense fallback={<div className="text-center p-8">Loading game...</div>}>
+                      {currentGame === 'snake' && <SnakeGame />}
+                      {currentGame === 'memory' && <MemoryGame />}
+                      {currentGame === 'math-quiz' && <MathQuizGame />}
+                      {currentGame === 'word-scramble' && <WordScrambleGame />}
+                      {currentGame === 'reaction' && <ReactionGame />}
+                      {currentGame === 'super-mario' && <SuperMarioRun />}
+                      {currentGame === 'dinosaur' && <DinosaurGame />}
+                    </Suspense>
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </div>
