@@ -402,7 +402,7 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         phone: data.phone.trim(),
         email: data.email?.trim() || undefined,
         city: data.district?.trim() || undefined,
-        ageBand: (data.age && typeof data.age === 'number' && data.age > 0) ? data.age.toString() : undefined,
+        ageBand: (data.age !== undefined && data.age !== null && typeof data.age === 'number' && data.age > 0) ? data.age.toString() : undefined,
         guardianPhone: data.guardianPhone?.trim() || undefined,
         marketingSource: data.marketingSource.trim(),
         campaignId: data.campaignId || undefined,
@@ -679,25 +679,49 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
               {/* Age */}
               <div className="space-y-1.5">
                 <Label htmlFor="age" className="text-xs sm:text-sm font-medium">Age (Optional)</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min="1"
-                  max="120"
-                  {...form.register('age', { 
-                    valueAsNumber: true,
-                    setValueAs: (value: string) => {
-                      if (value === '' || value === null || value === undefined) {
-                        return undefined
+                <div className="relative">
+                  <Input
+                    id="age"
+                    type="number"
+                    min="1"
+                    max="120"
+                    {...form.register('age', { 
+                      valueAsNumber: false, // Keep as string to allow clearing
+                      setValueAs: (value: string) => {
+                        if (value === '' || value === null || value === undefined || value.trim() === '') {
+                          return undefined
+                        }
+                        const num = parseInt(value)
+                        return isNaN(num) ? undefined : num
+                      },
+                      onChange: (e) => {
+                        const value = e.target.value
+                        if (value === '' || value === null || value === undefined) {
+                          form.setValue('age', undefined, { shouldValidate: false })
+                        } else {
+                          form.register('age').onChange(e)
+                        }
                       }
-                      const num = parseInt(value)
-                      return isNaN(num) ? undefined : num
-                    }
-                  })}
-                  placeholder="Enter age (optional)"
-                  onKeyDown={handleEnterAdvance}
-                  className="w-full"
-                />
+                    })}
+                    placeholder="Enter age (optional)"
+                    onKeyDown={handleEnterAdvance}
+                    className="w-full"
+                    value={form.watch('age') ?? ''}
+                  />
+                  {form.watch('age') !== undefined && form.watch('age') !== null && form.watch('age') !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        form.setValue('age', undefined, { shouldValidate: false })
+                        form.clearErrors('age')
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Clear age"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 {form.formState.errors.age && (
                   <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.age.message}</p>
                 )}
