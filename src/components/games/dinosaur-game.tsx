@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { RotateCcw } from 'lucide-react'
 
-type Cactus = { x: number; width: number; height: number }
+type Obstacle = { x: number; width: number; height: number; type: 'cactus' | 'bird' }
 
 const GRAVITY = 0.8
 const JUMP_STRENGTH = -15
@@ -14,12 +14,14 @@ const DINO_X = 50
 const DINO_SIZE = 40
 const CACTUS_WIDTH = 20
 const CACTUS_HEIGHT = 50
+const BIRD_WIDTH = 30
+const BIRD_HEIGHT = 25
 const GAME_WIDTH = 600
 const GAME_HEIGHT = 250
 
 export function DinosaurGame() {
   const [dinoY, setDinoY] = useState(GROUND_Y)
-  const [cacti, setCacti] = useState<Cactus[]>([])
+  const [obstacles, setObstacles] = useState<Obstacle[]>([])
   const [velocity, setVelocity] = useState(0)
   const [score, setScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
@@ -27,21 +29,23 @@ export function DinosaurGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const [gameSpeed, setGameSpeed] = useState(INITIAL_SPEED)
   const [groundOffset, setGroundOffset] = useState(0)
+  const [isNightMode, setIsNightMode] = useState(false)
   const gameLoopRef = useRef<number | null>(null)
-  const cactusTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const lastCactusTimeRef = useRef<number>(0)
+  const obstacleTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastObstacleTimeRef = useRef<number>(0)
+  const dinoYRef = useRef<number>(GROUND_Y)
 
-  const checkCollision = (dinoY: number, cactus: Cactus): boolean => {
+  const checkCollision = (dinoY: number, obstacle: Obstacle): boolean => {
     const dinoBottom = GAME_HEIGHT - dinoY
     const dinoTop = dinoBottom - DINO_SIZE
-    const cactusBottom = GROUND_Y
-    const cactusTop = cactusBottom - cactus.height
+    const obstacleBottom = obstacle.type === 'cactus' ? GROUND_Y : GROUND_Y - 30
+    const obstacleTop = obstacleBottom - obstacle.height
 
     return (
-      DINO_X < cactus.x + cactus.width &&
-      DINO_X + DINO_SIZE > cactus.x &&
-      dinoTop < cactusBottom &&
-      dinoBottom > cactusTop
+      DINO_X < obstacle.x + obstacle.width &&
+      DINO_X + DINO_SIZE > obstacle.x &&
+      dinoTop < obstacleBottom &&
+      dinoBottom > obstacleTop
     )
   }
 
@@ -52,9 +56,10 @@ export function DinosaurGame() {
     }
   }, [isJumping, gameOver, gameStarted, dinoY])
 
-  const startGame = () => {
+  const startGame = useCallback(() => {
     setDinoY(GROUND_Y)
-    setCacti([])
+    dinoYRef.current = GROUND_Y
+    setObstacles([])
     setVelocity(0)
     setScore(0)
     setGameOver(false)
@@ -62,30 +67,36 @@ export function DinosaurGame() {
     setGameStarted(true)
     setGameSpeed(INITIAL_SPEED)
     setGroundOffset(0)
-    lastCactusTimeRef.current = Date.now()
-  }
+    setIsNightMode(false)
+    lastObstacleTimeRef.current = Date.now()
+  }, [])
 
   useEffect(() => {
     if (!gameStarted || gameOver) return
 
-    const createCactus = () => {
+    const createObstacle = () => {
       const now = Date.now()
       // Random interval between 1.5-3 seconds, decreases with score
       const baseInterval = 2500 - Math.floor(score / 50) * 50
       const interval = Math.max(1500, baseInterval)
       
-      if (now - lastCactusTimeRef.current >= interval) {
-        lastCactusTimeRef.current = now
-        setCacti(prev => [...prev, {
+      if (now - lastObstacleTimeRef.current >= interval) {
+        lastObstacleTimeRef.current = now
+        
+        // After score 100, introduce birds (flying obstacles)
+        const useBird = score > 100 && Math.random() > 0.6
+        
+        setObstacles(prev => [...prev, {
           x: GAME_WIDTH,
-          width: CACTUS_WIDTH,
-          height: CACTUS_HEIGHT
+          width: useBird ? BIRD_WIDTH : CACTUS_WIDTH,
+          height: useBird ? BIRD_HEIGHT : CACTUS_HEIGHT,
+          type: useBird ? 'bird' : 'cactus'
         }])
       }
     }
 
-    const interval = setInterval(createCactus, 100)
-    cactusTimerRef.current = interval as any
+    const interval = setInterval(createObstacle, 100)
+    obstacleTimerRef.current = interval as any
 
     return () => {
       clearInterval(interval)
@@ -98,6 +109,11 @@ export function DinosaurGame() {
     // Increase game speed gradually
     const newSpeed = INITIAL_SPEED + Math.floor(score / 100) * 0.5
     setGameSpeed(newSpeed)
+
+    // Enable night mode after score 100
+    if (score > 100 && !isNightMode) {
+      setIsNightMode(true)
+    }
 
     const gameLoop = () => {
       // Update dinosaur position
@@ -113,29 +129,30 @@ export function DinosaurGame() {
         }
 
         setVelocity(newVelocity)
+        dinoYRef.current = newY
         return newY
       })
 
-      // Move cacti and check collisions
-      setCacti(prev => {
-        const updated = prev.map(cactus => ({
-          ...cactus,
-          x: cactus.x - gameSpeed
-        })).filter(cactus => cactus.x > -CACTUS_WIDTH)
+      // Move obstacles and check collisions
+      setObstacles(prev => {
+        const updated = prev.map(obstacle => ({
+          ...obstacle,
+          x: obstacle.x - gameSpeed
+        })).filter(obstacle => obstacle.x > -obstacle.width)
 
-        // Check collisions
-        for (const cactus of updated) {
-          if (checkCollision(dinoY, cactus)) {
+        // Check collisions using ref to get current value
+        for (const obstacle of updated) {
+          if (checkCollision(dinoYRef.current, obstacle)) {
             setGameOver(true)
             return updated
           }
         }
 
-        // Increase score when cactus passes
-        const passedCacti = prev.filter(cactus => 
-          cactus.x < DINO_X && cactus.x + CACTUS_WIDTH >= DINO_X - gameSpeed
+        // Increase score when obstacle passes
+        const passedObstacles = prev.filter(obstacle => 
+          obstacle.x < DINO_X && obstacle.x + obstacle.width >= DINO_X - gameSpeed
         )
-        if (passedCacti.length > 0) {
+        if (passedObstacles.length > 0) {
           setScore(prev => prev + 1)
         }
 
@@ -155,7 +172,7 @@ export function DinosaurGame() {
         cancelAnimationFrame(gameLoopRef.current)
       }
     }
-  }, [gameStarted, gameOver, velocity, dinoY, gameSpeed])
+  }, [gameStarted, gameOver, velocity, gameSpeed, isNightMode, score])
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -171,14 +188,14 @@ export function DinosaurGame() {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [jump, gameStarted, gameOver])
+  }, [jump, gameStarted, gameOver, startGame])
 
   const resetGame = () => {
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current)
     }
-    if (cactusTimerRef.current) {
-      clearInterval(cactusTimerRef.current)
+    if (obstacleTimerRef.current) {
+      clearInterval(obstacleTimerRef.current)
     }
     startGame()
   }
@@ -200,18 +217,44 @@ export function DinosaurGame() {
 
       <div className="flex justify-center">
         <div
-          className="relative border-2 border-gray-300 bg-white rounded-lg overflow-hidden"
+          className={`relative border-2 border-gray-300 rounded-lg overflow-hidden ${
+            isNightMode ? 'bg-gray-900' : 'bg-white'
+          }`}
           style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
         >
           {/* Sky/Background */}
-          <div className="absolute inset-0 bg-gradient-to-b from-blue-100 to-white" />
+          <div className={`absolute inset-0 ${
+            isNightMode 
+              ? 'bg-gradient-to-b from-gray-800 to-gray-900' 
+              : 'bg-gradient-to-b from-blue-100 to-white'
+          }`} />
+
+          {/* Clouds (only in day mode) */}
+          {!isNightMode && (
+            <>
+              <div className="absolute top-10 left-20 w-16 h-8 bg-white bg-opacity-50 rounded-full" />
+              <div className="absolute top-15 left-40 w-12 h-6 bg-white bg-opacity-50 rounded-full" />
+            </>
+          )}
+
+          {/* Stars (only in night mode) */}
+          {isNightMode && (
+            <>
+              <div className="absolute top-10 left-20 w-1 h-1 bg-white rounded-full" />
+              <div className="absolute top-15 left-40 w-1 h-1 bg-white rounded-full" />
+              <div className="absolute top-20 left-60 w-1 h-1 bg-white rounded-full" />
+              <div className="absolute top-12 left-80 w-1 h-1 bg-white rounded-full" />
+            </>
+          )}
 
           {/* Ground line (animated) */}
           <div
-            className="absolute bottom-0 w-full border-t-2 border-gray-400"
+            className={`absolute bottom-0 w-full border-t-2 ${
+              isNightMode ? 'border-gray-600' : 'border-gray-400'
+            }`}
             style={{
               bottom: GROUND_Y,
-              backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 19px, #666 19px, #666 20px)',
+              backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 19px, currentColor 19px, currentColor 20px)',
               backgroundPositionX: `${groundOffset}px`,
               height: '2px',
             }}
@@ -220,7 +263,7 @@ export function DinosaurGame() {
           {/* Dinosaur (stationary on left, only moves up/down) */}
           {gameStarted && (
             <div
-              className="absolute bg-gray-800"
+              className={`absolute ${isNightMode ? 'bg-gray-700' : 'bg-gray-800'}`}
               style={{
                 left: DINO_X,
                 bottom: dinoTop,
@@ -235,27 +278,38 @@ export function DinosaurGame() {
             </div>
           )}
 
-          {/* Cacti */}
-          {cacti.map((cactus, index) => {
-            const cactusBottom = GROUND_Y
-            const cactusTop = cactusBottom - cactus.height
+          {/* Obstacles */}
+          {obstacles.map((obstacle, index) => {
+            const obstacleBottom = obstacle.type === 'cactus' ? GROUND_Y : GROUND_Y - 30
+            const obstacleTop = obstacleBottom - obstacle.height
             return (
               <div
                 key={index}
-                className="absolute bg-green-700"
+                className={`absolute ${
+                  obstacle.type === 'cactus' 
+                    ? isNightMode ? 'bg-gray-600' : 'bg-green-700'
+                    : isNightMode ? 'bg-gray-500' : 'bg-gray-600'
+                }`}
                 style={{
-                  left: cactus.x,
-                  bottom: cactusTop,
-                  width: cactus.width,
-                  height: cactus.height,
+                  left: obstacle.x,
+                  bottom: obstacleTop,
+                  width: obstacle.width,
+                  height: obstacle.height,
                 }}
               >
-                {/* Simple cactus shape with branches */}
-                <div className="w-full h-full relative">
-                  <div className="absolute inset-0 bg-green-700" />
-                  <div className="absolute -left-2 top-1/3 w-2 h-4 bg-green-700" />
-                  <div className="absolute -right-2 top-1/2 w-2 h-4 bg-green-700" />
-                </div>
+                {obstacle.type === 'cactus' ? (
+                  // Cactus shape
+                  <div className="w-full h-full relative">
+                    <div className="absolute inset-0 bg-inherit" />
+                    <div className="absolute -left-2 top-1/3 w-2 h-4 bg-inherit" />
+                    <div className="absolute -right-2 top-1/2 w-2 h-4 bg-inherit" />
+                  </div>
+                ) : (
+                  // Bird shape
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-lg">🦅</div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -265,7 +319,7 @@ export function DinosaurGame() {
             <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
               <div className="text-center">
                 <p className="text-lg font-semibold mb-2">Press Space to start</p>
-                <p className="text-sm text-gray-600">Jump over the cacti!</p>
+                <p className="text-sm text-gray-600">Jump over the obstacles!</p>
               </div>
             </div>
           )}
@@ -302,9 +356,10 @@ export function DinosaurGame() {
 
       <div className="text-center text-sm text-gray-600">
         <p>Press Space or Arrow Up to jump! Game speed increases with score.</p>
+        {score > 100 && (
+          <p className="text-yellow-600 mt-1">Night mode activated! Watch out for birds!</p>
+        )}
       </div>
     </div>
   )
 }
-
-
