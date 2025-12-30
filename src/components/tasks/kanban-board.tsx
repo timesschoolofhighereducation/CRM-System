@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TaskSearchFilter } from './task-search-filter'
 import { CreateTaskDialog } from './create-task-dialog'
+import { toast } from 'sonner'
 import { 
   CheckCircle, 
   Clock, 
@@ -19,7 +21,8 @@ import {
   CheckSquare,
   History,
   MoreHorizontal,
-  Eye
+  Eye,
+  CheckCircle2
 } from 'lucide-react'
 import {
   DndContext,
@@ -50,6 +53,7 @@ interface FollowUpTask {
     id: string
     fullName: string
     phone: string
+    registerNow: boolean
   }
   user: {
     name: string
@@ -141,12 +145,14 @@ function DroppableColumn({
   column, 
   tasks, 
   onViewDetails, 
-  onViewHistory 
+  onViewHistory,
+  onToggleRegister
 }: { 
   column: { id: string; title: string; color: string; icon: any; headerColor: string }
   tasks: TaskItem[]
   onViewDetails: (task: TaskItem) => void
   onViewHistory: (task: TaskItem) => void
+  onToggleRegister: (task: TaskItem, registerNow: boolean) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -185,6 +191,7 @@ function DroppableColumn({
               task={task}
               onViewDetails={onViewDetails}
               onViewHistory={onViewHistory}
+              onToggleRegister={onToggleRegister}
             />
           ))}
           {tasks.length === 0 && (
@@ -203,10 +210,11 @@ function DroppableColumn({
 }
 
 // Sortable Task Card Component
-function SortableTaskCard({ task, onViewDetails, onViewHistory }: { 
+function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister }: { 
   task: TaskItem
   onViewDetails: (task: TaskItem) => void
   onViewHistory: (task: TaskItem) => void
+  onToggleRegister: (task: TaskItem, registerNow: boolean) => void
 }) {
   const {
     attributes,
@@ -359,6 +367,37 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory }: {
                 >
                   {'purpose' in task ? task.purpose.replace('_', ' ') : 'Task'}
                 </Badge>
+                {'seeker' in task && (
+                  <div 
+                    className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      onToggleRegister(task, !task.seeker.registerNow)
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                    }}
+                  >
+                    <Checkbox
+                      checked={task.seeker.registerNow}
+                      onCheckedChange={(checked) => {
+                        onToggleRegister(task, checked === true)
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                      }}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="font-medium text-green-700">Register</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
                 <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
@@ -443,6 +482,16 @@ export function KanbanBoard() {
 
   const updateTaskStatus = async (taskId: string, newStatus: string, taskType?: string) => {
     try {
+      // Find task to get its title/name for the toast message
+      const task = allTasks.find(t => t.id === taskId)
+      const taskName = task 
+        ? (task.type === 'regular' ? task.title : ('seeker' in task ? task.seeker.fullName : 'Task'))
+        : 'Task'
+      
+      // Get status display name
+      const statusColumn = statusColumns.find(col => col.id === newStatus)
+      const statusName = statusColumn?.title || newStatus.replace(/_/g, ' ')
+
       let response
       if (taskType === 'regular') {
         // Update regular task via enhanced API
@@ -473,16 +522,36 @@ export function KanbanBoard() {
           task.id === taskId ? { ...task, status: newStatus } : task
         ))
         
+        // Show success toast
+        toast.success('Task moved', {
+          description: `${taskName} moved to ${statusName}`,
+          duration: 3000,
+        })
+        
         // Refresh all tasks to get updated data including history
         await fetchTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Failed to update task status:', errorData)
+        
+        // Show error toast
+        toast.error('Failed to move task', {
+          description: errorData.error || 'Could not update task status',
+          duration: 4000,
+        })
+        
         // Revert optimistic update by refreshing
         await fetchTasks()
       }
     } catch (error) {
       console.error('Error updating task status:', error)
+      
+      // Show error toast
+      toast.error('Error moving task', {
+        description: 'An error occurred while updating the task',
+        duration: 4000,
+      })
+      
       // Revert optimistic update by refreshing
       await fetchTasks()
     }
@@ -547,6 +616,61 @@ export function KanbanBoard() {
 
   const handleViewDetails = (task: TaskItem) => {
     setSelectedTask(task)
+  }
+
+  const handleToggleRegister = async (task: TaskItem, registerNow: boolean) => {
+    if (task.type !== 'followup' || !('seeker' in task)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: task.status, // Keep current status
+          registerNow 
+        }),
+      })
+
+      if (response.ok) {
+        // Optimistically update the local state
+        setAllTasks(prev => prev.map(t => 
+          t.id === task.id && 'seeker' in t
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        setFilteredTasks(prev => prev.map(t => 
+          t.id === task.id && 'seeker' in t
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        
+        toast.success('Registration updated', {
+          description: `${'seeker' in task ? task.seeker.fullName : 'Task'} marked as ${registerNow ? 'Registered' : 'Not Registered'}`,
+          duration: 3000,
+        })
+        
+        // Refresh to get latest data
+        await fetchTasks()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Failed to update registration', {
+          description: errorData.error || 'Could not update registration status',
+          duration: 4000,
+        })
+        await fetchTasks()
+      }
+    } catch (error) {
+      console.error('Error updating registration:', error)
+      toast.error('Error updating registration', {
+        description: 'An error occurred while updating the registration status',
+        duration: 4000,
+      })
+      await fetchTasks()
+    }
   }
 
   const handleViewHistory = async (task: TaskItem) => {
@@ -644,6 +768,7 @@ export function KanbanBoard() {
                 tasks={columnTasks}
                 onViewDetails={handleViewDetails}
                 onViewHistory={handleViewHistory}
+                onToggleRegister={handleToggleRegister}
               />
             )
           })}

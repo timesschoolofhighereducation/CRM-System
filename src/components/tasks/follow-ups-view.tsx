@@ -25,6 +25,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -55,6 +56,7 @@ interface FollowUpTask {
     id: string
     fullName: string
     phone: string
+    registerNow: boolean
   }
   user: {
     name: string
@@ -353,6 +355,57 @@ export function FollowUpsView() {
     setMoveComment('')
   }, [pendingMove, moveComment, updateTaskStatus])
 
+  const handleToggleRegister = async (task: FollowUpTask, registerNow: boolean) => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: task.status, // Keep current status
+          registerNow 
+        }),
+      })
+
+      if (response.ok) {
+        // Optimistically update the local state
+        setAllTasks(prev => prev.map(t => 
+          t.id === task.id
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        setFilteredTasks(prev => prev.map(t => 
+          t.id === task.id
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        
+        toast.success('Registration updated', {
+          description: `${task.seeker.fullName} marked as ${registerNow ? 'Registered' : 'Not Registered'}`,
+          duration: 3000,
+        })
+        
+        // Refresh to get latest data
+        await fetchTasks()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Failed to update registration', {
+          description: errorData.error || 'Could not update registration status',
+          duration: 4000,
+        })
+        await fetchTasks()
+      }
+    } catch (error) {
+      console.error('Error updating registration:', error)
+      toast.error('Error updating registration', {
+        description: 'An error occurred while updating the registration status',
+        duration: 4000,
+      })
+      await fetchTasks()
+    }
+  }
+
   const getTasksByStatus = (status: string) => {
     return filteredTasks.filter(task => task.status === status)
   }
@@ -381,6 +434,7 @@ export function FollowUpsView() {
     tasks, 
     onViewHistory,
     onViewTask,
+    onToggleRegister,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -392,6 +446,7 @@ export function FollowUpsView() {
     tasks: FollowUpTask[]
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
+    onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -435,6 +490,7 @@ export function FollowUpsView() {
                 task={task}
                 onViewHistory={onViewHistory}
                 onViewTask={onViewTask}
+                onToggleRegister={onToggleRegister}
                 getStatusInfo={getStatusInfo}
                 isAutomatic={isAutomatic}
                 getFollowUpNumber={getFollowUpNumber}
@@ -463,6 +519,7 @@ export function FollowUpsView() {
     task, 
     onViewHistory, 
     onViewTask,
+    onToggleRegister,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -473,6 +530,7 @@ export function FollowUpsView() {
     task: FollowUpTask
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
+    onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -539,6 +597,35 @@ export function FollowUpsView() {
               <Badge variant="outline" className="text-xs">
                 {task.purpose.replace('_', ' ')}
               </Badge>
+              <div 
+                className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  onToggleRegister(task, !task.seeker.registerNow)
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                }}
+              >
+                <Checkbox
+                  checked={task.seeker.registerNow}
+                  onCheckedChange={(checked) => {
+                    onToggleRegister(task, checked === true)
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  className="h-3.5 w-3.5"
+                />
+                <span className="font-medium text-green-700">Register</span>
+              </div>
             </div>
 
             <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
@@ -746,6 +833,7 @@ export function FollowUpsView() {
                     tasks={columnTasks}
                     onViewHistory={handleViewHistory}
                     onViewTask={handleViewTask}
+                    onToggleRegister={handleToggleRegister}
                     getStatusInfo={getStatusInfo}
                     isAutomatic={isAutomatic}
                     getFollowUpNumber={getFollowUpNumber}

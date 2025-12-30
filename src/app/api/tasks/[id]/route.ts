@@ -9,7 +9,7 @@ export async function PATCH(
   try {
     const _user = await requireAuth(request)
     const body = await request.json()
-    const { status, notes } = body
+    const { status, notes, registerNow } = body
     const { id } = await params
 
     // Get the current task to track the status change
@@ -18,9 +18,12 @@ export async function PATCH(
       select: { 
         status: true,
         assignedTo: true,
+        seekerId: true,
         seeker: {
           select: {
-            createdById: true
+            id: true,
+            createdById: true,
+            registerNow: true
           }
         }
       }
@@ -55,6 +58,7 @@ export async function PATCH(
             fullName: true,
             phone: true,
             createdById: true,
+            registerNow: true,
           },
         },
         user: {
@@ -77,14 +81,30 @@ export async function PATCH(
       },
     })
 
+    // Update seeker's registerNow field if registerNow is provided
+    if (registerNow !== undefined && currentTask.seekerId) {
+      await prisma.seeker.update({
+        where: { id: currentTask.seekerId },
+        data: { registerNow: registerNow === true || registerNow === 'true' }
+      })
+      
+      // Update the response to reflect the change
+      ;(updatedTask.seeker as any).registerNow = registerNow === true || registerNow === 'true'
+    }
+
     // Create action history entry
+    const historyNotes = notes || 
+      (registerNow !== undefined 
+        ? `Status changed to ${status}. Registration marked as ${registerNow ? 'Yes' : 'No'}.`
+        : `Status changed from ${currentTask.status} to ${status}`)
+    
     await prisma.taskActionHistory.create({
       data: {
         taskId: id,
         fromStatus: currentTask.status,
         toStatus: status,
         actionBy: _user.id,
-        notes: notes || `Status changed from ${currentTask.status} to ${status}`,
+        notes: historyNotes,
       },
     })
 

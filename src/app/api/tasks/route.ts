@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
             fullName: true,
             phone: true,
             createdById: true,
+            registerNow: true,
           },
         },
         user: {

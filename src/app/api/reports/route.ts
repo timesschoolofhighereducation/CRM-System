@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get('format')
     
     // Build where clause based on user role
-    const seekerWhere: any = {}
+    // Treat legacy rows where isDeleted might be NULL as "not deleted"
+    const seekerWhere: any = {
+      NOT: { isDeleted: true }
+    }
     const interactionWhere: any = {}
     
     // If not ADMIN/ADMINISTRATOR/DEVELOPER, only show user's own data
@@ -56,16 +59,14 @@ export async function GET(request: NextRequest) {
     // ============================================
     // 4. CALCULATE CONVERSIONS
     // ============================================
-    // Converted stages: QUALIFIED, COUNSELING_SCHEDULED, READY_TO_REGISTER
-    // These represent inquiries that have progressed positively in the pipeline
-    const convertedStages: SeekerStage[] = [
-      SeekerStage.QUALIFIED,
-      SeekerStage.COUNSELING_SCHEDULED,
-      SeekerStage.READY_TO_REGISTER,
-    ]
-    const convertedCount = stageData
-      .filter(s => convertedStages.includes(s.stage))
-      .reduce((sum, item) => sum + item._count.id, 0)
+    // Use registerNow field to determine conversions (set via task checkbox)
+    // This provides more accurate conversion tracking based on actual registration intent
+    const convertedCount = await prisma.seeker.count({
+      where: {
+        ...seekerWhere,
+        registerNow: true
+      }
+    })
 
     // ============================================
     // 5. CALCULATE CONVERSION RATES PER SOURCE
@@ -76,9 +77,7 @@ export async function GET(request: NextRequest) {
         where: {
           ...seekerWhere,
           marketingSource: source.marketingSource,
-          stage: {
-            in: convertedStages
-          }
+          registerNow: true // Use registerNow instead of stage-based conversion
         }
       })
       sourceConversions[source.marketingSource] = source._count.id > 0 
@@ -116,7 +115,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         createdAt: true,
-        stage: true
+        registerNow: true // Use registerNow instead of stage
       }
     })
 
@@ -134,7 +133,7 @@ export async function GET(request: NextRequest) {
       })
       
       const conversions = monthSeekers.filter(s => 
-        convertedStages.includes(s.stage)
+        s.registerNow === true // Use registerNow instead of stage
       ).length
       
       monthlyTrends.push({
@@ -219,10 +218,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get inquiries grouped by user
+    // Get inquiries grouped by user (use same filters as main query)
     const inquiriesByUser = await prisma.seeker.groupBy({
       by: ['createdById'],
       where: {
+        ...seekerWhere,
         createdById: { not: null }
       },
       _count: {
@@ -230,14 +230,14 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get converted inquiries grouped by user
+    // Get converted inquiries grouped by user (use registerNow field instead of stage)
+    // This makes it easier to track conversions via the task checkbox
     const convertedByUser = await prisma.seeker.groupBy({
       by: ['createdById'],
       where: {
+        ...seekerWhere,
         createdById: { not: null },
-        stage: {
-          in: convertedStages
-        }
+        registerNow: true // Use registerNow checkbox instead of stage-based conversion
       },
       _count: {
         id: true
@@ -252,10 +252,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get this month's inquiries grouped by user
+    // Get this month's inquiries grouped by user (use same filters as main query)
     const thisMonthByUser = await prisma.seeker.groupBy({
       by: ['createdById'],
       where: {
+        ...seekerWhere,
         createdById: { not: null },
         createdAt: {
           gte: thisMonthStart

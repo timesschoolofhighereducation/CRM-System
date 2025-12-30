@@ -23,6 +23,7 @@ interface FollowUpTask {
     id: string
     fullName: string
     phone: string
+    registerNow: boolean
   }
   user: {
     name: string
