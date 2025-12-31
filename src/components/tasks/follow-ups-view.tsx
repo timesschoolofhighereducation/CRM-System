@@ -500,12 +500,12 @@ export function FollowUpsView() {
               />
             ))}
             {tasks.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                  <Clock className="h-6 w-6 text-gray-400" />
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
+                <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                  <Clock className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                 </div>
-                <p className="text-xs font-medium text-gray-500">No tasks</p>
-                <p className="text-xs text-gray-400 mt-1">Drop tasks here</p>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">No tasks</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Drop tasks here</p>
               </div>
             )}
           </div>

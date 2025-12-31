@@ -209,37 +209,37 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
 
   const getStageColor = (stage: string) => {
     const colors: Record<string, string> = {
-      NEW: 'bg-gray-100 text-gray-800',
-      ATTEMPTING_CONTACT: 'bg-yellow-100 text-yellow-800',
-      CONNECTED: 'bg-blue-100 text-blue-800',
-      QUALIFIED: 'bg-green-100 text-green-800',
-      COUNSELING_SCHEDULED: 'bg-purple-100 text-purple-800',
-      CONSIDERING: 'bg-orange-100 text-orange-800',
-      READY_TO_REGISTER: 'bg-emerald-100 text-emerald-800',
-      LOST: 'bg-red-100 text-red-800',
+      NEW: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100',
+      ATTEMPTING_CONTACT: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+      CONNECTED: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200',
+      QUALIFIED: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
+      COUNSELING_SCHEDULED: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200',
+      CONSIDERING: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200',
+      READY_TO_REGISTER: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200',
+      LOST: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
     }
-    return colors[stage] || 'bg-gray-100 text-gray-800'
+    return colors[stage] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100'
   }
 
   const getOutcomeColor = (outcome: string) => {
     const colors: Record<string, string> = {
-      CONNECTED_INTERESTED: 'bg-green-100 text-green-800',
-      NO_ANSWER: 'bg-yellow-100 text-yellow-800',
-      NOT_INTERESTED: 'bg-red-100 text-red-800',
-      APPOINTMENT_BOOKED: 'bg-blue-100 text-blue-800',
-      WRONG_NUMBER: 'bg-gray-100 text-gray-800',
-      DO_NOT_CONTACT: 'bg-red-100 text-red-800',
+      CONNECTED_INTERESTED: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
+      NO_ANSWER: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+      NOT_INTERESTED: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
+      APPOINTMENT_BOOKED: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200',
+      WRONG_NUMBER: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100',
+      DO_NOT_CONTACT: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
     }
-    return colors[outcome] || 'bg-gray-100 text-gray-800'
+    return colors[outcome] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100'
   }
 
   const getTaskStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      OPEN: 'bg-yellow-100 text-yellow-800',
-      DONE: 'bg-green-100 text-green-800',
-      OVERDUE: 'bg-red-100 text-red-800',
+      OPEN: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+      DONE: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
+      OVERDUE: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200',
     }
-    return colors[status] || 'bg-gray-100 text-gray-800'
+    return colors[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100'
   }
 
   return (

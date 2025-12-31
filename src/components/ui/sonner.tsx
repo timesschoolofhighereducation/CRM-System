@@ -1,14 +1,34 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useTheme } from "@/lib/theme-provider"
 import { Toaster as Sonner, ToasterProps } from "sonner"
+import { useEffect, useState } from "react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const { theme } = useTheme()
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light")
+
+  useEffect(() => {
+    const root = window.document.documentElement
+    
+    if (theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+      const updateTheme = () => {
+        setResolvedTheme(mediaQuery.matches ? "dark" : "light")
+      }
+      
+      updateTheme()
+      mediaQuery.addEventListener("change", updateTheme)
+      
+      return () => mediaQuery.removeEventListener("change", updateTheme)
+    } else {
+      setResolvedTheme(theme as "light" | "dark")
+    }
+  }, [theme])
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={resolvedTheme}
       className="toaster group"
       style={
         {
@@ -31,10 +51,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          success: "bg-green-600 text-white border-green-600",
-          error: "bg-red-600 text-white border-red-600",
-          warning: "bg-orange-500 text-white border-orange-500",
-          info: "bg-blue-600 text-white border-blue-600",
+          success: "bg-green-600 text-white border-green-600 dark:bg-green-500",
+          error: "bg-red-600 text-white border-red-600 dark:bg-red-500",
+          warning: "bg-orange-500 text-white border-orange-500 dark:bg-orange-400",
+          info: "bg-blue-600 text-white border-blue-600 dark:bg-blue-500",
         },
       }}
       {...props}

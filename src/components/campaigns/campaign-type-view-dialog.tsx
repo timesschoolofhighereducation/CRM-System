@@ -75,7 +75,7 @@ export function CampaignTypeViewDialog({ open, onOpenChange, campaignType }: Cam
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-500">Name</label>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
                 <div className="flex items-center space-x-2 mt-1">
                   {getSocialIcon(campaignType.name)}
                   <span className="text-lg font-semibold">{campaignType.name}</span>
@@ -88,49 +88,49 @@ export function CampaignTypeViewDialog({ open, onOpenChange, campaignType }: Cam
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Status</label>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
                 <div className="mt-1">
-                  <Badge className={campaignType.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  <Badge className={campaignType.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}>
                     {campaignType.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Color</label>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Color</label>
                 <div className="flex items-center space-x-2 mt-1">
                   <div 
-                    className="w-6 h-6 rounded border border-gray-300"
+                    className="w-6 h-6 rounded border border-gray-300 dark:border-gray-600"
                     style={{ backgroundColor: campaignType.color || '#6B7280' }}
                   />
-                  <span className="text-sm text-gray-600">{campaignType.color || '#6B7280'}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{campaignType.color || '#6B7280'}</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-500">Campaigns Count</label>
-                <div className="text-2xl font-bold text-blue-600 mt-1">
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Campaigns Count</label>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
                   {campaignType._count.campaigns}
                 </div>
-                <p className="text-sm text-gray-500">Total campaigns using this type</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total campaigns using this type</p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500">Created</label>
-                <div className="text-sm text-gray-600 mt-1">
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</label>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   {formatDate(campaignType.createdAt)}
                 </div>
               </div>
 
               {campaignType.createdBy && (
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Created By</label>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created By</label>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {campaignType.createdBy.name}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     {campaignType.createdBy.email}
                   </div>
                 </div>
@@ -141,16 +141,16 @@ export function CampaignTypeViewDialog({ open, onOpenChange, campaignType }: Cam
           {/* Description */}
           {campaignType.description && (
             <div>
-              <label className="text-sm font-medium text-gray-500">Description</label>
-              <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-700">{campaignType.description}</p>
+              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</label>
+              <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                <p className="text-sm text-gray-700 dark:text-gray-300">{campaignType.description}</p>
               </div>
             </div>
           )}
 
           {/* Campaign Type Category */}
           <div>
-            <label className="text-sm font-medium text-gray-500">Category</label>
+            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Category</label>
             <div className="mt-1">
               <Badge 
                 variant="outline" 
