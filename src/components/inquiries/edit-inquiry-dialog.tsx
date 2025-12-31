@@ -83,7 +83,7 @@ const inquirySchema = z.object({
   stage: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Marketing source is required unless "Not Answering" is checked
-  if (!data.notAnswering && (!data.marketingSource || !data.marketingSource.trim())) {
+  if (!data.notAnswering && (!data.marketingSource || (typeof data.marketingSource === 'string' && !data.marketingSource.trim()))) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Marketing source is required',
@@ -93,8 +93,8 @@ const inquirySchema = z.object({
   
   // If follow-up is enabled, date and time are required
   if (data.followUpAgain) {
-    const hasDate = data.followUpDate && data.followUpDate.trim().length > 0
-    const hasTime = data.followUpTime && data.followUpTime.trim().length > 0
+    const hasDate = data.followUpDate && typeof data.followUpDate === 'string' && data.followUpDate.trim().length > 0
+    const hasTime = data.followUpTime && typeof data.followUpTime === 'string' && data.followUpTime.trim().length > 0
     
     if (!hasDate) {
       ctx.addIssue({
@@ -371,10 +371,17 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     const values = form.getValues()
     const errors = form.formState.errors
     
+    // Helper to safely check if a string value exists and is not empty
+    const hasValue = (val: any): boolean => {
+      if (!val) return false
+      if (typeof val === 'string') return val.trim().length > 0
+      return true
+    }
+    
     // If "Not Answering" is checked, allow submission with minimal requirements
     if (values.notAnswering) {
       // Still need at least full name and phone
-      const hasMinimalFields = values.fullName?.trim() && values.phone?.trim()
+      const hasMinimalFields = hasValue(values.fullName) && hasValue(values.phone)
       // Only check for errors on critical fields (fullName and phone)
       // Ignore age, marketingSource, and other optional field errors
       const hasCriticalErrors = errors.fullName || errors.phone
@@ -382,9 +389,9 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     }
     
     // Normal validation: Check required fields
-    const hasRequiredFields = values.fullName?.trim() && 
-                             values.phone?.trim() && 
-                             values.marketingSource?.trim()
+    const hasRequiredFields = hasValue(values.fullName) && 
+                             hasValue(values.phone) && 
+                             hasValue(values.marketingSource)
     
     // Only check for critical validation errors (required fields)
     // Allow optional fields like age to be empty
@@ -396,27 +403,34 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
   const onSubmit = async (data: InquiryFormData) => {
     setIsLoading(true)
     try {
+      // Helper function to safely trim strings
+      const safeTrim = (value: any): string | undefined => {
+        if (value === null || value === undefined) return undefined
+        if (typeof value === 'string') return value.trim() || undefined
+        return String(value).trim() || undefined
+      }
+
       // Prepare update data
       const updateData = {
-        fullName: data.fullName.trim(),
-        phone: data.phone.trim(),
-        email: data.email?.trim() || undefined,
-        city: data.district?.trim() || undefined,
+        fullName: safeTrim(data.fullName) || '',
+        phone: safeTrim(data.phone) || '',
+        email: safeTrim(data.email),
+        city: safeTrim(data.district),
         ageBand: (data.age !== undefined && data.age !== null && typeof data.age === 'number' && data.age > 0) ? data.age.toString() : undefined,
-        guardianPhone: data.guardianPhone?.trim() || undefined,
-        marketingSource: data.marketingSource.trim(),
+        guardianPhone: safeTrim(data.guardianPhone),
+        marketingSource: safeTrim(data.marketingSource) || '',
         campaignId: data.campaignId || undefined,
-        preferredContactTime: data.preferredContactTime?.trim() || undefined,
+        preferredContactTime: safeTrim(data.preferredContactTime),
         followUpAgain: data.followUpAgain ?? false,
-        followUpDate: data.followUpDate || undefined,
-        followUpTime: data.followUpTime || undefined,
-        description: data.description?.trim() || undefined,
+        followUpDate: safeTrim(data.followUpDate),
+        followUpTime: safeTrim(data.followUpTime),
+        description: safeTrim(data.description),
         whatsapp: data.whatsapp,
         notAnswering: data.notAnswering ?? false,
         emailNotAnswering: data.emailNotAnswering ?? false,
         consent: data.consent,
         preferredProgramIds: selectedProgramIds,
-        whatsappNumber: data.whatsappNumber?.trim() || undefined,
+        whatsappNumber: safeTrim(data.whatsappNumber),
         stage: data.stage || 'NEW',
         preferredStatus: data.preferredStatus || undefined,
       }
@@ -688,10 +702,13 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                     {...form.register('age', { 
                       valueAsNumber: false, // Keep as string to allow clearing
                       setValueAs: (value: string) => {
-                        if (value === '' || value === null || value === undefined || value.trim() === '') {
+                        if (value === '' || value === null || value === undefined) {
                           return undefined
                         }
-                        const num = parseInt(value)
+                        if (typeof value === 'string' && value.trim() === '') {
+                          return undefined
+                        }
+                        const num = parseInt(String(value))
                         return isNaN(num) ? undefined : num
                       },
                       onChange: (e) => {
@@ -790,11 +807,11 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                     autoComplete="off"
                     onKeyDown={handleEnterAdvance}
                   />
-                  {showProgramList && programSearch.trim().length > 0 && (
+                  {showProgramList && typeof programSearch === 'string' && programSearch.trim().length > 0 && (
                     <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-background shadow text-sm">
                       {programs
                         .filter((p) => {
-                          const q = programSearch.trim().toLowerCase()
+                          const q = typeof programSearch === 'string' ? programSearch.trim().toLowerCase() : ''
                           return (
                             p.name.toLowerCase().includes(q) ||
                             p.level.toLowerCase().includes(q) ||
