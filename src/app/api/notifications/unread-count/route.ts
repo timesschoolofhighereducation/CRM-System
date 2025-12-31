@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, AuthenticationError } from '@/lib/auth'
 import {
   cleanupUnreadCountCache,
   getUnreadCountCacheKey,
@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ count })
   } catch (error) {
     console.error('Error fetching unread count:', error)
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      )
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch unread count' },
       { status: 500 }

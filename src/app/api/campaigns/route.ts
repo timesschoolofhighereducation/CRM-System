@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole } from '@/lib/auth'
+import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
 
 // GET /api/campaigns - Get all campaigns
 // Accessible to all authenticated users
@@ -101,6 +101,12 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ ERROR in /api/campaigns:', error)
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      )
+    }
     console.error('Error details:', {
       name: error instanceof Error ? error.name : 'Unknown',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -216,6 +222,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(campaign, { status: 201 })
   } catch (error) {
     console.error('Error creating campaign:', error)
+    
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      )
+    }
     
     if (error instanceof Error) {
       // Check for unique constraint violations

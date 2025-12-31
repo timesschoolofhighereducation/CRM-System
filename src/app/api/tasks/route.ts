@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole } from '@/lib/auth'
+import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,6 +57,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(userTasks)
   } catch (error) {
     console.error('Error fetching tasks:', error)
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      )
+    }
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
       { status: 500 }

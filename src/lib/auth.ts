@@ -7,6 +7,18 @@ import { cookies as nextCookies } from 'next/headers'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const JWT_EXPIRES_IN = '7d'
 
+// Custom error class for authentication errors
+export class AuthenticationError extends Error {
+  constructor(message: string = 'Authentication required') {
+    super(message)
+    this.name = 'AuthenticationError'
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, AuthenticationError)
+    }
+  }
+}
+
 export interface User {
   id: string
   name: string
@@ -142,8 +154,8 @@ export async function requireAuth(request?: Request | any): Promise<User> {
     }
   }
   
-  // No valid authentication found - throw error
-  throw new Error('Authentication required')
+  // No valid authentication found - throw authentication error
+  throw new AuthenticationError('Authentication required')
 }
 
 // Require specific role
@@ -151,7 +163,7 @@ export async function requireRole(role: string, request?: Request): Promise<User
   const user = await requireAuth(request)
   
   if (user.role !== role && !isAdminRole(user.role)) {
-    throw new Error(`Access denied. Required role: ${role}`)
+    throw new AuthenticationError(`Access denied. Required role: ${role}`)
   }
   
   return user
