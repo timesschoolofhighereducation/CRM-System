@@ -38,12 +38,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Set HTTP-only cookie
+    // Set session activity timestamp (1 hour from now)
+    const sessionExpiry = Date.now() + (60 * 60 * 1000) // 1 hour in milliseconds
+    
+    // Set HTTP-only cookie with cross-browser/OS compatibility
     response.cookies.set('auth-token', user.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // Works across browsers and OS
+      maxAge: 60 * 60, // 1 hour in seconds (for cookie expiry)
+      path: '/', // Ensure cookie is available site-wide
+    })
+    
+    // Set session activity cookie (client-readable for inactivity check)
+    response.cookies.set('session-activity', sessionExpiry.toString(), {
+      httpOnly: false, // Client needs to read this
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 60 * 60, // 1 hour
+      path: '/',
     })
 
     return response

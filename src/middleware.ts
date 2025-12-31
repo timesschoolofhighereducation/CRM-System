@@ -56,6 +56,18 @@ export function middleware(request: NextRequest) {
     response.headers.set('x-user-email', decoded.email)
     response.headers.set('x-user-role', decoded.role)
     
+    // Update session activity for API routes (only for API calls)
+    if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/')) {
+      const sessionExpiry = Date.now() + (60 * 60 * 1000) // 1 hour
+      response.cookies.set('session-activity', sessionExpiry.toString(), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60, // 1 hour
+        path: '/',
+      })
+    }
+    
     return response
   }
 
