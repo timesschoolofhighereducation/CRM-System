@@ -52,6 +52,7 @@ model User {
   postApprovals PostApproval[]    @relation("PostApprover")
   postComments  PostComment[]     @relation("PostCommenter")
   notifications Notification[]    @relation("UserNotifications")
+  pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
 
   // Notebook system relations
   createdNotebooks Notebook[] @relation("NotebookCreatedBy")
@@ -1109,6 +1110,27 @@ enum NotificationType {
   POST_FULLY_APPROVED
   SYSTEM
   REMINDER
+}
+
+// Push Notification Subscriptions for Web Push
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserPushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  
+  endpoint  String   @unique // Push subscription endpoint URL
+  keys      Json     // { p256dh: string, auth: string } - encryption keys
+  
+  userAgent String?  // Browser/device info
+  deviceInfo Json?   // { browser, os, device, isMobile }
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("push_subscriptions")
 }
 
 // Q&A Section Model (Program-wise)

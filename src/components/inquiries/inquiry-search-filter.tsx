@@ -51,7 +51,9 @@ interface Inquiry {
       type: string
     }
   }[]
+  createdById?: string
   createdBy?: {
+    id: string
     name: string
   }
 }
@@ -72,6 +74,7 @@ interface FilterState {
   marketingSources: string[]
   ageBands: string[]
   cities: string[]
+  createdByUsers: string[] // User IDs who created the inquiries
   dateRange: {
     from?: Date
     to?: Date
@@ -105,6 +108,7 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     marketingSources: [],
     ageBands: [],
     cities: [],
+    createdByUsers: [],
     dateRange: {},
     followUpRequired: null,
     hasWhatsapp: null,
@@ -124,6 +128,22 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     return Array.from(new Set(cities))
   }, [inquiries])
 
+  // Get unique createdBy users from inquiries
+  const uniqueCreatedByUsers = useMemo(() => {
+    const userMap = new Map<string, { id: string; name: string }>()
+    inquiries.forEach(inquiry => {
+      if (inquiry.createdById && inquiry.createdBy?.name) {
+        if (!userMap.has(inquiry.createdById)) {
+          userMap.set(inquiry.createdById, {
+            id: inquiry.createdById,
+            name: inquiry.createdBy.name
+          })
+        }
+      }
+    })
+    return Array.from(userMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [inquiries])
+
   // Filter inquiries based on current filters
   const filteredInquiries = useMemo(() => {
     let filtered = [...inquiries]
@@ -141,7 +161,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
         inquiry.preferredPrograms?.some(p => p.program.name.toLowerCase().includes(query)) ||
         inquiry.campaigns?.some(c => c.campaign.name.toLowerCase().includes(query)) ||
         inquiry.marketingSource.toLowerCase().includes(query) ||
-        inquiry.stage.toLowerCase().includes(query)
+        inquiry.stage.toLowerCase().includes(query) ||
+        inquiry.createdBy?.name.toLowerCase().includes(query)
       )
     }
 
@@ -184,6 +205,13 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       filtered = filtered.filter(inquiry => filters.cities.includes(inquiry.city || ''))
     }
 
+    // Created By User filter
+    if (filters.createdByUsers.length > 0) {
+      filtered = filtered.filter(inquiry => 
+        inquiry.createdById && filters.createdByUsers.includes(inquiry.createdById)
+      )
+    }
+
     // Date range filter
     if (filters.dateRange.from || filters.dateRange.to) {
       filtered = filtered.filter(inquiry => {
@@ -223,7 +251,7 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     setFilters(prev => ({ ...prev, searchQuery: value }))
   }
 
-  const handleArrayFilterToggle = (filterType: keyof Pick<FilterState, 'stages' | 'programs' | 'campaigns' | 'marketingSources' | 'ageBands' | 'cities'>, value: string) => {
+  const handleArrayFilterToggle = (filterType: keyof Pick<FilterState, 'stages' | 'programs' | 'campaigns' | 'marketingSources' | 'ageBands' | 'cities' | 'createdByUsers'>, value: string) => {
     setFilters(prev => ({
       ...prev,
       [filterType]: prev[filterType].includes(value)
@@ -241,6 +269,7 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       marketingSources: [],
       ageBands: [],
       cities: [],
+      createdByUsers: [],
       dateRange: {},
       followUpRequired: null,
       hasWhatsapp: null,
@@ -257,6 +286,7 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     if (filters.marketingSources.length > 0) count++
     if (filters.ageBands.length > 0) count++
     if (filters.cities.length > 0) count++
+    if (filters.createdByUsers.length > 0) count++
     if (filters.dateRange.from || filters.dateRange.to) count++
     if (filters.followUpRequired !== null) count++
     if (filters.hasWhatsapp !== null) count++
@@ -275,7 +305,7 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search inquiries by name, phone, email, city, programs, campaigns, or source..."
+                placeholder="Search inquiries by name, phone, email, city, programs, campaigns, source, or creator..."
                 value={filters.searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10 h-10 shadow-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
@@ -472,6 +502,36 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                 </div>
               </div>
 
+              {/* Created By User Filter */}
+              {uniqueCreatedByUsers.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center space-x-2">
+                    <User className="h-4 w-4" />
+                    <span>Created By</span>
+                  </label>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {uniqueCreatedByUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className={cn(
+                          "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                          filters.createdByUsers.includes(user.id) && "bg-blue-50 border border-blue-200"
+                        )}
+                        onClick={() => handleArrayFilterToggle('createdByUsers', user.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filters.createdByUsers.includes(user.id)}
+                          onChange={() => {}}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{user.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Date Range & Quick Filters */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center space-x-2">
@@ -643,6 +703,18 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                   />
                 </Badge>
               ))}
+              {filters.createdByUsers.map(userId => {
+                const user = uniqueCreatedByUsers.find(u => u.id === userId)
+                return (
+                  <Badge key={userId} variant="secondary" className="flex items-center space-x-1">
+                    <span>Created By: {user?.name}</span>
+                    <X 
+                      className="h-3 w-3 cursor-pointer" 
+                      onClick={() => handleArrayFilterToggle('createdByUsers', userId)}
+                    />
+                  </Badge>
+                )
+              })}
               {(filters.dateRange.from || filters.dateRange.to) && (
                 <Badge variant="secondary" className="flex items-center space-x-1">
                   <span>

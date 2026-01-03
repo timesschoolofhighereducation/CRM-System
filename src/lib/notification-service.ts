@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { sendPushNotification } from './push-notification-service'
 
 export type NotificationType = 
   | 'POST_APPROVAL_REQUEST'
@@ -17,7 +18,7 @@ interface CreateNotificationParams {
 }
 
 /**
- * Create a notification for a user
+ * Create a notification for a user and send push notification if enabled
  */
 export async function createNotification({
   userId,
@@ -27,7 +28,8 @@ export async function createNotification({
   postId,
 }: CreateNotificationParams) {
   try {
-    return await prisma.notification.create({
+    // Create notification in database
+    const notification = await prisma.notification.create({
       data: {
         userId,
         type,
@@ -37,6 +39,21 @@ export async function createNotification({
         read: false,
       },
     })
+
+    // Send push notification asynchronously (don't block if it fails)
+    sendPushNotification(userId, {
+      title,
+      body: message,
+      url: postId ? `/posts/${postId}` : '/dashboard',
+      notificationId: notification.id,
+      type: type.toLowerCase(),
+      requireInteraction: type === 'POST_APPROVAL_REQUEST',
+    }).catch((error) => {
+      console.error('Error sending push notification:', error)
+      // Don't throw - notification was created successfully
+    })
+
+    return notification
   } catch (error) {
     console.error('Error creating notification:', error)
     throw error

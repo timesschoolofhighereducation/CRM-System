@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { SafeNotification } from '@/lib/notification-utils'
+import { PushNotificationClient } from '@/lib/push-notification-client'
 
 export interface Notification {
   id: string
@@ -31,6 +32,10 @@ interface NotificationContextType {
   clearAllNotifications: () => void
   requestNotificationPermission: () => Promise<boolean>
   isNotificationSupported: boolean
+  isPushSupported: boolean
+  subscribeToPush: () => Promise<boolean>
+  unsubscribeFromPush: () => Promise<boolean>
+  isPushSubscribed: boolean
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -38,6 +43,8 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isNotificationSupported, setIsNotificationSupported] = useState(false)
+  const [isPushSupported, setIsPushSupported] = useState(false)
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -46,6 +53,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     
     if (typeof window !== 'undefined') {
       setIsNotificationSupported(SafeNotification.isSupported())
+      setIsPushSupported(PushNotificationClient.isSupported())
+      
+      // Check if already subscribed to push
+      PushNotificationClient.getSubscription().then((sub) => {
+        setIsPushSubscribed(!!sub)
+      })
+      
+      // Register service worker for push notifications
+      if (PushNotificationClient.isSupported()) {
+        PushNotificationClient.registerServiceWorker().catch(console.error)
+      }
       
       // Load notifications from localStorage
       const savedNotifications = localStorage.getItem('notifications')
@@ -229,6 +247,40 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return permission === 'granted'
   }, [isClient, isNotificationSupported])
 
+  const subscribeToPush = useCallback(async (): Promise<boolean> => {
+    if (!isClient || !isPushSupported) {
+      return false
+    }
+
+    try {
+      const success = await PushNotificationClient.subscribeAndSave()
+      if (success) {
+        setIsPushSubscribed(true)
+      }
+      return success
+    } catch (error) {
+      console.error('Error subscribing to push:', error)
+      return false
+    }
+  }, [isClient, isPushSupported])
+
+  const unsubscribeFromPush = useCallback(async (): Promise<boolean> => {
+    if (!isClient) {
+      return false
+    }
+
+    try {
+      const success = await PushNotificationClient.unsubscribeAndRemove()
+      if (success) {
+        setIsPushSubscribed(false)
+      }
+      return success
+    } catch (error) {
+      console.error('Error unsubscribing from push:', error)
+      return false
+    }
+  }, [isClient])
+
   const value: NotificationContextType = {
     notifications,
     unreadCount,
@@ -238,7 +290,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     removeNotification,
     clearAllNotifications,
     requestNotificationPermission,
-    isNotificationSupported
+    isNotificationSupported,
+    isPushSupported,
+    subscribeToPush,
+    unsubscribeFromPush,
+    isPushSubscribed
   }
 
   return (
