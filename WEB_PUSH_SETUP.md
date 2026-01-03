@@ -16,8 +16,18 @@ This guide will help you set up web push notifications that work across all brow
 1. HTTPS enabled (required for push notifications)
    - Local development: Use `https://localhost:3000` or a tunneling service like ngrok
    - Production: Ensure your domain has SSL certificate
+   - **Vercel**: HTTPS is automatically provided ✅
 
 2. Generate VAPID keys
+
+## 🚀 Vercel Deployment
+
+If deploying to Vercel, see `VERCEL_PUSH_NOTIFICATIONS_SETUP.md` for Vercel-specific instructions.
+
+**Quick Vercel Setup:**
+1. Generate keys: `npm run generate:vapid-keys`
+2. Add to Vercel: Settings → Environment Variables
+3. Deploy - that's it!
 
 ## 🚀 Setup Steps
 

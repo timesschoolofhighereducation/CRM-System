@@ -22,9 +22,12 @@ async function getWebPush() {
 }
 
 // Initialize web-push with VAPID keys
+// Vercel environment variables are automatically available
+// NEXT_PUBLIC_ prefix makes the public key available to client-side code
+// Private key is server-side only (no NEXT_PUBLIC_ prefix)
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
-const vapidSubject = process.env.VAPID_SUBJECT || `mailto:${process.env.NEXT_PUBLIC_APP_EMAIL || 'admin@example.com'}`
+const vapidSubject = process.env.VAPID_SUBJECT || `mailto:${process.env.NEXT_PUBLIC_APP_EMAIL || process.env.APP_EMAIL || 'admin@example.com'}`
 
 // Initialize VAPID details (async, called when needed)
 async function initializeVapid() {
