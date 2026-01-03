@@ -144,11 +144,6 @@ Vercel is the easiest way to deploy Next.js applications.
 3. **Add Environment Variables**
    - In Vercel dashboard, go to Settings > Environment Variables
    - Add all required variables from [Environment Variables](#environment-variables)
-   - **For Web Push Notifications**, add:
-     - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (generate with `npm run generate:vapid-keys`)
-     - `VAPID_PRIVATE_KEY` (from same command)
-     - `VAPID_SUBJECT` (e.g., `mailto:admin@example.com`)
-     - See `VERCEL_PUSH_NOTIFICATIONS_SETUP.md` for detailed instructions
 
 4. **Deploy**
    - Click "Deploy"
