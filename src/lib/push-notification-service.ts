@@ -1,13 +1,24 @@
 import { prisma } from '@/lib/prisma'
 
 // Server-side only import - web-push cannot be used on client
-let webpush: any = null
-if (typeof window === 'undefined') {
-  try {
-    webpush = require('web-push')
-  } catch (error) {
-    console.warn('web-push not available:', error)
+// Use dynamic import to avoid client-side bundling
+let webpush: typeof import('web-push') | null = null
+
+async function getWebPush() {
+  if (typeof window !== 'undefined') {
+    return null
   }
+  
+  if (!webpush) {
+    try {
+      webpush = await import('web-push')
+    } catch (error) {
+      console.warn('web-push not available:', error)
+      return null
+    }
+  }
+  
+  return webpush
 }
 
 // Initialize web-push with VAPID keys
@@ -15,13 +26,18 @@ const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.V
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
 const vapidSubject = process.env.VAPID_SUBJECT || `mailto:${process.env.NEXT_PUBLIC_APP_EMAIL || 'admin@example.com'}`
 
-// Initialize VAPID details
-if (webpush && vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(
-    vapidSubject,
-    vapidPublicKey,
-    vapidPrivateKey
-  )
+// Initialize VAPID details (async, called when needed)
+async function initializeVapid() {
+  if (typeof window !== 'undefined') return
+  
+  const wp = await getWebPush()
+  if (wp && vapidPublicKey && vapidPrivateKey) {
+    wp.setVapidDetails(
+      vapidSubject,
+      vapidPublicKey,
+      vapidPrivateKey
+    )
+  }
 }
 
 export interface PushNotificationPayload {
@@ -47,12 +63,21 @@ export async function sendPushNotification(
   userId: string,
   payload: PushNotificationPayload
 ): Promise<{ success: number; failed: number }> {
-  if (!webpush) {
-    console.warn('web-push not available (client-side or not installed)')
+  if (typeof window !== 'undefined') {
+    console.warn('sendPushNotification should only be called on the server')
     return { success: 0, failed: 0 }
   }
 
-  if (!vapidPublicKey || !vapidPrivateKey) {
+  const wp = await getWebPush()
+  if (!wp) {
+    console.warn('web-push not available (not installed or error loading)')
+    return { success: 0, failed: 0 }
+  }
+
+  // Initialize VAPID if not already done
+  if (vapidPublicKey && vapidPrivateKey) {
+    await initializeVapid()
+  } else {
     console.warn('Cannot send push notification: VAPID keys not configured')
     return { success: 0, failed: 0 }
   }
@@ -92,7 +117,7 @@ export async function sendPushNotification(
   // Send to all subscriptions
   const sendPromises = subscriptions.map(async (subscription) => {
     try {
-      await webpush.sendNotification(
+      await wp.sendNotification(
         {
           endpoint: subscription.endpoint,
           keys: {
