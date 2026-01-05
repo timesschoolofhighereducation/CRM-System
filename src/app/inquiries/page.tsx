@@ -5,6 +5,8 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { NewInquiryButton } from '@/components/inquiries/new-inquiry-button'
 import { InquiriesTable } from '@/components/inquiries/inquiries-table'
+import { RequestInquiriesTable } from '@/components/inquiries/request-inquiries-table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function InquiriesPage() {
   const { user, loading: authLoading } = useAuth()
@@ -62,7 +64,18 @@ export default function InquiriesPage() {
           {hasPermission('CREATE_SEEKER') && <NewInquiryButton />}
         </div>
         
-        <InquiriesTable />
+        <Tabs defaultValue="inquiries" className="w-full">
+          <TabsList>
+            <TabsTrigger value="inquiries">All Inquiries</TabsTrigger>
+            <TabsTrigger value="requests">Request Inquiries</TabsTrigger>
+          </TabsList>
+          <TabsContent value="inquiries" className="mt-4">
+            <InquiriesTable />
+          </TabsContent>
+          <TabsContent value="requests" className="mt-4">
+            <RequestInquiriesTable />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   )

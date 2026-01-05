@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Eye, Phone, MessageSquare, Mail, User, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { Eye, Phone, MessageSquare, Mail, User, Loader2, Pencil, Trash2, FileSpreadsheet, Download } from 'lucide-react'
 import { InquiryViewDialog } from './inquiry-view-dialog'
 import { EditInquiryDialog } from './edit-inquiry-dialog'
 import { InquirySearchFilter } from './inquiry-search-filter'
@@ -83,6 +83,7 @@ export function InquiriesTable() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
+  const [exporting, setExporting] = useState<string | null>(null)
   const observerTarget = useRef<HTMLDivElement>(null)
   const fetchInquiriesAbortController = useRef<AbortController | null>(null)
   const lastFetchTime = useRef<number>(0)
@@ -321,6 +322,40 @@ export function InquiriesTable() {
     return defaultColors[source] || 'bg-gray-100 text-gray-800'
   }
 
+  const handleExport = async (format: 'excel' | 'csv') => {
+    try {
+      setExporting(format)
+      const response = await fetch(`/api/inquiries/export?format=${format}`)
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to export inquiries' }))
+        toast.error(error.error || 'Failed to export inquiries')
+        return
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      
+      const extension = format === 'excel' ? 'xlsx' : 'csv'
+      const filename = `inquiries-export-${new Date().toISOString().split('T')[0]}.${extension}`
+      a.download = filename
+      
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      a.remove()
+      
+      toast.success(`Inquiries exported successfully as ${format.toUpperCase()}`)
+    } catch (error) {
+      console.error('Error exporting inquiries:', error)
+      toast.error('Failed to export inquiries')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   if (loading) {
     return (
       <Card className="shadow-sm">
@@ -346,11 +381,37 @@ export function InquiriesTable() {
 
       <Card className="shadow-sm border-gray-200">
         <CardHeader className="bg-gray-50/50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-gray-900">All Inquiries</CardTitle>
-            <Badge variant="secondary" className="text-xs font-medium">
-              {filteredInquiries.length} {filteredInquiries.length === 1 ? 'inquiry' : 'inquiries'}
-            </Badge>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center justify-between sm:justify-start gap-4">
+              <CardTitle className="text-lg font-semibold text-gray-900">All Inquiries</CardTitle>
+              <Badge variant="secondary" className="text-xs font-medium">
+                {filteredInquiries.length} {filteredInquiries.length === 1 ? 'inquiry' : 'inquiries'}
+              </Badge>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Button
+                onClick={() => handleExport('excel')}
+                variant="outline"
+                size="sm"
+                disabled={exporting !== null}
+                className="w-full sm:w-auto"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{exporting === 'excel' ? 'Exporting...' : 'Export Excel'}</span>
+                <span className="sm:hidden">{exporting === 'excel' ? 'Exporting...' : 'Excel'}</span>
+              </Button>
+              <Button
+                onClick={() => handleExport('csv')}
+                variant="outline"
+                size="sm"
+                disabled={exporting !== null}
+                className="w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{exporting === 'csv' ? 'Exporting...' : 'Export CSV'}</span>
+                <span className="sm:hidden">{exporting === 'csv' ? 'Exporting...' : 'CSV'}</span>
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
