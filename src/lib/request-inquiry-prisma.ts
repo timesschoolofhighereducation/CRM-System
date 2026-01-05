@@ -1,34 +1,37 @@
 // Dynamic import to handle the separate Prisma client for request inquiries
 // This uses a custom output path to avoid conflicts with the main Prisma client
-let RequestInquiryPrismaClient: any = null
-
-try {
-  // Try to import the request inquiry Prisma client from the custom output path
-  // Path: node_modules/.prisma/request-inquiry-client
-  RequestInquiryPrismaClient = require('../../node_modules/.prisma/request-inquiry-client').PrismaClient
-} catch (error: any) {
-  // Only warn in development, fail silently in production to avoid breaking the app
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('Request Inquiry Prisma client not found. Run: npm run db:generate:request-inquiry')
-    console.warn('Error:', error?.message || error)
-  }
-}
 
 const globalForRequestInquiryPrisma = globalThis as unknown as {
-  requestInquiryPrisma: RequestInquiryPrismaClient | undefined
+  requestInquiryPrisma: any | undefined
 }
 
+// Lazy load the Prisma client to avoid build errors if not generated
 function createRequestInquiryPrismaClient() {
-  if (!RequestInquiryPrismaClient) {
-    throw new Error('Request Inquiry Prisma client not available. Please run: npm run generate:request-inquiry-client')
-  }
+  // Use dynamic import in a way that's compatible with both build and runtime
   try {
-    return new RequestInquiryPrismaClient({
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const RequestInquiryClient = require('../../node_modules/.prisma/request-inquiry-client')
+    const PrismaClient = RequestInquiryClient.PrismaClient
+    
+    if (!PrismaClient) {
+      throw new Error('PrismaClient not found in request-inquiry-client module')
+    }
+    
+    return new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     })
-  } catch (error) {
-    console.error('Failed to create Request Inquiry Prisma client:', error)
-    throw error
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Request Inquiry Prisma client not found. Run: npm run db:generate:request-inquiry')
+      console.warn('Error:', errorMessage)
+    }
+    // Return a mock client that throws helpful errors
+    return new Proxy({}, {
+      get() {
+        throw new Error('Request Inquiry Prisma client not available. Please run: npm run db:generate:request-inquiry')
+      }
+    })
   }
 }
 
@@ -41,4 +44,3 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   globalForRequestInquiryPrisma.requestInquiryPrisma = requestInquiryPrisma
 }
-
