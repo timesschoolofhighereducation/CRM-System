@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { requestInquiryPrisma } from '@/lib/request-inquiry-prisma'
 import { prisma } from '@/lib/prisma'
 
-// POST /api/request-inquiries/[id]/convert - Convert request inquiry to regular inquiry
+// POST /api/request-inquiries/[id]/convert - Convert exhibition visitor to regular inquiry
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -12,29 +12,30 @@ export async function POST(
     const user = await requireAuth(request)
     const { id } = await params
 
-    // Get the request inquiry
-    const requestInquiry = await requestInquiryPrisma.requestInquiry.findUnique({
+    // Get the exhibition visitor with all related data
+    const visitor = await requestInquiryPrisma.exhibitionVisitor.findUnique({
       where: { id },
+      include: {
+        programs: {
+          include: {
+            program: true,
+          },
+        },
+        metadata: true,
+      },
     })
 
-    if (!requestInquiry) {
+    if (!visitor) {
       return NextResponse.json(
         { error: 'Request inquiry not found' },
         { status: 404 }
       )
     }
 
-    if (requestInquiry.isConverted) {
-      return NextResponse.json(
-        { error: 'This request inquiry has already been converted' },
-        { status: 400 }
-      )
-    }
-
     // Check for duplicate phone number in main database
     const existingSeeker = await prisma.seeker.findUnique({
       where: {
-        phone: requestInquiry.phone,
+        phone: visitor.workPhone,
       },
     })
 
@@ -45,28 +46,54 @@ export async function POST(
       )
     }
 
+    // Map selected programs to preferred programs in main database
+    const preferredProgramIds: string[] = []
+    if (visitor.programs && visitor.programs.length > 0) {
+      // Try to find matching programs in main database by name
+      for (const vp of visitor.programs) {
+        const mainProgram = await prisma.program.findFirst({
+          where: {
+            name: {
+              contains: vp.program.programName,
+              mode: 'insensitive',
+            },
+          },
+        })
+        if (mainProgram) {
+          preferredProgramIds.push(mainProgram.id)
+        }
+      }
+    }
+
     // Create the inquiry in the main database using the same process as POST /api/inquiries
     const seekerData: any = {
-      fullName: requestInquiry.fullName,
-      phone: requestInquiry.phone,
-      whatsapp: requestInquiry.whatsapp || false,
-      whatsappNumber: requestInquiry.whatsappNumber || null,
+      fullName: visitor.name,
+      phone: visitor.workPhone,
+      whatsapp: false,
+      whatsappNumber: null,
       notAnswering: false,
-      email: requestInquiry.email || null,
+      email: null,
       emailNotAnswering: false,
-      city: requestInquiry.city || null,
-      ageBand: requestInquiry.ageBand || null,
-      guardianPhone: requestInquiry.guardianPhone || null,
-      marketingSource: requestInquiry.marketingSource || 'REQUEST_INQUIRY',
+      city: visitor.metadata?.city || null,
+      ageBand: null,
+      guardianPhone: null,
+      marketingSource: 'EXHIBITION',
       campaignId: null,
-      preferredContactTime: requestInquiry.preferredContactTime || null,
-      preferredStatus: requestInquiry.preferredStatus || null,
+      preferredContactTime: null,
+      preferredStatus: null,
       followUpAgain: false,
       followUpDate: null,
       followUpTime: null,
-      description: requestInquiry.description || null,
-      consent: requestInquiry.consent || false,
+      description: visitor.metadata ? 
+        `Exhibition Registration - ${visitor.metadata.country || 'Unknown'} - ${visitor.metadata.browser || 'Unknown Browser'}` : 
+        'Exhibition Registration',
+      consent: true,
       createdById: user.id,
+      preferredPrograms: preferredProgramIds.length > 0 ? {
+        create: preferredProgramIds.map((programId: string) => ({
+          programId: programId,
+        })),
+      } : undefined,
     }
 
     const seeker = await prisma.seeker.create({
@@ -87,81 +114,68 @@ export async function POST(
     })
 
     // Create automatic follow-up tasks if not registering now
-    if (!seekerData.registerNow) {
-      try {
-        const firstDueDate = new Date()
-        firstDueDate.setDate(firstDueDate.getDate() + 3)
+    try {
+      const firstDueDate = new Date()
+      firstDueDate.setDate(firstDueDate.getDate() + 3)
 
-        const secondDueDate = new Date()
-        secondDueDate.setDate(secondDueDate.getDate() + 7)
+      const secondDueDate = new Date()
+      secondDueDate.setDate(secondDueDate.getDate() + 7)
 
-        const [firstFollowUpTask, secondFollowUpTask] = await Promise.all([
-          prisma.followUpTask.create({
-            data: {
-              seekerId: seeker.id,
-              assignedTo: user.id,
-              dueAt: firstDueDate,
-              purpose: 'CALLBACK',
-              notes: `Automatic follow-up #1: Primary follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
-              status: 'OPEN',
-            },
-          }),
-          prisma.followUpTask.create({
-            data: {
-              seekerId: seeker.id,
-              assignedTo: user.id,
-              dueAt: secondDueDate,
-              purpose: 'CALLBACK',
-              notes: `Automatic follow-up #2: Secondary follow-up for inquiry - ${seeker.fullName} (${seeker.phone})`,
-              status: 'OPEN',
-            },
-          }),
-        ])
+      const [firstFollowUpTask, secondFollowUpTask] = await Promise.all([
+        prisma.followUpTask.create({
+          data: {
+            seekerId: seeker.id,
+            assignedTo: user.id,
+            dueAt: firstDueDate,
+            purpose: 'CALLBACK',
+            notes: `Automatic follow-up #1: Primary follow-up for exhibition inquiry - ${seeker.fullName} (${seeker.phone})`,
+            status: 'OPEN',
+          },
+        }),
+        prisma.followUpTask.create({
+          data: {
+            seekerId: seeker.id,
+            assignedTo: user.id,
+            dueAt: secondDueDate,
+            purpose: 'CALLBACK',
+            notes: `Automatic follow-up #2: Secondary follow-up for exhibition inquiry - ${seeker.fullName} (${seeker.phone})`,
+            status: 'OPEN',
+          },
+        }),
+      ])
 
-        await Promise.all([
-          prisma.taskActionHistory.create({
-            data: {
-              taskId: firstFollowUpTask.id,
-              fromStatus: null,
-              toStatus: 'OPEN',
-              actionBy: user.id,
-              notes: 'Task created automatically from request inquiry - First follow-up (3 days)',
-            },
-          }),
-          prisma.taskActionHistory.create({
-            data: {
-              taskId: secondFollowUpTask.id,
-              fromStatus: null,
-              toStatus: 'OPEN',
-              actionBy: user.id,
-              notes: 'Task created automatically from request inquiry - Second follow-up (7 days)',
-            },
-          }),
-        ])
-      } catch (taskError) {
-        console.error('Error creating automatic follow-up tasks:', taskError)
-      }
+      await Promise.all([
+        prisma.taskActionHistory.create({
+          data: {
+            taskId: firstFollowUpTask.id,
+            fromStatus: null,
+            toStatus: 'OPEN',
+            actionBy: user.id,
+            notes: 'Task created automatically from exhibition registration - First follow-up (3 days)',
+          },
+        }),
+        prisma.taskActionHistory.create({
+          data: {
+            taskId: secondFollowUpTask.id,
+            fromStatus: null,
+            toStatus: 'OPEN',
+            actionBy: user.id,
+            notes: 'Task created automatically from exhibition registration - Second follow-up (7 days)',
+          },
+        }),
+      ])
+    } catch (taskError) {
+      console.error('Error creating automatic follow-up tasks:', taskError)
     }
 
-    // Mark request inquiry as converted
-    await requestInquiryPrisma.requestInquiry.update({
-      where: { id },
-      data: {
-        isConverted: true,
-        convertedAt: new Date(),
-        convertedById: user.id,
-      },
-    })
+    // Note: The exhibition_visitors table doesn't have an isConverted field
+    // Conversion status is tracked in the UI component state
+    // The visitor record remains in the database for historical purposes
 
     return NextResponse.json({
       success: true,
       inquiry: seeker,
-      requestInquiry: {
-        ...requestInquiry,
-        isConverted: true,
-        convertedAt: new Date(),
-        convertedById: user.id,
-      },
+      visitor: visitor,
     })
   } catch (error) {
     console.error('Error converting request inquiry:', error)
@@ -177,4 +191,3 @@ export async function POST(
     )
   }
 }
-

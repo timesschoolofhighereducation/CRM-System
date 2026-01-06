@@ -5,36 +5,50 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, MapPin, Globe, Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 
+interface Program {
+  id: number
+  programName: string
+  category: string | null
+  isActive: boolean
+}
+
+interface VisitorProgram {
+  id: string
+  program: Program
+}
+
+interface VisitorMetadata {
+  id: string
+  ipAddress: string | null
+  country: string | null
+  city: string | null
+  region: string | null
+  timezone: string | null
+  browser: string | null
+  device: string | null
+  submissionDate: string | null
+  submissionTime: string | null
+}
+
 interface RequestInquiry {
   id: string
-  fullName: string
-  phone: string
-  email?: string
-  whatsapp: boolean
-  whatsappNumber?: string
-  city?: string
-  ageBand?: string
-  guardianPhone?: string
-  marketingSource?: string
-  preferredContactTime?: string
-  preferredStatus?: number
-  description?: string
-  consent: boolean
-  isConverted: boolean
-  convertedAt?: string
-  convertedById?: string
+  name: string
+  workPhone: string
   createdAt: string
-  updatedAt: string
+  programs: VisitorProgram[]
+  metadata: VisitorMetadata | null
+  isConverted?: boolean // Track conversion status locally
 }
 
 export function RequestInquiriesTable() {
   const [requestInquiries, setRequestInquiries] = useState<RequestInquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
+  const [convertedIds, setConvertedIds] = useState<Set<string>>(new Set())
   const { user } = useAuth()
 
   const fetchRequestInquiries = async () => {
@@ -45,12 +59,19 @@ export function RequestInquiriesTable() {
         const data = await response.json()
         // Sort: non-converted first, then by creation date (newest first)
         const sorted = data.sort((a: RequestInquiry, b: RequestInquiry) => {
-          if (a.isConverted !== b.isConverted) {
-            return a.isConverted ? 1 : -1
+          const aConverted = convertedIds.has(a.id)
+          const bConverted = convertedIds.has(b.id)
+          if (aConverted !== bConverted) {
+            return aConverted ? 1 : -1
           }
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         })
-        setRequestInquiries(sorted)
+        // Mark items as converted based on local state
+        const withConvertedStatus = sorted.map((item: RequestInquiry) => ({
+          ...item,
+          isConverted: convertedIds.has(item.id),
+        }))
+        setRequestInquiries(withConvertedStatus)
       } else {
         toast.error('Failed to fetch request inquiries')
       }
@@ -67,10 +88,10 @@ export function RequestInquiriesTable() {
     // Poll for updates every 30 seconds
     const interval = setInterval(fetchRequestInquiries, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [convertedIds])
 
   const handleConvertToInquiry = async (requestInquiry: RequestInquiry) => {
-    if (convertingIds.has(requestInquiry.id)) return
+    if (convertingIds.has(requestInquiry.id) || convertedIds.has(requestInquiry.id)) return
 
     try {
       setConvertingIds(prev => new Set(prev).add(requestInquiry.id))
@@ -87,20 +108,23 @@ export function RequestInquiriesTable() {
 
       const result = await response.json()
       
-      // Update the request inquiry in the list
+      // Mark as converted
+      setConvertedIds(prev => new Set(prev).add(requestInquiry.id))
+      
+      // Update the list to move converted item to bottom
       setRequestInquiries(prev => {
         const updated = prev.map(ri => 
           ri.id === requestInquiry.id 
-            ? { ...ri, isConverted: true, convertedAt: new Date().toISOString(), convertedById: user?.id }
+            ? { ...ri, isConverted: true }
             : ri
         )
-        // Move converted item to bottom
-        const nonConverted = updated.filter(ri => !ri.isConverted)
-        const converted = updated.filter(ri => ri.isConverted)
+        // Sort: non-converted first, then by creation date
+        const nonConverted = updated.filter(ri => !convertedIds.has(ri.id) && ri.id !== requestInquiry.id)
+        const converted = updated.filter(ri => convertedIds.has(ri.id) || ri.id === requestInquiry.id)
         return [...nonConverted, ...converted]
       })
 
-      toast.success(`Inquiry created successfully for ${requestInquiry.fullName}`)
+      toast.success(`Inquiry created successfully for ${requestInquiry.name}`)
     } catch (error) {
       console.error('Error converting request inquiry:', error)
       toast.error('Failed to convert request inquiry')
@@ -130,9 +154,9 @@ export function RequestInquiriesTable() {
     <Card className="shadow-sm border-gray-200">
       <CardHeader className="bg-gray-50/50 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-900">Request Inquiries</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-900">Exhibition Registration Requests</CardTitle>
           <Badge variant="secondary" className="text-xs font-medium">
-            {requestInquiries.length} {requestInquiries.length === 1 ? 'request' : 'requests'}
+            {requestInquiries.length} {requestInquiries.length === 1 ? 'visitor' : 'visitors'}
           </Badge>
         </div>
       </CardHeader>
@@ -143,11 +167,11 @@ export function RequestInquiriesTable() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>Marketing Source</TableHead>
+                <TableHead>Programs</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Device Info</TableHead>
+                <TableHead>Registered</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -155,13 +179,20 @@ export function RequestInquiriesTable() {
               {requestInquiries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                    No request inquiries found
+                    No exhibition registrations found
                   </TableCell>
                 </TableRow>
               ) : (
                 requestInquiries.map((requestInquiry) => {
                   const isConverting = convertingIds.has(requestInquiry.id)
-                  const isConverted = requestInquiry.isConverted
+                  const isConverted = convertedIds.has(requestInquiry.id)
+                  const programs = requestInquiry.programs?.map(vp => vp.program.programName).join(', ') || 'None'
+                  const location = requestInquiry.metadata 
+                    ? `${requestInquiry.metadata.city || ''}${requestInquiry.metadata.city && requestInquiry.metadata.country ? ', ' : ''}${requestInquiry.metadata.country || ''}`.trim() || '-'
+                    : '-'
+                  const deviceInfo = requestInquiry.metadata
+                    ? `${requestInquiry.metadata.browser || 'Unknown'}${requestInquiry.metadata.device ? ` • ${requestInquiry.metadata.device}` : ''}`
+                    : '-'
                   
                   return (
                     <TableRow
@@ -172,11 +203,33 @@ export function RequestInquiriesTable() {
                           : 'hover:bg-gray-50 transition-colors'
                       }
                     >
-                      <TableCell className="font-medium">{requestInquiry.fullName}</TableCell>
-                      <TableCell>{requestInquiry.phone}</TableCell>
-                      <TableCell>{requestInquiry.email || '-'}</TableCell>
-                      <TableCell>{requestInquiry.city || '-'}</TableCell>
-                      <TableCell>{requestInquiry.marketingSource || '-'}</TableCell>
+                      <TableCell className="font-medium">{requestInquiry.name}</TableCell>
+                      <TableCell>{requestInquiry.workPhone}</TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={programs}>
+                          {programs}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {requestInquiry.metadata ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3 w-3 text-gray-400" />
+                            <span>{location}</span>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {deviceInfo}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(requestInquiry.createdAt).toLocaleDateString()}
+                        <br />
+                        <span className="text-xs text-gray-500">
+                          {new Date(requestInquiry.createdAt).toLocaleTimeString()}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         {isConverted ? (
                           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
@@ -187,9 +240,6 @@ export function RequestInquiriesTable() {
                             Pending
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(requestInquiry.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -228,4 +278,3 @@ export function RequestInquiriesTable() {
     </Card>
   )
 }
-
