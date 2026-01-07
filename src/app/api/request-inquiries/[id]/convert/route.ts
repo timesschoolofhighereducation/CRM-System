@@ -32,6 +32,14 @@ export async function POST(
       )
     }
 
+    // Check if already converted
+    if (visitor.isConverted) {
+      return NextResponse.json(
+        { error: 'This exhibition visitor has already been converted to an inquiry' },
+        { status: 400 }
+      )
+    }
+
     // Check for duplicate phone number in main database
     const existingSeeker = await prisma.seeker.findUnique({
       where: {
@@ -168,14 +176,27 @@ export async function POST(
       console.error('Error creating automatic follow-up tasks:', taskError)
     }
 
-    // Note: The exhibition_visitors table doesn't have an isConverted field
-    // Conversion status is tracked in the UI component state
-    // The visitor record remains in the database for historical purposes
+    // Mark visitor as converted in the database
+    const updatedVisitor = await requestInquiryPrisma.exhibitionVisitor.update({
+      where: { id },
+      data: {
+        isConverted: true,
+        convertedAt: new Date(),
+      },
+      include: {
+        programs: {
+          include: {
+            program: true,
+          },
+        },
+        metadata: true,
+      },
+    })
 
     return NextResponse.json({
       success: true,
       inquiry: seeker,
-      visitor: visitor,
+      visitor: updatedVisitor,
     })
   } catch (error) {
     console.error('Error converting request inquiry:', error)

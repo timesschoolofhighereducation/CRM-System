@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
         },
         metadata: true,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { isConverted: 'asc' }, // Non-converted first
+        { createdAt: 'desc' },   // Then by creation date (newest first)
+      ],
     })
 
     return NextResponse.json(visitors)

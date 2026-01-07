@@ -38,17 +38,17 @@ interface RequestInquiry {
   id: string
   name: string
   workPhone: string
+  isConverted: boolean
+  convertedAt: string | null
   createdAt: string
   programs: VisitorProgram[]
   metadata: VisitorMetadata | null
-  isConverted?: boolean // Track conversion status locally
 }
 
 export function RequestInquiriesTable() {
   const [requestInquiries, setRequestInquiries] = useState<RequestInquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
-  const [convertedIds, setConvertedIds] = useState<Set<string>>(new Set())
   const { user } = useAuth()
 
   const fetchRequestInquiries = async () => {
@@ -57,21 +57,8 @@ export function RequestInquiriesTable() {
       const response = await fetch('/api/request-inquiries')
       if (response.ok) {
         const data = await response.json()
-        // Sort: non-converted first, then by creation date (newest first)
-        const sorted = data.sort((a: RequestInquiry, b: RequestInquiry) => {
-          const aConverted = convertedIds.has(a.id)
-          const bConverted = convertedIds.has(b.id)
-          if (aConverted !== bConverted) {
-            return aConverted ? 1 : -1
-          }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        })
-        // Mark items as converted based on local state
-        const withConvertedStatus = sorted.map((item: RequestInquiry) => ({
-          ...item,
-          isConverted: convertedIds.has(item.id),
-        }))
-        setRequestInquiries(withConvertedStatus)
+        // Data is already sorted by the API (non-converted first, then by creation date)
+        setRequestInquiries(data)
       } else {
         toast.error('Failed to fetch request inquiries')
       }
@@ -88,10 +75,10 @@ export function RequestInquiriesTable() {
     // Poll for updates every 30 seconds
     const interval = setInterval(fetchRequestInquiries, 30000)
     return () => clearInterval(interval)
-  }, [convertedIds])
+  }, [])
 
   const handleConvertToInquiry = async (requestInquiry: RequestInquiry) => {
-    if (convertingIds.has(requestInquiry.id) || convertedIds.has(requestInquiry.id)) return
+    if (convertingIds.has(requestInquiry.id) || requestInquiry.isConverted) return
 
     try {
       setConvertingIds(prev => new Set(prev).add(requestInquiry.id))
@@ -108,21 +95,8 @@ export function RequestInquiriesTable() {
 
       const result = await response.json()
       
-      // Mark as converted
-      setConvertedIds(prev => new Set(prev).add(requestInquiry.id))
-      
-      // Update the list to move converted item to bottom
-      setRequestInquiries(prev => {
-        const updated = prev.map(ri => 
-          ri.id === requestInquiry.id 
-            ? { ...ri, isConverted: true }
-            : ri
-        )
-        // Sort: non-converted first, then by creation date
-        const nonConverted = updated.filter(ri => !convertedIds.has(ri.id) && ri.id !== requestInquiry.id)
-        const converted = updated.filter(ri => convertedIds.has(ri.id) || ri.id === requestInquiry.id)
-        return [...nonConverted, ...converted]
-      })
+      // Refresh the list to get updated data from database
+      await fetchRequestInquiries()
 
       toast.success(`Inquiry created successfully for ${requestInquiry.name}`)
     } catch (error) {
@@ -185,7 +159,7 @@ export function RequestInquiriesTable() {
               ) : (
                 requestInquiries.map((requestInquiry) => {
                   const isConverting = convertingIds.has(requestInquiry.id)
-                  const isConverted = convertedIds.has(requestInquiry.id)
+                  const isConverted = requestInquiry.isConverted
                   const programs = requestInquiry.programs?.map(vp => vp.program.programName).join(', ') || 'None'
                   const location = requestInquiry.metadata 
                     ? `${requestInquiry.metadata.city || ''}${requestInquiry.metadata.city && requestInquiry.metadata.country ? ', ' : ''}${requestInquiry.metadata.country || ''}`.trim() || '-'
