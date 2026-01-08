@@ -248,77 +248,38 @@ export async function PATCH(
       },
     })
 
-    // If registerNow is set to true, complete all related tasks
+    // Handle status-based task automation using service layer
+    const { handleStatusChange, normalizeStatus, isFinalStatus } = await import('@/lib/seeker-status-service')
+    
+    // Legacy: If registerNow is set to true, update status to REGISTERED
     if (dataToUpdate.registerNow === true) {
-      try {
-        const allSeekerTasks = await prisma.followUpTask.findMany({
-          where: {
-            seekerId: id,
-            status: { not: 'COMPLETED' }
-          },
-          select: { id: true, status: true }
-        })
-        
-        if (allSeekerTasks.length > 0) {
-          await Promise.all(
-            allSeekerTasks.map(async (task) => {
-              await prisma.followUpTask.update({
-                where: { id: task.id },
-                data: { status: 'COMPLETED' }
-              })
-              
-              await prisma.taskActionHistory.create({
-                data: {
-                  taskId: task.id,
-                  fromStatus: task.status,
-                  toStatus: 'COMPLETED',
-                  actionBy: _user.id,
-                  notes: `Task automatically completed - Seeker registered (registerNow=true)`
-                }
-              })
-            })
-          )
-        }
-      } catch (taskError) {
-        console.error('Error completing tasks for registered seeker:', taskError)
-        // Don't fail the request if task completion fails
-      }
+      dataToUpdate.stage = 'REGISTERED'
     }
-
-    // If stage is set to LOST (Not Interested), complete all related tasks
-    if (dataToUpdate.stage === 'LOST') {
+    
+    // Normalize the status if it's being updated
+    if (dataToUpdate.stage) {
+      dataToUpdate.stage = normalizeStatus(dataToUpdate.stage)
+    }
+    
+    // If status is being changed to a final status, handle task automation
+    const oldStatus = existingSeeker.stage
+    const newStatus = dataToUpdate.stage || oldStatus
+    
+    if (newStatus !== oldStatus && isFinalStatus(newStatus)) {
       try {
-        const allSeekerTasks = await prisma.followUpTask.findMany({
-          where: {
-            seekerId: id,
-            status: { not: 'COMPLETED' }
-          },
-          select: { id: true, status: true }
-        })
-        
-        if (allSeekerTasks.length > 0) {
-          await Promise.all(
-            allSeekerTasks.map(async (task) => {
-              await prisma.followUpTask.update({
-                where: { id: task.id },
-                data: { status: 'COMPLETED' }
-              })
-              
-              await prisma.taskActionHistory.create({
-                data: {
-                  taskId: task.id,
-                  fromStatus: task.status,
-                  toStatus: 'COMPLETED',
-                  actionBy: _user.id,
-                  notes: `Task automatically completed - Seeker marked as Not Interested (stage=LOST)`
-                }
-              })
-            })
-          )
+        const result = await handleStatusChange(
+          id,
+          newStatus,
+          _user.id,
+          oldStatus,
+          body.rejectionReason
+        )
+        if (result.tasksCompleted > 0) {
+          console.log(`Status change automation: ${result.message}`)
         }
-      } catch (taskError) {
-        console.error('Error completing tasks for not interested seeker:', taskError)
-        // Don't fail the request if task completion fails
+      } catch (statusError) {
+        console.error('Error handling status-based task completion:', statusError)
+        // Don't fail the request if status handling fails
       }
     }
 

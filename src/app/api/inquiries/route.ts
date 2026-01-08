@@ -142,7 +142,19 @@ export async function POST(request: NextRequest) {
       createdById: _user.id,
     })
     
-    // Build data object - temporarily exclude registerNow until Prisma client is regenerated
+    // Normalize stage/status - use service layer
+    const { normalizeStatus } = await import('@/lib/seeker-status-service')
+    let stage = body.stage || 'PENDING'
+    
+    // Legacy: If registerNow is true, set status to REGISTERED
+    if (body.registerNow === true) {
+      stage = 'REGISTERED'
+    }
+    
+    // Normalize the status (handles legacy statuses like LOST -> NOT_INTERESTED)
+    stage = normalizeStatus(stage)
+    
+    // Build data object
     const seekerData: any = {
       fullName: body.fullName,
       phone: body.phone,
@@ -163,6 +175,7 @@ export async function POST(request: NextRequest) {
       followUpTime: body.followUpTime || null,
       description: body.description || null,
       consent: body.consent || false,
+      stage: stage, // Use normalized status
       createdById: _user.id,
       // Create many-to-many relationships for preferred programs
       preferredPrograms: {
@@ -312,8 +325,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Automatically create 2 follow-up tasks for new inquiries
-    // BUT skip if registerNow is true (seeker is already registered)
-    const shouldCreateTasks = !body.registerNow
+    // BUT skip if status is final (REGISTERED, NOT_INTERESTED, COMPLETED)
+    const { canCreateTasks, isFinalStatus, handleStatusChange } = await import('@/lib/seeker-status-service')
+    const shouldCreateTasks = canCreateTasks(seeker.stage)
+    
     if (shouldCreateTasks) {
       try {
         const now = new Date()
@@ -378,93 +393,32 @@ export async function POST(request: NextRequest) {
           first: firstFollowUpTask.id,
           second: secondFollowUpTask.id,
         })
-
-        // If stage is LOST (Not Interested), complete all tasks immediately
-        if (seeker.stage === 'LOST') {
-          try {
-            await Promise.all([
-              prisma.followUpTask.update({
-                where: { id: firstFollowUpTask.id },
-                data: { status: 'COMPLETED' }
-              }),
-              prisma.followUpTask.update({
-                where: { id: secondFollowUpTask.id },
-                data: { status: 'COMPLETED' }
-              })
-            ])
-            
-            await Promise.all([
-              prisma.taskActionHistory.create({
-                data: {
-                  taskId: firstFollowUpTask.id,
-                  fromStatus: 'OPEN',
-                  toStatus: 'COMPLETED',
-                  actionBy: _user.id,
-                  notes: 'Task automatically completed - Seeker marked as Not Interested (stage=LOST)'
-                }
-              }),
-              prisma.taskActionHistory.create({
-                data: {
-                  taskId: secondFollowUpTask.id,
-                  fromStatus: 'OPEN',
-                  toStatus: 'COMPLETED',
-                  actionBy: _user.id,
-                  notes: 'Task automatically completed - Seeker marked as Not Interested (stage=LOST)'
-                }
-              })
-            ])
-            
-            console.log('Tasks automatically completed - Seeker marked as Not Interested')
-          } catch (completeError) {
-            console.error('Error completing tasks for not interested seeker:', completeError)
-            // Don't fail the inquiry creation if task completion fails
-          }
-        }
-
-        // If registerNow is true, complete any existing tasks
-        if (body.registerNow === true) {
-          try {
-            const allSeekerTasks = await prisma.followUpTask.findMany({
-              where: {
-                seekerId: seeker.id,
-                status: { not: 'COMPLETED' }
-              },
-              select: { id: true, status: true }
-            })
-            
-            if (allSeekerTasks.length > 0) {
-              await Promise.all(
-                allSeekerTasks.map(async (task) => {
-                  await prisma.followUpTask.update({
-                    where: { id: task.id },
-                    data: { status: 'COMPLETED' }
-                  })
-                  
-                  await prisma.taskActionHistory.create({
-                    data: {
-                      taskId: task.id,
-                      fromStatus: task.status,
-                      toStatus: 'COMPLETED',
-                      actionBy: _user.id,
-                      notes: 'Task automatically completed - Seeker registered (registerNow=true)'
-                    }
-                  })
-                })
-              )
-              
-              console.log('Tasks automatically completed - Seeker registered')
-            }
-          } catch (completeError) {
-            console.error('Error completing tasks for registered seeker:', completeError)
-            // Don't fail the inquiry creation if task completion fails
-          }
-        }
       } catch (taskError) {
         console.error('Error creating automatic follow-up tasks:', taskError)
         // Don't fail the inquiry creation if task creation fails
       }
     } else {
-      console.log('Skipping follow-up task creation - seeker is already registered (registerNow=true)')
+      console.log(`Skipping follow-up task creation - seeker status is ${seeker.stage} (final status)`)
+    }
+
+    // Handle status-based task automation using service layer
+    // If status is final (REGISTERED, NOT_INTERESTED, COMPLETED), complete all tasks
+    if (isFinalStatus(seeker.stage)) {
+      try {
+        const result = await handleStatusChange(
+          seeker.id,
+          seeker.stage,
+          _user.id,
+          undefined, // No old status on creation
+          body.rejectionReason
+        )
+        if (result.tasksCompleted > 0) {
+          console.log(`Automatically completed ${result.tasksCompleted} tasks for seeker ${seeker.id} (status: ${seeker.stage})`)
+        }
+      } catch (statusError) {
+        console.error('Error handling status-based task completion:', statusError)
+        // Don't fail the inquiry creation if status handling fails
+      }
     }
 
     return NextResponse.json(seeker, { status: 201 })

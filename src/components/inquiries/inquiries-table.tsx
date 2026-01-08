@@ -222,17 +222,99 @@ export function InquiriesTable() {
   }
 
   const getNameIndicatorColor = (inquiry: Inquiry) => {
+    // Status-based colors (highest priority) - using service layer
+    const statusColors: Record<string, string> = {
+      'REGISTERED': 'bg-green-500',
+      'NOT_INTERESTED': 'bg-red-500',
+      'COMPLETED': 'bg-blue-500',
+      'IN_PROGRESS': 'bg-yellow-500',
+      'PENDING': 'bg-gray-400',
+    }
+    
+    // Check normalized status
+    const normalizedStatus = normalizeStatus(inquiry.stage)
+    if (statusColors[normalizedStatus]) {
+      return statusColors[normalizedStatus]
+    }
+    
+    // Legacy: Check registerNow flag
     if (inquiry.registerNow) return 'bg-green-500'
+    
+    // Legacy: Direct LOST check (maps to NOT_INTERESTED)
     if (inquiry.stage === 'LOST') return 'bg-red-500'
+    
+    // Other legacy indicators
     if (inquiry.notAnswering) return 'bg-red-500'
     if (inquiry.followUpAgain) return 'bg-orange-500'
+    
     return 'bg-transparent'
   }
 
   const getRowBackgroundColor = (inquiry: Inquiry) => {
-    if (inquiry.registerNow) return 'bg-green-50 hover:bg-green-100'
-    if (inquiry.stage === 'LOST') return 'bg-red-50 hover:bg-red-100'
+    // Status-based row colors (highest priority) - using service layer
+    const statusColors: Record<string, string> = {
+      'REGISTERED': 'bg-green-50 hover:bg-green-100',
+      'NOT_INTERESTED': 'bg-red-50 hover:bg-red-100',
+      'COMPLETED': 'bg-blue-50 hover:bg-blue-100',
+      'IN_PROGRESS': 'hover:bg-yellow-50',
+      'PENDING': 'hover:bg-gray-50/30',
+    }
+    
+    // Check normalized status
+    const normalizedStatus = normalizeStatus(inquiry.stage)
+    if (statusColors[normalizedStatus]) {
+      return statusColors[normalizedStatus]
+    }
+    
+    // Legacy: Check registerNow flag
+    if (inquiry.registerNow) {
+      return 'bg-green-50 hover:bg-green-100'
+    }
+    
+    // Legacy: Direct LOST check (maps to NOT_INTERESTED)
+    if (inquiry.stage === 'LOST') {
+      return 'bg-red-50 hover:bg-red-100'
+    }
+    
     return 'hover:bg-gray-50/30'
+  }
+  
+  // Helper to normalize status (imported from service)
+  const normalizeStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'NEW': 'PENDING',
+      'ATTEMPTING_CONTACT': 'IN_PROGRESS',
+      'CONNECTED': 'IN_PROGRESS',
+      'QUALIFIED': 'IN_PROGRESS',
+      'COUNSELING_SCHEDULED': 'IN_PROGRESS',
+      'CONSIDERING': 'IN_PROGRESS',
+      'READY_TO_REGISTER': 'IN_PROGRESS',
+      'LOST': 'NOT_INTERESTED',
+    }
+    return statusMap[status] || status
+  }
+  
+  // Helper for sticky cell background (matches row color)
+  const getCellBackgroundColor = (inquiry: Inquiry): string => {
+    const normalizedStatus = normalizeStatus(inquiry.stage)
+    
+    const statusColors: Record<string, string> = {
+      'REGISTERED': 'bg-green-50 group-hover:bg-green-100',
+      'NOT_INTERESTED': 'bg-red-50 group-hover:bg-red-100',
+      'COMPLETED': 'bg-blue-50 group-hover:bg-blue-100',
+      'IN_PROGRESS': 'bg-yellow-50 group-hover:bg-yellow-50',
+      'PENDING': 'bg-white group-hover:bg-gray-50/30',
+    }
+    
+    if (statusColors[normalizedStatus]) {
+      return statusColors[normalizedStatus]
+    }
+    
+    // Legacy checks
+    if (inquiry.registerNow) return 'bg-green-50 group-hover:bg-green-100'
+    if (inquiry.stage === 'LOST') return 'bg-red-50 group-hover:bg-red-100'
+    
+    return 'bg-white group-hover:bg-gray-50/30'
   }
 
   const handleDeleteInquiry = async (inquiryId: string, inquiryName: string) => {
@@ -462,7 +544,7 @@ export function InquiriesTable() {
                 <TableBody>
                   {filteredInquiries.map((inquiry: Inquiry) => (
                     <TableRow key={inquiry.id} className={`${getRowBackgroundColor(inquiry)} transition-colors group`}>
-                      <TableCell className={`relative font-semibold text-gray-900 sticky left-0 z-10 border-r whitespace-nowrap truncate max-w-[150px] shadow-[2px_0_4px_rgba(0,0,0,0.05)] pl-4 ${inquiry.registerNow ? 'bg-green-50 group-hover:bg-green-100' : inquiry.stage === 'LOST' ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-gray-50/30'}`}>
+                      <TableCell className={`relative font-semibold text-gray-900 sticky left-0 z-10 border-r whitespace-nowrap truncate max-w-[150px] shadow-[2px_0_4px_rgba(0,0,0,0.05)] pl-4 ${getCellBackgroundColor(inquiry)}`}>
                         <span
                           className={`absolute left-0 inset-y-0 w-2 rounded-r ${getNameIndicatorColor(inquiry)}`}
                           aria-hidden="true"

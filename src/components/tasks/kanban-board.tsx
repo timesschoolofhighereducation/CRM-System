@@ -54,6 +54,7 @@ interface FollowUpTask {
     fullName: string
     phone: string
     registerNow: boolean
+    stage: string // Add stage to track seeker status
   }
   user: {
     name: string
@@ -209,6 +210,21 @@ function DroppableColumn({
   )
 }
 
+// Helper to normalize status (defined at module level for reuse)
+const normalizeStatusHelper = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    'NEW': 'PENDING',
+    'ATTEMPTING_CONTACT': 'IN_PROGRESS',
+    'CONNECTED': 'IN_PROGRESS',
+    'QUALIFIED': 'IN_PROGRESS',
+    'COUNSELING_SCHEDULED': 'IN_PROGRESS',
+    'CONSIDERING': 'IN_PROGRESS',
+    'READY_TO_REGISTER': 'IN_PROGRESS',
+    'LOST': 'NOT_INTERESTED',
+  }
+  return statusMap[status] || status
+}
+
 // Sortable Task Card Component
 function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister }: { 
   task: TaskItem
@@ -216,6 +232,12 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
   onViewHistory: (task: TaskItem) => void
   onToggleRegister: (task: TaskItem, registerNow: boolean) => void
 }) {
+  // Check if task is read-only (seeker has final status)
+  const isReadOnly = task.type === 'followup' && 'seeker' in task && (() => {
+    const normalizedStatus = normalizeStatusHelper(task.seeker.stage)
+    const finalStatuses = ['REGISTERED', 'NOT_INTERESTED', 'COMPLETED']
+    return finalStatuses.includes(normalizedStatus)
+  })()
   const {
     attributes,
     listeners,
@@ -249,15 +271,18 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
     <Card
       ref={setNodeRef}
       style={style}
-      className={`cursor-grab active:cursor-grabbing transition-all duration-200 hover:shadow-md border-l-4 ${
+      className={`transition-all duration-200 hover:shadow-md border-l-4 ${
+        isReadOnly 
+          ? 'cursor-not-allowed opacity-60 bg-gray-50' 
+          : 'cursor-grab active:cursor-grabbing'
+      } ${
         isDragging ? 'opacity-50 scale-95' : 'hover:scale-[1.02] shadow-sm'
       } ${
         task.type === 'regular' 
           ? 'border-l-blue-500 bg-white' 
           : 'border-l-purple-500 bg-white'
       }`}
-      {...attributes}
-      {...listeners}
+      {...(isReadOnly ? {} : { ...attributes, ...listeners })}
     >
       <CardContent className="p-3">
         <div className="space-y-2">
@@ -580,6 +605,21 @@ export function KanbanBoard() {
       return
     }
 
+    // GUARD: Check if seeker has final status (REGISTERED, NOT_INTERESTED, COMPLETED)
+    // Tasks for final statuses cannot be manually moved
+    if (task.type === 'followup' && 'seeker' in task) {
+      const normalizedStatus = normalizeStatusHelper(task.seeker.stage)
+      const finalStatuses = ['REGISTERED', 'NOT_INTERESTED', 'COMPLETED']
+      
+      if (finalStatuses.includes(normalizedStatus)) {
+        toast.error('Cannot move task', {
+          description: `This task is read-only because the seeker status is ${normalizedStatus}. Tasks are automatically managed based on seeker status.`,
+          duration: 5000,
+        })
+        return
+      }
+    }
+
     // Get valid column statuses
     const validStatuses = statusColumns.map(col => col.id)
     
@@ -624,32 +664,33 @@ export function KanbanBoard() {
     }
 
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
+      // Update seeker status to REGISTERED using the inquiry update endpoint
+      const response = await fetch(`/api/inquiries/${task.seeker.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          status: task.status, // Keep current status
-          registerNow 
+          stage: registerNow ? 'REGISTERED' : task.seeker.stage,
+          registerNow // Legacy support
         }),
       })
 
       if (response.ok) {
         if (registerNow) {
-          // If registering, all tasks for this seeker will be moved to COMPLETED
+          // Service layer will auto-complete all tasks for this seeker
           toast.success('Seeker Registered!', {
-            description: `All tasks for ${'seeker' in task ? task.seeker.fullName : 'this seeker'} have been automatically moved to Completed`,
+            description: `All tasks for ${task.seeker.fullName} have been automatically completed. Status set to REGISTERED.`,
             duration: 4000,
           })
         } else {
           toast.success('Registration updated', {
-            description: `${'seeker' in task ? task.seeker.fullName : 'Task'} marked as Not Registered`,
+            description: `${task.seeker.fullName} marked as Not Registered`,
             duration: 3000,
           })
         }
         
-        // Refresh to get latest data (tasks will be moved to COMPLETED if registerNow was true)
+        // Refresh to get latest data (tasks will be auto-completed by service layer)
         await fetchTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))

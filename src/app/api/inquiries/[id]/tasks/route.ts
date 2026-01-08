@@ -65,11 +65,33 @@ export async function POST(
     if (!isAdminRole(_user.role)) {
       seekerWhere.createdById = _user.id
     }
-    const seeker = await prisma.seeker.findFirst({ where: seekerWhere, select: { id: true } })
+    const seeker = await prisma.seeker.findFirst({ 
+      where: seekerWhere, 
+      select: { 
+        id: true,
+        fullName: true,
+        stage: true,
+      } 
+    })
     if (!seeker) {
       return NextResponse.json(
         { error: 'Inquiry not found or access denied' },
         { status: 404 }
+      )
+    }
+    
+    // GUARD: Validate task creation using service layer
+    // Prevents tasks for REGISTERED, NOT_INTERESTED, or COMPLETED seekers
+    const { validateTaskCreation } = await import('@/lib/seeker-status-service')
+    try {
+      await validateTaskCreation(id)
+    } catch (validationError) {
+      const message = validationError instanceof Error 
+        ? validationError.message 
+        : 'Cannot create task for this seeker'
+      return NextResponse.json(
+        { error: message },
+        { status: 400 }
       )
     }
     

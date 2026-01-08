@@ -472,14 +472,24 @@ enum CampaignStatus {
 }
 
 enum SeekerStage {
-  NEW
-  ATTEMPTING_CONTACT
-  CONNECTED
-  QUALIFIED
-  COUNSELING_SCHEDULED
-  CONSIDERING
-  READY_TO_REGISTER
-  LOST
+  // Active statuses - can create tasks
+  PENDING              // Initial state, waiting for first contact
+  IN_PROGRESS          // Actively being worked on
+  
+  // Final statuses - cannot create tasks, auto-complete existing tasks
+  REGISTERED           // Successfully registered (GREEN in UI)
+  NOT_INTERESTED       // Not interested/Lost (RED in UI)
+  COMPLETED            // Process completed
+  
+  // Legacy statuses - for backward compatibility
+  NEW                  // Maps to PENDING
+  ATTEMPTING_CONTACT   // Maps to IN_PROGRESS
+  CONNECTED            // Maps to IN_PROGRESS
+  QUALIFIED            // Maps to IN_PROGRESS
+  COUNSELING_SCHEDULED // Maps to IN_PROGRESS
+  CONSIDERING          // Maps to IN_PROGRESS
+  READY_TO_REGISTER    // Maps to IN_PROGRESS
+  LOST                 // Maps to NOT_INTERESTED
 }
 
 enum ActivityType {
