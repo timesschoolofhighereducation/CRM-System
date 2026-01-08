@@ -70,7 +70,7 @@ export default function InquiriesPage() {
             <TabsTrigger value="requests">Request Inquiries</TabsTrigger>
           </TabsList>
           <TabsContent value="inquiries" className="mt-4">
-            <InquiriesTable />
+        <InquiriesTable />
           </TabsContent>
           <TabsContent value="requests" className="mt-4">
             <RequestInquiriesTable />

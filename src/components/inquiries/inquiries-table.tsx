@@ -222,10 +222,17 @@ export function InquiriesTable() {
   }
 
   const getNameIndicatorColor = (inquiry: Inquiry) => {
+    if (inquiry.registerNow) return 'bg-green-500'
+    if (inquiry.stage === 'LOST') return 'bg-red-500'
     if (inquiry.notAnswering) return 'bg-red-500'
     if (inquiry.followUpAgain) return 'bg-orange-500'
-    if (inquiry.registerNow) return 'bg-green-500'
     return 'bg-transparent'
+  }
+
+  const getRowBackgroundColor = (inquiry: Inquiry) => {
+    if (inquiry.registerNow) return 'bg-green-50 hover:bg-green-100'
+    if (inquiry.stage === 'LOST') return 'bg-red-50 hover:bg-red-100'
+    return 'hover:bg-gray-50/30'
   }
 
   const handleDeleteInquiry = async (inquiryId: string, inquiryName: string) => {
@@ -383,10 +390,10 @@ export function InquiriesTable() {
         <CardHeader className="bg-gray-50/50 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center justify-between sm:justify-start gap-4">
-              <CardTitle className="text-lg font-semibold text-gray-900">All Inquiries</CardTitle>
-              <Badge variant="secondary" className="text-xs font-medium">
-                {filteredInquiries.length} {filteredInquiries.length === 1 ? 'inquiry' : 'inquiries'}
-              </Badge>
+            <CardTitle className="text-lg font-semibold text-gray-900">All Inquiries</CardTitle>
+            <Badge variant="secondary" className="text-xs font-medium">
+              {filteredInquiries.length} {filteredInquiries.length === 1 ? 'inquiry' : 'inquiries'}
+            </Badge>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
@@ -454,8 +461,8 @@ export function InquiriesTable() {
                 </TableHeader>
                 <TableBody>
                   {filteredInquiries.map((inquiry: Inquiry) => (
-                    <TableRow key={inquiry.id} className="hover:bg-gray-50/30 transition-colors group">
-                      <TableCell className="relative font-semibold text-gray-900 sticky left-0 bg-white group-hover:bg-gray-50/30 z-10 border-r whitespace-nowrap truncate max-w-[150px] shadow-[2px_0_4px_rgba(0,0,0,0.05)] pl-4">
+                    <TableRow key={inquiry.id} className={`${getRowBackgroundColor(inquiry)} transition-colors group`}>
+                      <TableCell className={`relative font-semibold text-gray-900 sticky left-0 z-10 border-r whitespace-nowrap truncate max-w-[150px] shadow-[2px_0_4px_rgba(0,0,0,0.05)] pl-4 ${inquiry.registerNow ? 'bg-green-50 group-hover:bg-green-100' : inquiry.stage === 'LOST' ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-gray-50/30'}`}>
                         <span
                           className={`absolute left-0 inset-y-0 w-2 rounded-r ${getNameIndicatorColor(inquiry)}`}
                           aria-hidden="true"

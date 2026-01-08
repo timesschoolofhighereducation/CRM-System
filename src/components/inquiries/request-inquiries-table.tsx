@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Loader2, MapPin, Globe, Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { NewInquiryDialog } from './new-inquiry-dialog'
 
 interface Program {
   id: number
@@ -49,6 +50,8 @@ export function RequestInquiriesTable() {
   const [requestInquiries, setRequestInquiries] = useState<RequestInquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedVisitor, setSelectedVisitor] = useState<RequestInquiry | null>(null)
   const { user } = useAuth()
 
   const fetchRequestInquiries = async () => {
@@ -77,37 +80,39 @@ export function RequestInquiriesTable() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleConvertToInquiry = async (requestInquiry: RequestInquiry) => {
-    if (convertingIds.has(requestInquiry.id) || requestInquiry.isConverted) return
+  const handleConvertToInquiry = (requestInquiry: RequestInquiry) => {
+    if (requestInquiry.isConverted) return
+    
+    // Open the dialog with pre-filled data
+    setSelectedVisitor(requestInquiry)
+    setIsDialogOpen(true)
+  }
 
+  const handleInquiryCreated = async (visitorId: string) => {
     try {
-      setConvertingIds(prev => new Set(prev).add(requestInquiry.id))
-      
-      const response = await fetch(`/api/request-inquiries/${requestInquiry.id}/convert`, {
+      // Mark the visitor as converted in the database
+      const response = await fetch(`/api/request-inquiries/${visitorId}/mark-converted`, {
         method: 'POST',
       })
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to convert request inquiry' }))
-        toast.error(error.error || 'Failed to convert request inquiry')
-        return
+        const error = await response.json().catch(() => ({ error: 'Failed to mark visitor as converted' }))
+        console.error('Error marking visitor as converted:', error)
+        // Don't show error to user since inquiry was already created successfully
       }
 
-      const result = await response.json()
-      
       // Refresh the list to get updated data from database
       await fetchRequestInquiries()
-
-      toast.success(`Inquiry created successfully for ${requestInquiry.name}`)
     } catch (error) {
-      console.error('Error converting request inquiry:', error)
-      toast.error('Failed to convert request inquiry')
-    } finally {
-      setConvertingIds(prev => {
-        const next = new Set(prev)
-        next.delete(requestInquiry.id)
-        return next
-      })
+      console.error('Error marking visitor as converted:', error)
+      // Don't show error to user since inquiry was already created successfully
+    }
+  }
+
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open)
+    if (!open) {
+      setSelectedVisitor(null)
     }
   }
 
@@ -249,6 +254,19 @@ export function RequestInquiriesTable() {
           </Table>
         </div>
       </CardContent>
+      
+      <NewInquiryDialog
+        open={isDialogOpen}
+        onOpenChange={handleDialogClose}
+        initialData={selectedVisitor ? {
+          id: selectedVisitor.id,
+          name: selectedVisitor.name,
+          workPhone: selectedVisitor.workPhone,
+          programs: selectedVisitor.programs,
+          metadata: selectedVisitor.metadata,
+        } : null}
+        onInquiryCreated={handleInquiryCreated}
+      />
     </Card>
   )
 }

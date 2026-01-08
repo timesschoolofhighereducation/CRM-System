@@ -149,9 +149,23 @@ const inquirySchema = z.object({
 
 type InquiryFormData = z.infer<typeof inquirySchema>
 
+interface ExhibitionVisitorData {
+  id: string
+  name: string
+  workPhone: string
+  programs?: Array<{ program: { programName: string; id: number } }>
+  metadata?: {
+    city?: string | null
+    country?: string | null
+    email?: string | null
+  } | null
+}
+
 interface NewInquiryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialData?: ExhibitionVisitorData | null
+  onInquiryCreated?: (visitorId: string) => void
 }
 
 // Sri Lankan districts list (will be shown in alphabetical order by default)
@@ -181,7 +195,7 @@ interface Campaign {
   imageUrl?: string
 }
 
-export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) {
+export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCreated }: NewInquiryDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [programs, setPrograms] = useState<Array<{ id: string; name: string; level: string; campus: string }>>([])
   const [programsLoading, setProgramsLoading] = useState(false)
@@ -324,45 +338,92 @@ export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) 
   // Initialize district search when form is opened
   useEffect(() => {
     if (open) {
-      const currentDistrict = form.getValues('district')
-      if (currentDistrict) {
-        setDistrictSearch(currentDistrict)
-      }
-      // Reset form validation errors when dialog opens
       form.clearErrors()
-      // Reset form state
-      form.reset({
-        fullName: '',
-        phone: '',
-        whatsappNumber: '',
-        email: '',
-        district: '',
-        age: undefined,
-        guardianPhone: '',
-        programInterestId: '',
-        marketingSource: '',
-        campaignId: '',
-        preferredContactTime: '',
-        preferredStatus: undefined,
-        followUpAgain: false,
-        followUpDate: '',
-        followUpTime: '',
-        description: '',
-        callStartTime: '',
-        callMode: 'AUTO',
-        whatsapp: false,
-        notAnswering: false,
-        emailNotAnswering: false,
-        consent: false,
-        registerNow: false,
-      })
-      // Reset other state
-      setSelectedProgramIds([])
-      setProgramSearch('')
-      setDistrictSearch('')
-      setCampaigns([])
+      
+      // If initialData is provided, pre-fill the form
+      if (initialData) {
+        const defaultValues = {
+          fullName: initialData.name || '',
+          phone: initialData.workPhone || '',
+          whatsappNumber: '',
+          email: initialData.metadata?.email || '',
+          district: initialData.metadata?.city || '',
+          age: undefined,
+          guardianPhone: '',
+          programInterestId: '',
+          marketingSource: 'EXHIBITION',
+          campaignId: '',
+          preferredContactTime: '',
+          preferredStatus: undefined,
+          followUpAgain: false,
+          followUpDate: '',
+          followUpTime: '',
+          description: initialData.metadata 
+            ? `Exhibition Registration - ${initialData.metadata.country || 'Unknown'}`
+            : 'Exhibition Registration',
+          callStartTime: '',
+          callMode: 'AUTO' as const,
+          whatsapp: false,
+          notAnswering: false,
+          emailNotAnswering: false,
+          consent: true,
+          registerNow: false,
+        }
+        form.reset(defaultValues)
+        setDistrictSearch(defaultValues.district)
+        
+        // Set selected programs after programs are loaded
+        if (initialData.programs && initialData.programs.length > 0 && programs.length > 0) {
+          const programNames = initialData.programs.map(vp => vp.program.programName)
+          const matchingPrograms = programs.filter(p => 
+            programNames.some(name => 
+              p.name.toLowerCase().includes(name.toLowerCase()) || 
+              name.toLowerCase().includes(p.name.toLowerCase())
+            )
+          )
+          if (matchingPrograms.length > 0) {
+            setSelectedProgramIds(matchingPrograms.map(p => p.id))
+          }
+        }
+      } else {
+        // Reset form state when no initial data
+        const currentDistrict = form.getValues('district')
+        if (currentDistrict) {
+          setDistrictSearch(currentDistrict)
+        }
+        form.reset({
+          fullName: '',
+          phone: '',
+          whatsappNumber: '',
+          email: '',
+          district: '',
+          age: undefined,
+          guardianPhone: '',
+          programInterestId: '',
+          marketingSource: '',
+          campaignId: '',
+          preferredContactTime: '',
+          preferredStatus: undefined,
+          followUpAgain: false,
+          followUpDate: '',
+          followUpTime: '',
+          description: '',
+          callStartTime: '',
+          callMode: 'AUTO' as const,
+          whatsapp: false,
+          notAnswering: false,
+          emailNotAnswering: false,
+          consent: false,
+          registerNow: false,
+        })
+        setSelectedProgramIds([])
+        setProgramSearch('')
+        setDistrictSearch('')
+        setCampaigns([])
+        setAutoFilled(false)
+      }
     }
-  }, [open, form])
+  }, [open, form, initialData, programs])
 
   // If Date Auto is ON, set call start time automatically when opening the dialog
   useEffect(() => {
@@ -712,6 +773,12 @@ export function NewInquiryDialog({ open, onOpenChange }: NewInquiryDialogProps) 
         : 'Inquiry created successfully'
       
       toast.success(successMessage)
+      
+      // If this was created from an exhibition visitor, mark it as converted
+      if (initialData && onInquiryCreated) {
+        onInquiryCreated(initialData.id)
+      }
+      
       form.reset()
       onOpenChange(false)
       // Refresh the inquiries list

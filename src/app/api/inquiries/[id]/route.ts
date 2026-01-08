@@ -248,6 +248,80 @@ export async function PATCH(
       },
     })
 
+    // If registerNow is set to true, complete all related tasks
+    if (dataToUpdate.registerNow === true) {
+      try {
+        const allSeekerTasks = await prisma.followUpTask.findMany({
+          where: {
+            seekerId: id,
+            status: { not: 'COMPLETED' }
+          },
+          select: { id: true, status: true }
+        })
+        
+        if (allSeekerTasks.length > 0) {
+          await Promise.all(
+            allSeekerTasks.map(async (task) => {
+              await prisma.followUpTask.update({
+                where: { id: task.id },
+                data: { status: 'COMPLETED' }
+              })
+              
+              await prisma.taskActionHistory.create({
+                data: {
+                  taskId: task.id,
+                  fromStatus: task.status,
+                  toStatus: 'COMPLETED',
+                  actionBy: _user.id,
+                  notes: `Task automatically completed - Seeker registered (registerNow=true)`
+                }
+              })
+            })
+          )
+        }
+      } catch (taskError) {
+        console.error('Error completing tasks for registered seeker:', taskError)
+        // Don't fail the request if task completion fails
+      }
+    }
+
+    // If stage is set to LOST (Not Interested), complete all related tasks
+    if (dataToUpdate.stage === 'LOST') {
+      try {
+        const allSeekerTasks = await prisma.followUpTask.findMany({
+          where: {
+            seekerId: id,
+            status: { not: 'COMPLETED' }
+          },
+          select: { id: true, status: true }
+        })
+        
+        if (allSeekerTasks.length > 0) {
+          await Promise.all(
+            allSeekerTasks.map(async (task) => {
+              await prisma.followUpTask.update({
+                where: { id: task.id },
+                data: { status: 'COMPLETED' }
+              })
+              
+              await prisma.taskActionHistory.create({
+                data: {
+                  taskId: task.id,
+                  fromStatus: task.status,
+                  toStatus: 'COMPLETED',
+                  actionBy: _user.id,
+                  notes: `Task automatically completed - Seeker marked as Not Interested (stage=LOST)`
+                }
+              })
+            })
+          )
+        }
+      } catch (taskError) {
+        console.error('Error completing tasks for not interested seeker:', taskError)
+        // Don't fail the request if task completion fails
+      }
+    }
+
     // Log activity: Inquiry updated
     try {
       await logUserActivity({

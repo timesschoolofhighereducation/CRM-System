@@ -378,6 +378,87 @@ export async function POST(request: NextRequest) {
           first: firstFollowUpTask.id,
           second: secondFollowUpTask.id,
         })
+
+        // If stage is LOST (Not Interested), complete all tasks immediately
+        if (seeker.stage === 'LOST') {
+          try {
+            await Promise.all([
+              prisma.followUpTask.update({
+                where: { id: firstFollowUpTask.id },
+                data: { status: 'COMPLETED' }
+              }),
+              prisma.followUpTask.update({
+                where: { id: secondFollowUpTask.id },
+                data: { status: 'COMPLETED' }
+              })
+            ])
+            
+            await Promise.all([
+              prisma.taskActionHistory.create({
+                data: {
+                  taskId: firstFollowUpTask.id,
+                  fromStatus: 'OPEN',
+                  toStatus: 'COMPLETED',
+                  actionBy: _user.id,
+                  notes: 'Task automatically completed - Seeker marked as Not Interested (stage=LOST)'
+                }
+              }),
+              prisma.taskActionHistory.create({
+                data: {
+                  taskId: secondFollowUpTask.id,
+                  fromStatus: 'OPEN',
+                  toStatus: 'COMPLETED',
+                  actionBy: _user.id,
+                  notes: 'Task automatically completed - Seeker marked as Not Interested (stage=LOST)'
+                }
+              })
+            ])
+            
+            console.log('Tasks automatically completed - Seeker marked as Not Interested')
+          } catch (completeError) {
+            console.error('Error completing tasks for not interested seeker:', completeError)
+            // Don't fail the inquiry creation if task completion fails
+          }
+        }
+
+        // If registerNow is true, complete any existing tasks
+        if (body.registerNow === true) {
+          try {
+            const allSeekerTasks = await prisma.followUpTask.findMany({
+              where: {
+                seekerId: seeker.id,
+                status: { not: 'COMPLETED' }
+              },
+              select: { id: true, status: true }
+            })
+            
+            if (allSeekerTasks.length > 0) {
+              await Promise.all(
+                allSeekerTasks.map(async (task) => {
+                  await prisma.followUpTask.update({
+                    where: { id: task.id },
+                    data: { status: 'COMPLETED' }
+                  })
+                  
+                  await prisma.taskActionHistory.create({
+                    data: {
+                      taskId: task.id,
+                      fromStatus: task.status,
+                      toStatus: 'COMPLETED',
+                      actionBy: _user.id,
+                      notes: 'Task automatically completed - Seeker registered (registerNow=true)'
+                    }
+                  })
+                })
+              )
+              
+              console.log('Tasks automatically completed - Seeker registered')
+            }
+          } catch (completeError) {
+            console.error('Error completing tasks for registered seeker:', completeError)
+            // Don't fail the inquiry creation if task completion fails
+          }
+        }
       } catch (taskError) {
         console.error('Error creating automatic follow-up tasks:', taskError)
         // Don't fail the inquiry creation if task creation fails
