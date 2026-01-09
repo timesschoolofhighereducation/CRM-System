@@ -142,19 +142,7 @@ export async function POST(request: NextRequest) {
       createdById: _user.id,
     })
     
-    // Normalize stage/status - use service layer
-    const { normalizeStatus } = await import('@/lib/seeker-status-service')
-    let stage = body.stage || 'PENDING'
-    
-    // Legacy: If registerNow is true, set status to REGISTERED
-    if (body.registerNow === true) {
-      stage = 'REGISTERED'
-    }
-    
-    // Normalize the status (handles legacy statuses like LOST -> NOT_INTERESTED)
-    stage = normalizeStatus(stage)
-    
-    // Build data object
+    // Build data object - temporarily exclude registerNow until Prisma client is regenerated
     const seekerData: any = {
       fullName: body.fullName,
       phone: body.phone,
@@ -175,7 +163,6 @@ export async function POST(request: NextRequest) {
       followUpTime: body.followUpTime || null,
       description: body.description || null,
       consent: body.consent || false,
-      stage: stage, // Use normalized status
       createdById: _user.id,
       // Create many-to-many relationships for preferred programs
       preferredPrograms: {
@@ -325,10 +312,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Automatically create 2 follow-up tasks for new inquiries
-    // BUT skip if status is final (REGISTERED, NOT_INTERESTED, COMPLETED)
-    const { canCreateTasks, isFinalStatus, handleStatusChange } = await import('@/lib/seeker-status-service')
-    const shouldCreateTasks = canCreateTasks(seeker.stage)
-    
+    // BUT skip if registerNow is true (seeker is already registered)
+    const shouldCreateTasks = !body.registerNow
     if (shouldCreateTasks) {
       try {
         const now = new Date()
@@ -398,27 +383,7 @@ export async function POST(request: NextRequest) {
         // Don't fail the inquiry creation if task creation fails
       }
     } else {
-      console.log(`Skipping follow-up task creation - seeker status is ${seeker.stage} (final status)`)
-    }
-
-    // Handle status-based task automation using service layer
-    // If status is final (REGISTERED, NOT_INTERESTED, COMPLETED), complete all tasks
-    if (isFinalStatus(seeker.stage)) {
-      try {
-        const result = await handleStatusChange(
-          seeker.id,
-          seeker.stage,
-          _user.id,
-          undefined, // No old status on creation
-          body.rejectionReason
-        )
-        if (result.tasksCompleted > 0) {
-          console.log(`Automatically completed ${result.tasksCompleted} tasks for seeker ${seeker.id} (status: ${seeker.stage})`)
-        }
-      } catch (statusError) {
-        console.error('Error handling status-based task completion:', statusError)
-        // Don't fail the inquiry creation if status handling fails
-      }
+      console.log('Skipping follow-up task creation - seeker is already registered (registerNow=true)')
     }
 
     return NextResponse.json(seeker, { status: 201 })

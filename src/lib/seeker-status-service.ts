@@ -18,24 +18,24 @@ import { SeekerStage } from '@prisma/client'
 /**
  * Final statuses that trigger task completion and prevent new task creation
  */
-export const FINAL_STATUSES: SeekerStage[] = [
+export const FINAL_STATUSES = [
   'REGISTERED',
   'NOT_INTERESTED',
   'COMPLETED',
-]
+] as const
 
 /**
  * Legacy status mapping for backward compatibility
  */
-const LEGACY_STATUS_MAP: Record<string, SeekerStage> = {
-  'NEW': 'PENDING',
-  'ATTEMPTING_CONTACT': 'IN_PROGRESS',
-  'CONNECTED': 'IN_PROGRESS',
-  'QUALIFIED': 'IN_PROGRESS',
-  'COUNSELING_SCHEDULED': 'IN_PROGRESS',
-  'CONSIDERING': 'IN_PROGRESS',
-  'READY_TO_REGISTER': 'IN_PROGRESS',
-  'LOST': 'NOT_INTERESTED',
+const LEGACY_STATUS_MAP: Record<string, string> = {
+  'NEW': 'NEW',
+  'ATTEMPTING_CONTACT': 'ATTEMPTING_CONTACT',
+  'CONNECTED': 'CONNECTED',
+  'QUALIFIED': 'QUALIFIED',
+  'COUNSELING_SCHEDULED': 'COUNSELING_SCHEDULED',
+  'CONSIDERING': 'CONSIDERING',
+  'READY_TO_REGISTER': 'READY_TO_REGISTER',
+  'LOST': 'LOST',
 }
 
 /**
@@ -44,7 +44,7 @@ const LEGACY_STATUS_MAP: Record<string, SeekerStage> = {
 export function isFinalStatus(status: SeekerStage | string): boolean {
   // Map legacy statuses
   const mappedStatus = LEGACY_STATUS_MAP[status] || status
-  return FINAL_STATUSES.includes(mappedStatus as SeekerStage)
+  return FINAL_STATUSES.includes(mappedStatus as any)
 }
 
 /**
@@ -154,7 +154,7 @@ export async function handleStatusChange(
 /**
  * Generate appropriate note for task action history
  */
-function getStatusChangeNote(status: SeekerStage, rejectionReason?: string): string {
+function getStatusChangeNote(status: string, rejectionReason?: string): string {
   switch (status) {
     case 'REGISTERED':
       return 'Task automatically completed - Seeker registered successfully'
@@ -196,14 +196,14 @@ export async function validateTaskCreation(seekerId: string): Promise<void> {
 /**
  * Get UI color class for a status
  */
-export function getStatusColor(status: SeekerStage | string): {
+export function getStatusColor(status: string): {
   row: string
   indicator: string
   badge: string
 } {
   const normalized = normalizeStatus(status)
   
-  switch (normalized) {
+  switch (normalized as any) {
     case 'REGISTERED':
       return {
         row: 'bg-green-50 hover:bg-green-100',

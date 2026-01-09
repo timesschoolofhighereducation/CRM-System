@@ -24,7 +24,7 @@ interface FollowUpTask {
     fullName: string
     phone: string
     registerNow: boolean
-    stage: string // Add stage for status checking
+    stage: string
   }
   user: {
     name: string

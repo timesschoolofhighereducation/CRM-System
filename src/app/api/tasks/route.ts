@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
             phone: true,
             createdById: true,
             registerNow: true,
-            stage: true, // Include stage for status checking
           },
         },
         user: {
