@@ -54,9 +54,17 @@ function updateFaviconLink(dataURL: string) {
 }
 
 /**
- * Draw a badge on the favicon
+ * Badge display style
  */
-function drawBadge(count: number, faviconImg: HTMLImageElement): string {
+export type BadgeStyle = 'count' | 'dot' | 'both'
+
+/**
+ * Draw a badge on the favicon
+ * @param count - Number of unread items
+ * @param faviconImg - Original favicon image
+ * @param style - Badge style: 'count' (number), 'dot' (red dot), or 'both'
+ */
+function drawBadge(count: number, faviconImg: HTMLImageElement, style: BadgeStyle = 'count'): string {
   const canvas = getCanvas()
   const ctx = canvas.getContext('2d')
   
@@ -71,30 +79,88 @@ function drawBadge(count: number, faviconImg: HTMLImageElement): string {
   ctx.drawImage(faviconImg, 0, 0, canvas.width, canvas.height)
   
   if (count > 0) {
-    // Badge configuration
-    const badgeSize = count > 99 ? 24 : count > 9 ? 20 : 16
-    const badgeX = canvas.width - badgeSize / 2 - 2
-    const badgeY = badgeSize / 2 + 2
-    const badgeRadius = badgeSize / 2
-    
-    // Draw red circle badge
-    ctx.beginPath()
-    ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI)
-    ctx.fillStyle = '#EF4444' // Tailwind red-500
-    ctx.fill()
-    
-    // Add white border for better visibility
-    ctx.strokeStyle = '#FFFFFF'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    
-    // Draw count text
-    const displayCount = count > 99 ? '99+' : count.toString()
-    ctx.fillStyle = '#FFFFFF'
-    ctx.font = `bold ${count > 99 ? 9 : count > 9 ? 11 : 13}px Arial, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(displayCount, badgeX, badgeY)
+    if (style === 'dot') {
+      // Simple red dot indicator (small, subtle)
+      const dotSize = 10
+      const dotX = canvas.width - dotSize / 2 - 1
+      const dotY = dotSize / 2 + 1
+      
+      // Draw red dot
+      ctx.beginPath()
+      ctx.arc(dotX, dotY, dotSize / 2, 0, 2 * Math.PI)
+      ctx.fillStyle = '#EF4444' // Tailwind red-500
+      ctx.fill()
+      
+      // Add white border for better visibility
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+    } else if (style === 'count') {
+      // Badge with count number
+      const badgeSize = count > 99 ? 24 : count > 9 ? 20 : 16
+      const badgeX = canvas.width - badgeSize / 2 - 2
+      const badgeY = badgeSize / 2 + 2
+      const badgeRadius = badgeSize / 2
+      
+      // Draw red circle badge
+      ctx.beginPath()
+      ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI)
+      ctx.fillStyle = '#EF4444' // Tailwind red-500
+      ctx.fill()
+      
+      // Add white border for better visibility
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      
+      // Draw count text
+      const displayCount = count > 99 ? '99+' : count.toString()
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = `bold ${count > 99 ? 9 : count > 9 ? 11 : 13}px Arial, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(displayCount, badgeX, badgeY)
+    } else if (style === 'both') {
+      // Both dot and count badge
+      // Draw count badge (slightly larger)
+      const badgeSize = count > 99 ? 24 : count > 9 ? 20 : 16
+      const badgeX = canvas.width - badgeSize / 2 - 2
+      const badgeY = badgeSize / 2 + 2
+      const badgeRadius = badgeSize / 2
+      
+      // Draw red circle badge
+      ctx.beginPath()
+      ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI)
+      ctx.fillStyle = '#EF4444'
+      ctx.fill()
+      
+      // Add white border
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      
+      // Draw count text
+      const displayCount = count > 99 ? '99+' : count.toString()
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = `bold ${count > 99 ? 9 : count > 9 ? 11 : 13}px Arial, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(displayCount, badgeX, badgeY)
+      
+      // Add pulsing effect indicator (optional small dot at bottom)
+      const dotSize = 6
+      const dotX = canvas.width - dotSize / 2 - 2
+      const dotY = canvas.height - dotSize / 2 - 2
+      
+      ctx.beginPath()
+      ctx.arc(dotX, dotY, dotSize / 2, 0, 2 * Math.PI)
+      ctx.fillStyle = '#DC2626' // Darker red
+      ctx.fill()
+      
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
   }
   
   return canvas.toDataURL('image/png')
@@ -103,8 +169,9 @@ function drawBadge(count: number, faviconImg: HTMLImageElement): string {
 /**
  * Update the favicon with a notification badge
  * @param count - Number of unread notifications (0 to remove badge)
+ * @param style - Badge style: 'count' (default), 'dot', or 'both'
  */
-export function updateFaviconBadge(count: number): void {
+export function updateFaviconBadge(count: number, style: BadgeStyle = 'count'): void {
   // Skip in server-side rendering
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return
@@ -123,7 +190,7 @@ export function updateFaviconBadge(count: number): void {
   img.crossOrigin = 'anonymous'
   
   img.onload = () => {
-    const badgedFavicon = drawBadge(count, img)
+    const badgedFavicon = drawBadge(count, img, style)
     updateFaviconLink(badgedFavicon)
   }
   
@@ -179,9 +246,10 @@ export function updateDocumentTitle(baseTitle: string, count: number): void {
  * Update both favicon badge and document title
  * @param count - Number of unread notifications
  * @param baseTitle - Base title for the document (default: "TSHE CRM")
+ * @param style - Badge style: 'count' (default), 'dot', or 'both'
  */
-export function updateNotificationBadge(count: number, baseTitle: string = 'TSHE CRM'): void {
-  updateFaviconBadge(count)
+export function updateNotificationBadge(count: number, baseTitle: string = 'TSHE CRM', style: BadgeStyle = 'dot'): void {
+  updateFaviconBadge(count, style)
   updateDocumentTitle(baseTitle, count)
 }
 

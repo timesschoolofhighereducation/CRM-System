@@ -94,7 +94,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Update favicon badge and document title when unread count changes
   useEffect(() => {
     if (isClient) {
-      updateNotificationBadge(unreadCount, 'TSHE CRM')
+      // Use 'dot' style for simple red dot indicator
+      // Options: 'dot' (red dot only), 'count' (with number), 'both' (dot + number)
+      updateNotificationBadge(unreadCount, 'TSHE CRM', 'dot')
     }
   }, [unreadCount, isClient])
 
