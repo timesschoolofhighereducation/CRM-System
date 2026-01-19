@@ -1,14 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Loader2, MapPin, Globe, Monitor } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Plus, Loader2, MapPin, Globe, Monitor, RefreshCw, Search, CalendarIcon, Filter, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { NewInquiryDialog } from './new-inquiry-dialog'
+import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 interface Program {
   id: number
@@ -48,15 +54,30 @@ interface RequestInquiry {
 
 export function RequestInquiriesTable() {
   const [requestInquiries, setRequestInquiries] = useState<RequestInquiry[]>([])
+  const [filteredInquiries, setFilteredInquiries] = useState<RequestInquiry[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedVisitor, setSelectedVisitor] = useState<RequestInquiry | null>(null)
   const { user } = useAuth()
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([])
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([])
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({})
+  const [showFilters, setShowFilters] = useState(false)
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [campaigns, setCampaigns] = useState<any[]>([])
 
-  const fetchRequestInquiries = async () => {
+  const fetchRequestInquiries = async (isManualRefresh = false) => {
     try {
-      setLoading(true)
+      if (isManualRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       const response = await fetch('/api/request-inquiries')
       if (response.ok) {
         const data = await response.json()
@@ -70,14 +91,40 @@ export function RequestInquiriesTable() {
       toast.error('Failed to fetch request inquiries')
     } finally {
       setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  const fetchPrograms = async () => {
+    try {
+      const response = await fetch('/api/programs')
+      if (response.ok) {
+        const data = await response.json()
+        setPrograms(data)
+      }
+    } catch (error) {
+      console.error('Error fetching programs:', error)
+    }
+  }
+
+  const fetchCampaigns = async () => {
+    try {
+      const response = await fetch('/api/campaigns?limit=100')
+      if (response.ok) {
+        const data = await response.json()
+        const campaignsData = data.campaigns || (Array.isArray(data) ? data : [])
+        setCampaigns(campaignsData)
+      }
+    } catch (error) {
+      console.error('Error fetching campaigns:', error)
     }
   }
 
   useEffect(() => {
     fetchRequestInquiries()
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchRequestInquiries, 30000)
-    return () => clearInterval(interval)
+    fetchPrograms()
+    fetchCampaigns()
+    // Removed auto-refresh - now using manual refresh button only
   }, [])
 
   const handleConvertToInquiry = (requestInquiry: RequestInquiry) => {
@@ -116,6 +163,82 @@ export function RequestInquiriesTable() {
     }
   }
 
+  // Filter logic
+  useEffect(() => {
+    let filtered = [...requestInquiries]
+
+    // Universal search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(inquiry =>
+        inquiry.name.toLowerCase().includes(query) ||
+        inquiry.workPhone.includes(query) ||
+        inquiry.programs?.some(vp => vp.program.programName.toLowerCase().includes(query)) ||
+        inquiry.metadata?.city?.toLowerCase().includes(query) ||
+        inquiry.metadata?.country?.toLowerCase().includes(query) ||
+        inquiry.metadata?.browser?.toLowerCase().includes(query) ||
+        inquiry.metadata?.device?.toLowerCase().includes(query)
+      )
+    }
+
+    // Program filter
+    if (selectedPrograms.length > 0) {
+      filtered = filtered.filter(inquiry =>
+        inquiry.programs?.some(vp => selectedPrograms.includes(vp.program.id.toString()))
+      )
+    }
+
+    // Campaign filter (if we add campaign tracking later)
+    // For now, campaigns might not be directly tracked in request inquiries
+    
+    // Date range filter
+    if (dateRange.from || dateRange.to) {
+      filtered = filtered.filter(inquiry => {
+        const inquiryDate = new Date(inquiry.createdAt)
+        if (dateRange.from && inquiryDate < dateRange.from) return false
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to)
+          toDate.setHours(23, 59, 59, 999) // Include the entire end date
+          if (inquiryDate > toDate) return false
+        }
+        return true
+      })
+    }
+
+    setFilteredInquiries(filtered)
+  }, [requestInquiries, searchQuery, selectedPrograms, selectedCampaigns, dateRange])
+
+  const clearAllFilters = () => {
+    setSearchQuery('')
+    setSelectedPrograms([])
+    setSelectedCampaigns([])
+    setDateRange({})
+  }
+
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (searchQuery) count++
+    if (selectedPrograms.length > 0) count++
+    if (selectedCampaigns.length > 0) count++
+    if (dateRange.from || dateRange.to) count++
+    return count
+  }
+
+  const activeFiltersCount = getActiveFiltersCount()
+
+  // Get unique programs from inquiries for filter dropdown
+  const uniquePrograms = useMemo(() => {
+    const programMap = new Map<number, Program>()
+    requestInquiries.forEach(inquiry => {
+      inquiry.programs?.forEach(vp => {
+        if (!programMap.has(vp.program.id)) {
+          programMap.set(vp.program.id, vp.program)
+        }
+      })
+    })
+    return Array.from(programMap.values())
+  }, [requestInquiries])
+
   if (loading) {
     return (
       <Card className="shadow-sm">
@@ -132,13 +255,186 @@ export function RequestInquiriesTable() {
   return (
     <Card className="shadow-sm border-gray-200">
       <CardHeader className="bg-gray-50/50 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-900">Exhibition Registration Requests</CardTitle>
-          <Badge variant="secondary" className="text-xs font-medium">
-            {requestInquiries.length} {requestInquiries.length === 1 ? 'visitor' : 'visitors'}
-          </Badge>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between sm:justify-start gap-4">
+            <CardTitle className="text-lg font-semibold text-gray-900">Exhibition Registration Requests</CardTitle>
+            <Badge variant="secondary" className="text-xs font-medium">
+              {filteredInquiries.length} {filteredInquiries.length === 1 ? 'visitor' : 'visitors'}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchRequestInquiries(true)}
+              disabled={refreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
+      
+      {/* Search and Filter Section */}
+      <div className="p-4 border-b border-gray-200 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search by name, phone, program, location, device..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-10 shadow-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center space-x-2 h-10 shadow-sm border-gray-300 hover:bg-gray-50"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="font-medium">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 border-blue-200">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
+          {activeFiltersCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-10 w-10 p-0 hover:bg-red-50 hover:text-red-600 transition-colors"
+              title="Clear all filters"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+            {/* Program Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Programs</label>
+              <Select
+                value={selectedPrograms.length > 0 ? selectedPrograms[0] : ''}
+                onValueChange={(value) => {
+                  if (value) {
+                    if (!selectedPrograms.includes(value)) {
+                      setSelectedPrograms([...selectedPrograms, value])
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select program" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniquePrograms.map((program) => (
+                    <SelectItem key={program.id} value={program.id.toString()}>
+                      {program.programName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPrograms.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedPrograms.map((programId) => {
+                    const program = uniquePrograms.find(p => p.id.toString() === programId)
+                    return (
+                      <Badge key={programId} variant="secondary" className="flex items-center space-x-1">
+                        <span>{program?.programName || programId}</span>
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => setSelectedPrograms(selectedPrograms.filter(id => id !== programId))}
+                        />
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Date Range Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date Range</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd')}`
+                      ) : (
+                        format(dateRange.from, 'MMM dd, yyyy')
+                      )
+                    ) : (
+                      'Select date range'
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange.from}
+                    selected={dateRange.from ? { from: dateRange.from, to: dateRange.to } : undefined}
+                    onSelect={(range) => setDateRange(range || { from: undefined, to: undefined })}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filters Display */}
+        {activeFiltersCount > 0 && (
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
+            <span className="text-sm text-gray-600">Active filters:</span>
+            {searchQuery && (
+              <Badge variant="secondary" className="flex items-center space-x-1">
+                <span>Search: "{searchQuery}"</span>
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => setSearchQuery('')}
+                />
+              </Badge>
+            )}
+            {selectedPrograms.map((programId) => {
+              const program = uniquePrograms.find(p => p.id.toString() === programId)
+              return (
+                <Badge key={programId} variant="secondary" className="flex items-center space-x-1">
+                  <span>Program: {program?.programName || programId}</span>
+                  <X
+                    className="h-3 w-3 cursor-pointer"
+                    onClick={() => setSelectedPrograms(selectedPrograms.filter(id => id !== programId))}
+                  />
+                </Badge>
+              )
+            })}
+            {(dateRange.from || dateRange.to) && (
+              <Badge variant="secondary" className="flex items-center space-x-1">
+                <span>
+                  Date: {dateRange.from ? format(dateRange.from, 'MMM dd') : 'Start'}
+                  {' - '}
+                  {dateRange.to ? format(dateRange.to, 'MMM dd') : 'End'}
+                </span>
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => setDateRange({})}
+                />
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
@@ -155,14 +451,16 @@ export function RequestInquiriesTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requestInquiries.length === 0 ? (
+              {filteredInquiries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                    No exhibition registrations found
+                    {requestInquiries.length === 0 
+                      ? 'No exhibition registrations found' 
+                      : 'No results match your filters'}
                   </TableCell>
                 </TableRow>
               ) : (
-                requestInquiries.map((requestInquiry) => {
+                filteredInquiries.map((requestInquiry) => {
                   const isConverting = convertingIds.has(requestInquiry.id)
                   const isConverted = requestInquiry.isConverted
                   const programs = requestInquiry.programs?.map(vp => vp.program.programName).join(', ') || 'None'

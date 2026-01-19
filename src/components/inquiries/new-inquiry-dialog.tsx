@@ -712,8 +712,8 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         }
       }
 
-      // Map form data to Seeker model fields
-      const formData = {
+      // Base form data (shared across all inquiries if multiple programs)
+      const baseFormData = {
         fullName: data.fullName.trim(),
         phone: data.phone.trim(),
         email: data.email?.trim() || undefined,
@@ -734,49 +734,125 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         emailNotAnswering: data.emailNotAnswering ?? false,
         consent: data.consent,
         registerNow: data.registerNow ?? false,
-        programInterestId: selectedProgramIds[0] ?? undefined, // Keep for backward compatibility
-        preferredProgramIds: selectedProgramIds, // Send all selected program IDs
         whatsappNumber: data.whatsappNumber?.trim() || undefined,
       }
 
-      const response = await fetch('/api/inquiries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      // Get response text first (can only read once)
-      const responseText = await response.text()
+      // Check if we have multiple programs - if so, create separate inquiry for each
+      const hasMultiplePrograms = selectedProgramIds.length > 1
       
-      if (!response.ok) {
-        let errorData
-        try {
-          errorData = responseText ? JSON.parse(responseText) : { error: 'Unknown error' }
-        } catch (e) {
-          errorData = { error: `Failed to create inquiry (Status: ${response.status})` }
+      if (hasMultiplePrograms) {
+        // Create separate inquiry for each program
+        let successCount = 0
+        let errorCount = 0
+        const errors: string[] = []
+
+        // Get program names for description
+        const programNames = selectedProgramIds.map(id => {
+          const program = programs.find(p => p.id === id)
+          return program?.name || id
+        }).join(', ')
+
+        for (const programId of selectedProgramIds) {
+          try {
+            const programName = programs.find(p => p.id === programId)?.name || 'Unknown Program'
+            const formData = {
+              ...baseFormData,
+              programInterestId: programId, // Keep for backward compatibility
+              preferredProgramIds: [programId], // Only one program per inquiry
+              allowDuplicatePhone: true, // Allow duplicate phone numbers when creating multiple inquiries for different programs
+              description: baseFormData.description 
+                ? `${baseFormData.description} | Multi-program inquiry: This inquiry is for ${programName} (1 of ${selectedProgramIds.length} programs: ${programNames})`
+                : `Multi-program inquiry: This inquiry is for ${programName} (1 of ${selectedProgramIds.length} programs: ${programNames})`,
+            }
+
+            const response = await fetch('/api/inquiries', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(formData),
+            })
+
+            const responseText = await response.text()
+            
+            if (!response.ok) {
+              let errorData
+              try {
+                errorData = responseText ? JSON.parse(responseText) : { error: 'Unknown error' }
+              } catch (e) {
+                errorData = { error: `Failed to create inquiry (Status: ${response.status})` }
+              }
+              throw new Error(errorData.error || 'Failed to create inquiry')
+            }
+
+            successCount++
+          } catch (error) {
+            errorCount++
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create inquiry'
+            errors.push(errorMessage)
+            console.error(`Error creating inquiry for program ${programId}:`, error)
+          }
         }
-        throw new Error(errorData.error || 'Failed to create inquiry')
-      }
 
-      // Parse successful response
-      let responseData
-      try {
-        responseData = responseText ? JSON.parse(responseText) : {}
-      } catch (e) {
-        throw new Error(`Invalid response from server: ${responseText || 'Empty response'}`)
-      }
+        if (errorCount === 0) {
+          toast.success(`Successfully created ${successCount} ${successCount === 1 ? 'inquiry' : 'inquiries'} - one for each program`)
+        } else if (successCount > 0) {
+          toast.warning(`Created ${successCount} ${successCount === 1 ? 'inquiry' : 'inquiries'}, but ${errorCount} ${errorCount === 1 ? 'failed' : 'failed'}. ${errors[0]}`)
+        } else {
+          throw new Error(`Failed to create inquiries: ${errors.join(', ')}`)
+        }
 
-      const successMessage = responseData.followUpAgain 
-        ? 'Inquiry created successfully with follow-up task assigned'
-        : 'Inquiry created successfully'
-      
-      toast.success(successMessage)
-      
-      // If this was created from an exhibition visitor, mark it as converted
-      if (initialData && onInquiryCreated) {
-        onInquiryCreated(initialData.id)
+        // If this was created from an exhibition visitor, mark it as converted after all inquiries are created
+        if (initialData && onInquiryCreated && successCount > 0) {
+          onInquiryCreated(initialData.id)
+        }
+      } else {
+        // Single inquiry (0 or 1 program) - original behavior
+        const formData = {
+          ...baseFormData,
+          programInterestId: selectedProgramIds[0] ?? undefined, // Keep for backward compatibility
+          preferredProgramIds: selectedProgramIds, // Send all selected program IDs (will be 0 or 1)
+        }
+
+        const response = await fetch('/api/inquiries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        })
+
+        // Get response text first (can only read once)
+        const responseText = await response.text()
+        
+        if (!response.ok) {
+          let errorData
+          try {
+            errorData = responseText ? JSON.parse(responseText) : { error: 'Unknown error' }
+          } catch (e) {
+            errorData = { error: `Failed to create inquiry (Status: ${response.status})` }
+          }
+          throw new Error(errorData.error || 'Failed to create inquiry')
+        }
+
+        // Parse successful response
+        let responseData
+        try {
+          responseData = responseText ? JSON.parse(responseText) : {}
+        } catch (e) {
+          throw new Error(`Invalid response from server: ${responseText || 'Empty response'}`)
+        }
+
+        const successMessage = responseData.followUpAgain 
+          ? 'Inquiry created successfully with follow-up task assigned'
+          : 'Inquiry created successfully'
+        
+        toast.success(successMessage)
+        
+        // If this was created from an exhibition visitor, mark it as converted
+        if (initialData && onInquiryCreated) {
+          onInquiryCreated(initialData.id)
+        }
       }
       
       form.reset()
