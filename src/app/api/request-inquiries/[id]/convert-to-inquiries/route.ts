@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { requestInquiryPrisma } from '@/lib/request-inquiry-prisma'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // POST /api/request-inquiries/[id]/convert-to-inquiries
 // Create separate inquiries for each program the visitor selected
@@ -59,7 +60,7 @@ export async function POST(
     for (const visitorProgram of programs) {
       try {
         // Prepare inquiry data for this program
-        const inquiryData: any = {
+        const inquiryData: Prisma.SeekerUncheckedCreateInput = {
           fullName: body.fullName || visitor.name,
           phone: body.phone || visitor.workPhone,
           email: body.email || visitor.metadata?.city || null,
