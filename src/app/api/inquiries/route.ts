@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         // This allows coordinators to see inquiries assigned through the Assignment model
         where.OR = [
           { createdById: _user.id },
-          { assignedSeekers: { some: { coordinatorId: _user.id } } }
+          { assignments: { some: { coordinatorId: _user.id } } }
         ]
       } else {
         // Non-admin, non-coordinator users can only see inquiries they created
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-          assignedSeekers: {
+          assignments: {
             where: {
               coordinatorId: !isAdminRole(_user.role) && _user.role === 'COORDINATOR' ? _user.id : undefined,
             },
