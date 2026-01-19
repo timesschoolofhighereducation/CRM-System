@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     // Build where clause based on user role
     // Only ADMIN/ADMINISTRATOR/DEVELOPER can see all inquiries
     // Other users can only see inquiries they created
+    // For COORDINATOR role, filter by assigned inquiries through Assignment model
     // Treat legacy rows where isDeleted might be NULL as "not deleted"
     // (Some older DB rows may have NULL even if Prisma schema is non-nullable)
     const where: any = {
@@ -32,8 +33,17 @@ export async function GET(request: NextRequest) {
     }
     
     if (!isAdminRole(_user.role)) {
-      // Non-admin users can only see inquiries they created
-      where.createdById = _user.id
+      if (_user.role === 'COORDINATOR') {
+        // Coordinators see inquiries assigned to them OR inquiries they created
+        // This allows coordinators to see inquiries assigned through the Assignment model
+        where.OR = [
+          { createdById: _user.id },
+          { assignedSeekers: { some: { coordinatorId: _user.id } } }
+        ]
+      } else {
+        // Non-admin, non-coordinator users can only see inquiries they created
+        where.createdById = _user.id
+      }
     }
     
     // Use transaction to fetch data and count in parallel for better performance
@@ -61,6 +71,20 @@ export async function GET(request: NextRequest) {
                   id: true,
                   name: true,
                   type: true,
+                },
+              },
+            },
+          },
+          assignedSeekers: {
+            where: {
+              coordinatorId: !isAdminRole(_user.role) && _user.role === 'COORDINATOR' ? _user.id : undefined,
+            },
+            include: {
+              coordinator: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
                 },
               },
             },

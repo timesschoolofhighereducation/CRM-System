@@ -746,23 +746,24 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         let errorCount = 0
         const errors: string[] = []
 
-        // Get program names for description
-        const programNames = selectedProgramIds.map(id => {
-          const program = programs.find(p => p.id === id)
-          return program?.name || id
-        }).join(', ')
-
         for (const programId of selectedProgramIds) {
           try {
             const programName = programs.find(p => p.id === programId)?.name || 'Unknown Program'
+            
+            // Build description - only mention THIS specific program, not others
+            let description = baseFormData.description || ''
+            if (description) {
+              description = `${description} | Program: ${programName}`
+            } else {
+              description = `Program: ${programName}`
+            }
+            
             const formData = {
               ...baseFormData,
-              programInterestId: programId, // Keep for backward compatibility
-              preferredProgramIds: [programId], // Only one program per inquiry
+              programInterestId: programId, // Only this one program
+              preferredProgramIds: [programId], // Only this one program - remove all others
               allowDuplicatePhone: true, // Allow duplicate phone numbers when creating multiple inquiries for different programs
-              description: baseFormData.description 
-                ? `${baseFormData.description} | Multi-program inquiry: This inquiry is for ${programName} (1 of ${selectedProgramIds.length} programs: ${programNames})`
-                : `Multi-program inquiry: This inquiry is for ${programName} (1 of ${selectedProgramIds.length} programs: ${programNames})`,
+              description: description, // Only reference this program, not others
             }
 
             const response = await fetch('/api/inquiries', {
