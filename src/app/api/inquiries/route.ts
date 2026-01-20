@@ -123,19 +123,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('Received body:', body)
 
-    // Check for duplicate phone number
-    const existingSeeker = await prisma.seeker.findUnique({
-      where: {
-        phone: body.phone,
-      },
-    })
-
-    if (existingSeeker) {
-      return NextResponse.json(
-        { error: 'An inquiry with this phone number already exists' },
-        { status: 400 }
-      )
-    }
+    // Note: Phone number uniqueness constraint removed to allow multiple inquiries
+    // for the same person across different programs (especially for exhibition registrations)
 
     console.log('Creating seeker with data:', {
       ...body,
