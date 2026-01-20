@@ -326,11 +326,19 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
     mode: 'onChange', // Validate on change for better UX
   })
 
-  // Auto-copy phone number to WhatsApp number when WhatsApp checkbox is checked
+  // Auto-copy phone number to WhatsApp number when WhatsApp checkbox is checked (only if whatsappNumber is empty)
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
+      // Only auto-fill if:
+      // 1. Phone field changed
+      // 2. WhatsApp checkbox is checked
+      // 3. There's a phone value
+      // 4. WhatsApp number field is empty (don't overwrite user input)
       if (name === 'phone' && form.getValues('whatsapp') && value.phone) {
-        form.setValue('whatsappNumber', value.phone)
+        const currentWhatsAppNumber = form.getValues('whatsappNumber')
+        if (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '') {
+          form.setValue('whatsappNumber', value.phone)
+        }
       }
     })
     return () => subscription.unsubscribe()
@@ -973,8 +981,13 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
                   checked={form.watch('whatsapp')}
                   onCheckedChange={(checked) => {
                     form.setValue('whatsapp', checked as boolean)
+                    // Only auto-fill if checkbox is checked AND whatsappNumber is empty
+                    // Don't overwrite if user has already entered a different number
                     if (checked && form.getValues('phone')) {
-                      form.setValue('whatsappNumber', form.getValues('phone'))
+                      const currentWhatsAppNumber = form.getValues('whatsappNumber')
+                      if (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '') {
+                        form.setValue('whatsappNumber', form.getValues('phone'))
+                      }
                     }
                   }}
                 />
