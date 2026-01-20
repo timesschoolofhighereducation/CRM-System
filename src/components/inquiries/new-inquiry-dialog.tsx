@@ -159,6 +159,7 @@ interface ExhibitionVisitorData {
     country?: string | null
     email?: string | null
   } | null
+  selectedProgram?: { id: number; programName: string; category: string | null; isActive: boolean } | null
 }
 
 interface NewInquiryDialogProps {
