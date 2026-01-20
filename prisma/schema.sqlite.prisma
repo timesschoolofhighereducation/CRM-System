@@ -143,7 +143,7 @@ model Program {
 model Seeker {
   id                   String              @id @default(cuid())
   fullName             String
-  phone                String
+  phone                String              @unique
   whatsapp             Boolean             @default(false)
   whatsappNumber       String?
   notAnswering         Boolean             @default(false)

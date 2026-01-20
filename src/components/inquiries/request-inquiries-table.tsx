@@ -5,16 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Plus, Loader2, MapPin, Globe, Monitor, RefreshCw, Search, X } from 'lucide-react'
+import { Plus, Loader2, MapPin, Globe, Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
-import { format } from 'date-fns'
-import { Calendar as CalendarIcon } from 'lucide-react'
-import { DateRange } from 'react-day-picker'
+import { NewInquiryDialog } from './new-inquiry-dialog'
 
 interface Program {
   id: number
@@ -54,32 +48,20 @@ interface RequestInquiry {
 
 export function RequestInquiriesTable() {
   const [requestInquiries, setRequestInquiries] = useState<RequestInquiry[]>([])
-  const [filteredInquiries, setFilteredInquiries] = useState<RequestInquiry[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [convertingIds, setConvertingIds] = useState<Set<string>>(new Set())
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedProgram, setSelectedProgram] = useState<string>('all')
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [availablePrograms, setAvailablePrograms] = useState<Program[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedVisitor, setSelectedVisitor] = useState<RequestInquiry | null>(null)
   const { user } = useAuth()
 
-  const fetchRequestInquiries = async (isRefresh = false) => {
+  const fetchRequestInquiries = async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true)
-      } else {
-        setLoading(true)
-      }
+      setLoading(true)
       const response = await fetch('/api/request-inquiries')
       if (response.ok) {
         const data = await response.json()
         // Data is already sorted by the API (non-converted first, then by creation date)
         setRequestInquiries(data)
-        setFilteredInquiries(data)
-        if (isRefresh) {
-          toast.success('Data refreshed successfully')
-        }
       } else {
         toast.error('Failed to fetch request inquiries')
       }
@@ -88,117 +70,51 @@ export function RequestInquiriesTable() {
       toast.error('Failed to fetch request inquiries')
     } finally {
       setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  const fetchPrograms = async () => {
-    try {
-      const response = await fetch('/api/request-inquiries/programs')
-      if (response.ok) {
-        const data = await response.json()
-        setAvailablePrograms(data)
-      }
-    } catch (error) {
-      console.error('Error fetching programs:', error)
     }
   }
 
   useEffect(() => {
     fetchRequestInquiries()
-    fetchPrograms()
+    // Poll for updates every 30 seconds
+    const interval = setInterval(fetchRequestInquiries, 30000)
+    return () => clearInterval(interval)
   }, [])
 
-  // Filter inquiries based on search term, program, and date range
-  useEffect(() => {
-    let filtered = requestInquiries
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(inquiry =>
-        inquiry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inquiry.workPhone.includes(searchTerm)
-      )
-    }
-
-    // Program filter
-    if (selectedProgram !== 'all') {
-      filtered = filtered.filter(inquiry =>
-        inquiry.programs.some(vp => vp.program.programName === selectedProgram)
-      )
-    }
-
-    // Date range filter
-    if (dateRange?.from) {
-      filtered = filtered.filter(inquiry => {
-        const inquiryDate = new Date(inquiry.createdAt)
-        const fromDate = new Date(dateRange.from!)
-        fromDate.setHours(0, 0, 0, 0)
-        
-        if (dateRange.to) {
-          const toDate = new Date(dateRange.to)
-          toDate.setHours(23, 59, 59, 999)
-          return inquiryDate >= fromDate && inquiryDate <= toDate
-        }
-        return inquiryDate >= fromDate
-      })
-    }
-
-    setFilteredInquiries(filtered)
-  }, [searchTerm, selectedProgram, dateRange, requestInquiries])
-
-  const handleRefresh = () => {
-    fetchRequestInquiries(true)
-  }
-
-  const clearFilters = () => {
-    setSearchTerm('')
-    setSelectedProgram('all')
-    setDateRange(undefined)
-  }
-
-  const handleConvertToInquiry = async (requestInquiry: RequestInquiry) => {
+  const handleConvertToInquiry = (requestInquiry: RequestInquiry) => {
     if (requestInquiry.isConverted) return
     
-    // Use the convert API endpoint directly
+    // Open the dialog with pre-filled data
+    setSelectedVisitor(requestInquiry)
+    setIsDialogOpen(true)
+  }
+
+  const handleInquiryCreated = async (visitorId: string) => {
     try {
-      setConvertingIds(prev => new Set(prev).add(requestInquiry.id))
-      
-      const response = await fetch(`/api/request-inquiries/${requestInquiry.id}/convert`, {
+      // Mark the visitor as converted in the database
+      const response = await fetch(`/api/request-inquiries/${visitorId}/mark-converted`, {
         method: 'POST',
       })
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to convert inquiry' }))
-        toast.error(error.error || 'Failed to convert inquiry')
-        return
+        const error = await response.json().catch(() => ({ error: 'Failed to mark visitor as converted' }))
+        console.error('Error marking visitor as converted:', error)
+        // Don't show error to user since inquiry was already created successfully
       }
 
-      const data = await response.json()
-      const inquiryCount = data.inquiries?.length || 1
-      
-      toast.success(
-        data.message || `Successfully created ${inquiryCount} inquir${inquiryCount === 1 ? 'y' : 'ies'} (one per program)`
-      )
-      
-      if (data.failedPrograms && data.failedPrograms.length > 0) {
-        toast.warning(`Failed to create inquiries for: ${data.failedPrograms.join(', ')}`)
-      }
-
-      // Refresh the list to get updated data
+      // Refresh the list to get updated data from database
       await fetchRequestInquiries()
     } catch (error) {
-      console.error('Error converting inquiry:', error)
-      toast.error('Failed to convert inquiry')
-    } finally {
-      setConvertingIds(prev => {
-        const next = new Set(prev)
-        next.delete(requestInquiry.id)
-        return next
-      })
+      console.error('Error marking visitor as converted:', error)
+      // Don't show error to user since inquiry was already created successfully
     }
   }
 
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open)
+    if (!open) {
+      setSelectedVisitor(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -213,104 +129,14 @@ export function RequestInquiriesTable() {
     )
   }
 
-  const hasActiveFilters = searchTerm || selectedProgram !== 'all' || dateRange?.from
-
   return (
     <Card className="shadow-sm border-gray-200">
       <CardHeader className="bg-gray-50/50 border-b border-gray-200">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-gray-900">Exhibition Registration Requests</CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs font-medium">
-                {filteredInquiries.length} of {requestInquiries.length} {requestInquiries.length === 1 ? 'visitor' : 'visitors'}
-              </Badge>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'Refreshing...' : 'Refresh'}
-              </Button>
-            </div>
-          </div>
-          
-          {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by name or phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select value={selectedProgram} onValueChange={setSelectedProgram}>
-              <SelectTrigger className="w-full sm:w-[220px]">
-                <SelectValue placeholder="Filter by program" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Programs</SelectItem>
-                {availablePrograms.map((program) => (
-                  <SelectItem key={program.id} value={program.programName}>
-                    {program.programName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={`w-full sm:w-[280px] justify-start text-left font-normal ${
-                    !dateRange?.from && 'text-muted-foreground'
-                  }`}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, 'LLL dd, y')} -{' '}
-                        {format(dateRange.to, 'LLL dd, y')}
-                      </>
-                    ) : (
-                      format(dateRange.from, 'LLL dd, y')
-                    )
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
-            
-            {hasActiveFilters && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={clearFilters}
-                className="gap-2"
-              >
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-gray-900">Exhibition Registration Requests</CardTitle>
+          <Badge variant="secondary" className="text-xs font-medium">
+            {requestInquiries.length} {requestInquiries.length === 1 ? 'visitor' : 'visitors'}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -329,14 +155,14 @@ export function RequestInquiriesTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInquiries.length === 0 ? (
+              {requestInquiries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                    {hasActiveFilters ? 'No exhibition registrations match your filters' : 'No exhibition registrations found'}
+                    No exhibition registrations found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInquiries.map((requestInquiry) => {
+                requestInquiries.map((requestInquiry) => {
                   const isConverting = convertingIds.has(requestInquiry.id)
                   const isConverted = requestInquiry.isConverted
                   const programs = requestInquiry.programs?.map(vp => vp.program.programName).join(', ') || 'None'
@@ -395,37 +221,30 @@ export function RequestInquiriesTable() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            size="sm"
-                            onClick={() => handleConvertToInquiry(requestInquiry)}
-                            disabled={isConverted || isConverting}
-                            className={
-                              isConverted
-                                ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                : ''
-                            }
-                          >
-                            {isConverting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Converting...
-                              </>
-                            ) : isConverted ? (
-                              'Converted'
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create Inquiries
-                              </>
-                            )}
-                          </Button>
-                          {!isConverted && requestInquiry.programs.length > 1 && (
-                            <span className="text-xs text-gray-500 text-center">
-                              {requestInquiry.programs.length} programs
-                            </span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleConvertToInquiry(requestInquiry)}
+                          disabled={isConverted || isConverting}
+                          className={
+                            isConverted
+                              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                              : ''
+                          }
+                        >
+                          {isConverting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Creating...
+                            </>
+                          ) : isConverted ? (
+                            'Converted'
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Inquiry
+                            </>
                           )}
-                        </div>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   )
@@ -435,6 +254,19 @@ export function RequestInquiriesTable() {
           </Table>
         </div>
       </CardContent>
+      
+      <NewInquiryDialog
+        open={isDialogOpen}
+        onOpenChange={handleDialogClose}
+        initialData={selectedVisitor ? {
+          id: selectedVisitor.id,
+          name: selectedVisitor.name,
+          workPhone: selectedVisitor.workPhone,
+          programs: selectedVisitor.programs,
+          metadata: selectedVisitor.metadata,
+        } : null}
+        onInquiryCreated={handleInquiryCreated}
+      />
     </Card>
   )
 }
