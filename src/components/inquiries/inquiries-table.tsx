@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Eye, Phone, MessageSquare, Mail, User, Loader2, Pencil, Trash2, FileSpreadsheet, Download } from 'lucide-react'
+import { Eye, Phone, MessageSquare, Mail, User, Loader2, Pencil, Trash2, FileSpreadsheet, Download, RefreshCw } from 'lucide-react'
 import { InquiryViewDialog } from './inquiry-view-dialog'
 import { EditInquiryDialog } from './edit-inquiry-dialog'
 import { InquirySearchFilter } from './inquiry-search-filter'
@@ -389,6 +389,20 @@ export function InquiriesTable() {
             </Badge>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Button
+                onClick={() => {
+                  fetchInitialData()
+                  toast.success('Refreshing inquiries...')
+                }}
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Refresh</span>
+              </Button>
               <Button
                 onClick={() => handleExport('excel')}
                 variant="outline"

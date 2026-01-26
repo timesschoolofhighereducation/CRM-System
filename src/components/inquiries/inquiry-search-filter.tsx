@@ -28,6 +28,8 @@ interface Inquiry {
   stage: string
   marketingSource: string
   createdAt: string
+  notAnswering?: boolean
+  registerNow?: boolean
   programInterest?: {
     id: string
     name: string
@@ -82,6 +84,10 @@ interface FilterState {
   followUpRequired: boolean | null
   hasWhatsapp: boolean | null
   showRecent: boolean
+  notAnswering: boolean | null
+  registerNow: boolean | null
+  completed: boolean | null
+  hold: boolean | null
 }
 
 const stageOptions = [
@@ -113,6 +119,10 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     followUpRequired: null,
     hasWhatsapp: null,
     showRecent: false,
+    notAnswering: null,
+    registerNow: null,
+    completed: null,
+    hold: null,
   })
 
   const [showFilters, setShowFilters] = useState(false)
@@ -239,6 +249,40 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       filtered = filtered.filter(inquiry => new Date(inquiry.createdAt) >= weekAgo)
     }
 
+    // Not Answering filter
+    if (filters.notAnswering !== null) {
+      filtered = filtered.filter(inquiry => {
+        const inquiryNotAnswering = inquiry.notAnswering === true
+        return inquiryNotAnswering === filters.notAnswering
+      })
+    }
+
+    // Register Now filter
+    if (filters.registerNow !== null) {
+      filtered = filtered.filter(inquiry => {
+        const inquiryRegisterNow = inquiry.registerNow === true
+        return inquiryRegisterNow === filters.registerNow
+      })
+    }
+
+    // Completed filter (inquiries ready to register)
+    if (filters.completed !== null) {
+      filtered = filtered.filter(inquiry => {
+        const isCompleted = inquiry.stage === 'READY_TO_REGISTER' || inquiry.registerNow === true
+        return isCompleted === filters.completed
+      })
+    }
+
+    // Hold filter (not answering and not ready to register)
+    if (filters.hold !== null) {
+      filtered = filtered.filter(inquiry => {
+        const isOnHold = inquiry.notAnswering === true && 
+                        inquiry.stage !== 'READY_TO_REGISTER' && 
+                        inquiry.registerNow !== true
+        return isOnHold === filters.hold
+      })
+    }
+
     return filtered
   }, [inquiries, filters])
 
@@ -274,6 +318,10 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       followUpRequired: null,
       hasWhatsapp: null,
       showRecent: false,
+      notAnswering: null,
+      registerNow: null,
+      completed: null,
+      hold: null,
     })
   }
 
@@ -291,6 +339,10 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     if (filters.followUpRequired !== null) count++
     if (filters.hasWhatsapp !== null) count++
     if (filters.showRecent) count++
+    if (filters.notAnswering !== null) count++
+    if (filters.registerNow !== null) count++
+    if (filters.completed !== null) count++
+    if (filters.hold !== null) count++
     return count
   }
 
@@ -624,6 +676,78 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                       />
                       <span className="text-sm">Has WhatsApp</span>
                     </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.notAnswering === true && "bg-red-50 border border-red-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        notAnswering: prev.notAnswering === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.notAnswering === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Not Answering</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.registerNow === true && "bg-blue-50 border border-blue-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        registerNow: prev.registerNow === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.registerNow === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Register</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.completed === true && "bg-purple-50 border border-purple-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        completed: prev.completed === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.completed === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Completed</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.hold === true && "bg-yellow-50 border border-yellow-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        hold: prev.hold === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.hold === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Hold</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -752,6 +876,42 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                   <X 
                     className="h-3 w-3 cursor-pointer" 
                     onClick={() => setFilters(prev => ({ ...prev, hasWhatsapp: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.notAnswering === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-red-100 text-red-700">
+                  <span>Not Answering</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, notAnswering: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.registerNow === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-blue-100 text-blue-700">
+                  <span>Register</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, registerNow: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.completed === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-purple-100 text-purple-700">
+                  <span>Completed</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, completed: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.hold === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-yellow-100 text-yellow-700">
+                  <span>Hold</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, hold: null }))}
                   />
                 </Badge>
               )}
