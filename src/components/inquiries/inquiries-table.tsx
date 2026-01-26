@@ -467,9 +467,9 @@ export function InquiriesTable() {
                         {inquiry.whatsapp ? (
                           <div className="flex flex-col gap-0.5">
                             <Badge className="bg-green-50 text-green-700 border-green-200 text-xs w-fit">Yes</Badge>
-                            {inquiry.whatsappNumber && (
-                              <span className="text-xs text-gray-600">{inquiry.whatsappNumber}</span>
-                            )}
+                            <span className="text-xs text-gray-600">
+                              {inquiry.whatsappNumber || inquiry.phone}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-gray-400">No</span>
@@ -710,9 +710,9 @@ export function InquiriesTable() {
                       {inquiry.whatsapp && (
                         <div className="flex items-center gap-1 mt-0.5">
                           <Badge className="bg-green-50 text-green-700 border-green-200 text-xs">WhatsApp</Badge>
-                          {inquiry.whatsappNumber && inquiry.whatsappNumber !== inquiry.phone && (
-                            <span className="text-xs text-gray-500">({inquiry.whatsappNumber})</span>
-                          )}
+                          <span className="text-xs text-gray-500">
+                            {inquiry.whatsappNumber || inquiry.phone}
+                          </span>
                         </div>
                       )}
                       {inquiry.email && (

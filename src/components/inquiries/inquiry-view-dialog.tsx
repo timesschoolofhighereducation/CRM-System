@@ -278,15 +278,14 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
                     <div className="flex items-center space-x-2 flex-wrap gap-1">
                       <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <span className="text-sm sm:text-base break-all">{inquiry.phone}</span>
-                      {inquiry.whatsapp && (
-                        <Badge variant="secondary" className="text-xs">WhatsApp</Badge>
-                      )}
                     </div>
-                    {inquiry.whatsappNumber && inquiry.whatsappNumber !== inquiry.phone && (
+                    {inquiry.whatsapp && (
                       <div className="flex items-center space-x-2 flex-wrap gap-1">
-                        <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                        <span className="text-sm sm:text-base break-all">{inquiry.whatsappNumber}</span>
-                        <Badge variant="secondary" className="text-xs">WhatsApp #</Badge>
+                        <MessageSquare className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <span className="text-sm sm:text-base break-all font-medium text-green-700">
+                          {inquiry.whatsappNumber || inquiry.phone}
+                        </span>
+                        <Badge variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">WhatsApp</Badge>
                       </div>
                     )}
                     {inquiry.notAnswering && (
