@@ -1,0 +1,617 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{amsmath}
+
+% Page setup
+\geometry{margin=2.5cm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{Software Development Budget Plan}}
+\fancyhead[R]{\today}
+\fancyfoot[C]{Page \thepage\ of \pageref{LastPage}}
+
+% Colors
+\definecolor{primaryblue}{RGB}{0,51,102}
+\definecolor{secondaryblue}{RGB}{0,102,204}
+\definecolor{accentgreen}{RGB}{0,153,76}
+
+% Title
+\title{\vspace{-2cm}\Huge\textbf{Software Development Budget Plan}\\
+\Large Sri Lankan Software Development Company\\
+\large Using Cursor AI, Vercel \& Supabase\vspace{0.5cm}}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+This comprehensive budget plan outlines the development costs for a software development company in Sri Lanka using Cursor AI development tools, Vercel hosting platform, and Supabase database services. The development timeline is \textbf{2 months and 15 days (2.5 months)}, which enables rapid development and reduced costs. The budget includes initial development, deployment, maintenance, and operational costs across different company sizes (0-100 employees) and profit margins (0-100\%). All costs are presented in Sri Lankan Rupees (LKR).
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Executive Summary}
+
+\textbf{Development Timeline: 2 months and 15 days (2.5 months)}
+
+This budget plan provides a detailed financial breakdown for developing and maintaining a software application using modern development tools and cloud services. The accelerated development timeline of \textbf{2.5 months} is made possible through the use of Cursor AI, which significantly improves developer productivity. The analysis covers:
+
+\begin{itemize}
+    \item \textbf{Development Tools}: Cursor AI subscription costs
+    \item \textbf{Hosting}: Vercel platform costs
+    \item \textbf{Database}: Supabase service costs
+    \item \textbf{Personnel}: Developer salaries (Sri Lankan market rates)
+    \item \textbf{Deployment \& Maintenance}: Ongoing operational costs
+    \item \textbf{Bug Fixes}: Support and maintenance expenses
+\end{itemize}
+
+\section{Currency and Exchange Rates}
+
+All costs are presented in \textbf{Sri Lankan Rupees (LKR)}. Base exchange rates used:
+\begin{itemize}
+    \item USD to LKR: 1 USD = 320 LKR (approximate)
+    \item EUR to LKR: 1 EUR = 350 LKR (approximate)
+\end{itemize}
+
+\section{Development Tools Costs}
+
+\subsection{Cursor AI Subscription}
+
+Cursor AI is an AI-powered code editor that accelerates development. Subscription costs:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Plan} & \textbf{USD/Month} & \textbf{LKR/Month} \\
+\hline
+Cursor Pro (Individual) & \$20 & 6,400 \\
+Cursor Business (Team) & \$40/user & 12,800/user \\
+Cursor Enterprise & Custom & Custom \\
+\hline
+\end{tabular}
+\caption{Cursor AI Subscription Plans}
+\end{table}
+
+\textbf{Annual Cost Calculation:}
+\begin{itemize}
+    \item Small Team (5 developers): 5 × 12,800 × 12 = \textbf{768,000 LKR/year}
+    \item Medium Team (20 developers): 20 × 12,800 × 12 = \textbf{3,072,000 LKR/year}
+    \item Large Team (50 developers): 50 × 12,800 × 12 = \textbf{7,680,000 LKR/year}
+\end{itemize}
+
+\section{Cloud Infrastructure Costs}
+
+\subsection{Vercel Hosting}
+
+Vercel provides hosting for Next.js applications with serverless functions.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Plan} & \textbf{USD/Month} & \textbf{LKR/Month} \\
+\hline
+Hobby (Free) & \$0 & 0 \\
+Pro & \$20 & 6,400 \\
+Enterprise & \$40+ & 12,800+ \\
+\hline
+\textbf{Additional Costs:} & & \\
+Bandwidth (per 100GB) & \$20 & 6,400 \\
+Serverless Function Executions & \$0.36/million & 115/million \\
+\hline
+\end{tabular}
+\caption{Vercel Hosting Plans}
+\end{table}
+
+\textbf{Estimated Monthly Costs (Medium Traffic):}
+\begin{itemize}
+    \item Pro Plan: 6,400 LKR
+    \item Bandwidth (500GB): 32,000 LKR
+    \item Function Executions (10M): 1,150 LKR
+    \item \textbf{Total: 39,550 LKR/month} = \textbf{474,600 LKR/year}
+\end{itemize}
+
+\subsection{Supabase Database}
+
+Supabase provides PostgreSQL database hosting with additional features.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Plan} & \textbf{USD/Month} & \textbf{LKR/Month} \\
+\hline
+Free Tier & \$0 & 0 \\
+Pro & \$25 & 8,000 \\
+Team & \$599 & 191,680 \\
+Enterprise & Custom & Custom \\
+\hline
+\textbf{Additional Costs:} & & \\
+Database Size (per GB) & \$0.125 & 40 \\
+Bandwidth (per GB) & \$0.09 & 29 \\
+\hline
+\end{tabular}
+\caption{Supabase Database Plans}
+\end{table}
+
+\textbf{Estimated Monthly Costs (Production):}
+\begin{itemize}
+    \item Pro Plan: 8,000 LKR
+    \item Database Storage (50GB): 2,000 LKR
+    \item Bandwidth (100GB): 2,900 LKR
+    \item \textbf{Total: 12,900 LKR/month} = \textbf{154,800 LKR/year}
+\end{itemize}
+
+\section{Personnel Costs}
+
+\subsection{Developer Salaries (Sri Lankan Market Rates)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Position} & \textbf{Monthly Salary (LKR)} & \textbf{Annual (LKR)} \\
+\hline
+Junior Developer & 80,000 - 120,000 & 960,000 - 1,440,000 \\
+Mid-Level Developer & 150,000 - 250,000 & 1,800,000 - 3,000,000 \\
+Senior Developer & 300,000 - 500,000 & 3,600,000 - 6,000,000 \\
+Tech Lead & 500,000 - 800,000 & 6,000,000 - 9,600,000 \\
+\hline
+\end{tabular}
+\caption{Developer Salary Ranges in Sri Lanka}
+\end{table}
+
+\subsection{Team Composition Scenarios}
+
+\textbf{Small Team (5 developers):}
+\begin{itemize}
+    \item 1 Tech Lead: 650,000 LKR/month
+    \item 2 Senior Developers: 2 × 400,000 = 800,000 LKR/month
+    \item 2 Mid-Level Developers: 2 × 200,000 = 400,000 LKR/month
+    \item \textbf{Total: 1,850,000 LKR/month} = \textbf{22,200,000 LKR/year}
+\end{itemize}
+
+\textbf{Medium Team (20 developers):}
+\begin{itemize}
+    \item 1 Tech Lead: 650,000 LKR/month
+    \item 4 Senior Developers: 4 × 400,000 = 1,600,000 LKR/month
+    \item 10 Mid-Level Developers: 10 × 200,000 = 2,000,000 LKR/month
+    \item 5 Junior Developers: 5 × 100,000 = 500,000 LKR/month
+    \item \textbf{Total: 4,750,000 LKR/month} = \textbf{57,000,000 LKR/year}
+\end{itemize}
+
+\textbf{Large Team (50 developers):}
+\begin{itemize}
+    \item 2 Tech Leads: 2 × 650,000 = 1,300,000 LKR/month
+    \item 10 Senior Developers: 10 × 400,000 = 4,000,000 LKR/month
+    \item 25 Mid-Level Developers: 25 × 200,000 = 5,000,000 LKR/month
+    \item 13 Junior Developers: 13 × 100,000 = 1,300,000 LKR/month
+    \item \textbf{Total: 11,600,000 LKR/month} = \textbf{139,200,000 LKR/year}
+\end{itemize}
+
+\section{Development Phases and Costs}
+
+\subsection{Initial Development Phase (2 months and 15 days)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Cost (LKR)} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Small Team (5 developers)}} \\
+\hline
+Personnel (2.5 months) & 4,625,000 \\
+Cursor AI (2.5 months) & 160,000 \\
+Vercel (2.5 months) & 98,875 \\
+Supabase (2.5 months) & 32,250 \\
+Development Tools \& Software & 200,000 \\
+\hline
+\textbf{Subtotal} & \textbf{5,116,125} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Medium Team (20 developers)}} \\
+\hline
+Personnel (2.5 months) & 11,875,000 \\
+Cursor AI (2.5 months) & 640,000 \\
+Vercel (2.5 months) & 98,875 \\
+Supabase (2.5 months) & 32,250 \\
+Development Tools \& Software & 500,000 \\
+\hline
+\textbf{Subtotal} & \textbf{13,146,125} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Large Team (50 developers)}} \\
+\hline
+Personnel (2.5 months) & 29,000,000 \\
+Cursor AI (2.5 months) & 1,600,000 \\
+Vercel (2.5 months) & 98,875 \\
+Supabase (2.5 months) & 32,250 \\
+Development Tools \& Software & 1,000,000 \\
+\hline
+\textbf{Subtotal} & \textbf{31,731,125} \\
+\hline
+\end{tabular}
+\caption{Initial Development Phase Costs (2 months and 15 days)}
+\end{table}
+
+\subsection{Deployment Phase (1 month)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Cost (LKR)} \\
+\hline
+Deployment Setup & 100,000 \\
+CI/CD Pipeline Configuration & 150,000 \\
+Environment Setup (Dev, Staging, Prod) & 200,000 \\
+Security Audit & 300,000 \\
+Performance Testing & 200,000 \\
+Documentation & 100,000 \\
+\hline
+\textbf{Total Deployment Cost} & \textbf{1,050,000} \\
+\hline
+\end{tabular}
+\caption{Deployment Phase Costs}
+\end{table}
+
+\subsection{Maintenance and Bug Fixes (Annual)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Cost (LKR/Year)} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Small Team}} \\
+\hline
+Maintenance Team (2 developers, 20\% time) & 4,440,000 \\
+Bug Fixes \& Support & 2,000,000 \\
+Infrastructure (Vercel + Supabase) & 629,400 \\
+Cursor AI Subscription & 768,000 \\
+Monitoring \& Tools & 300,000 \\
+\hline
+\textbf{Subtotal} & \textbf{8,137,400} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Medium Team}} \\
+\hline
+Maintenance Team (4 developers, 20\% time) & 11,400,000 \\
+Bug Fixes \& Support & 5,000,000 \\
+Infrastructure (Vercel + Supabase) & 629,400 \\
+Cursor AI Subscription & 3,072,000 \\
+Monitoring \& Tools & 500,000 \\
+\hline
+\textbf{Subtotal} & \textbf{20,601,400} \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Large Team}} \\
+\hline
+Maintenance Team (10 developers, 20\% time) & 27,840,000 \\
+Bug Fixes \& Support & 10,000,000 \\
+Infrastructure (Vercel + Supabase) & 629,400 \\
+Cursor AI Subscription & 7,680,000 \\
+Monitoring \& Tools & 1,000,000 \\
+\hline
+\textbf{Subtotal} & \textbf{47,149,400} \\
+\hline
+\end{tabular}
+\caption{Annual Maintenance and Bug Fix Costs}
+\end{table}
+
+\section{Total Cost Analysis}
+
+\subsection{First Year Total Costs}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Cost Category} & \textbf{Small} & \textbf{Medium} & \textbf{Large} \\
+ & \textbf{(5 devs)} & \textbf{(20 devs)} & \textbf{(50 devs)} \\
+\hline
+Initial Development (2.5 months) & 5,116,125 & 13,146,125 & 31,731,125 \\
+Deployment (1 month) & 1,050,000 & 1,050,000 & 1,050,000 \\
+Maintenance (remaining 8.5 months) & 5,768,700 & 14,601,400 & 33,424,700 \\
+\hline
+\textbf{Total First Year} & \textbf{11,934,825} & \textbf{28,797,525} & \textbf{66,205,825} \\
+\hline
+\end{tabular}
+\caption{First Year Total Costs by Team Size (Development: 2.5 months)}
+\end{table}
+
+\subsection{Annual Operating Costs (Year 2+)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Cost Category} & \textbf{Small} & \textbf{Medium} & \textbf{Large} \\
+\hline
+Personnel (Full-time) & 22,200,000 & 57,000,000 & 139,200,000 \\
+Infrastructure & 629,400 & 629,400 & 629,400 \\
+Cursor AI & 768,000 & 3,072,000 & 7,680,000 \\
+Maintenance \& Support & 2,000,000 & 5,000,000 & 10,000,000 \\
+Tools \& Software & 300,000 & 500,000 & 1,000,000 \\
+\hline
+\textbf{Total Annual} & \textbf{25,897,400} & \textbf{66,201,400} & \textbf{158,509,400} \\
+\hline
+\end{tabular}
+\caption{Annual Operating Costs (Year 2+)}
+\end{table}
+
+\section{Profit Margin Analysis}
+
+\subsection{Cost Plus Pricing Model}
+
+The following tables show total project costs with different profit margins applied:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|c|c|c|}
+\hline
+\multirow{2}{*}{\textbf{Profit Margin}} & \multicolumn{3}{c|}{\textbf{First Year Total (LKR)}} \\
+\cline{2-4}
+ & \textbf{Small} & \textbf{Medium} & \textbf{Large} \\
+\hline
+0\% (Break-even) & 11,934,825 & 28,797,525 & 66,205,825 \\
+10\% & 13,128,308 & 31,677,278 & 72,826,408 \\
+20\% & 14,321,790 & 34,557,030 & 79,446,990 \\
+30\% & 15,515,273 & 37,436,783 & 86,067,573 \\
+40\% & 16,708,755 & 40,316,535 & 92,688,155 \\
+50\% & 17,902,238 & 43,196,288 & 99,308,738 \\
+60\% & 19,095,720 & 46,076,040 & 105,929,320 \\
+70\% & 20,289,203 & 48,955,793 & 112,549,903 \\
+80\% & 21,482,685 & 51,835,545 & 119,170,485 \\
+90\% & 22,676,168 & 54,715,298 & 125,791,068 \\
+100\% & 23,869,650 & 57,595,050 & 132,411,650 \\
+\hline
+\end{tabular}
+\caption{First Year Costs with Profit Margins}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|c|c|c|}
+\hline
+\multirow{2}{*}{\textbf{Profit Margin}} & \multicolumn{3}{c|}{\textbf{Annual Operating (LKR)}} \\
+\cline{2-4}
+ & \textbf{Small} & \textbf{Medium} & \textbf{Large} \\
+\hline
+0\% (Break-even) & 25,897,400 & 66,201,400 & 158,509,400 \\
+10\% & 28,487,140 & 72,821,540 & 174,360,340 \\
+20\% & 31,076,880 & 79,441,680 & 190,211,280 \\
+30\% & 33,666,620 & 86,061,820 & 206,062,220 \\
+40\% & 36,256,360 & 92,681,960 & 221,913,160 \\
+50\% & 38,846,100 & 99,302,100 & 237,764,100 \\
+60\% & 41,435,840 & 105,922,240 & 253,615,040 \\
+70\% & 44,025,580 & 112,542,380 & 269,465,980 \\
+80\% & 46,615,320 & 119,162,520 & 285,316,920 \\
+90\% & 49,205,060 & 125,782,660 & 301,167,860 \\
+100\% & 51,794,800 & 132,402,800 & 317,018,800 \\
+\hline
+\end{tabular}
+\caption{Annual Operating Costs with Profit Margins (Year 2+)}
+\end{table}
+
+\section{Cost Breakdown by Category}
+
+\subsection{Percentage Distribution (First Year - Small Team)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Category} & \textbf{Amount (LKR)} & \textbf{Percentage} \\
+\hline
+Personnel Costs & 10,393,750 & 87.1\% \\
+Development Tools (Cursor AI) & 160,000 & 1.3\% \\
+Infrastructure (Vercel + Supabase) & 131,125 & 1.1\% \\
+Deployment & 1,050,000 & 8.8\% \\
+Other Tools \& Software & 200,000 & 1.7\% \\
+\hline
+\textbf{Total} & \textbf{11,934,825} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\caption{Cost Distribution - Small Team (First Year - 2.5 months development)}
+\end{table}
+
+\subsection{Percentage Distribution (First Year - Medium Team)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Category} & \textbf{Amount (LKR)} & \textbf{Percentage} \\
+\hline
+Personnel Costs & 26,476,250 & 91.9\% \\
+Development Tools (Cursor AI) & 640,000 & 2.2\% \\
+Infrastructure (Vercel + Supabase) & 131,125 & 0.5\% \\
+Deployment & 1,050,000 & 3.6\% \\
+Other Tools \& Software & 500,000 & 1.7\% \\
+\hline
+\textbf{Total} & \textbf{28,797,525} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\caption{Cost Distribution - Medium Team (First Year - 2.5 months development)}
+\end{table}
+
+\subsection{Percentage Distribution (First Year - Large Team)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Category} & \textbf{Amount (LKR)} & \textbf{Percentage} \\
+\hline
+Personnel Costs & 62,424,750 & 94.3\% \\
+Development Tools (Cursor AI) & 1,600,000 & 2.4\% \\
+Infrastructure (Vercel + Supabase) & 131,125 & 0.2\% \\
+Deployment & 1,050,000 & 1.6\% \\
+Other Tools \& Software & 1,000,000 & 1.5\% \\
+\hline
+\textbf{Total} & \textbf{66,205,825} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\caption{Cost Distribution - Large Team (First Year - 2.5 months development)}
+\end{table}
+
+\section{Monthly Cost Breakdown}
+
+\subsection{Small Team (5 developers) - Monthly Costs}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Monthly Cost (LKR)} \\
+\hline
+Personnel (5 developers) & 1,850,000 \\
+Cursor AI (5 licenses) & 64,000 \\
+Vercel Hosting & 39,550 \\
+Supabase Database & 12,900 \\
+Monitoring \& Tools & 25,000 \\
+\hline
+\textbf{Total Monthly} & \textbf{1,991,450} \\
+\hline
+\end{tabular}
+\caption{Monthly Operating Costs - Small Team}
+\end{table}
+
+\subsection{Medium Team (20 developers) - Monthly Costs}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Monthly Cost (LKR)} \\
+\hline
+Personnel (20 developers) & 4,750,000 \\
+Cursor AI (20 licenses) & 256,000 \\
+Vercel Hosting & 39,550 \\
+Supabase Database & 12,900 \\
+Monitoring \& Tools & 42,000 \\
+\hline
+\textbf{Total Monthly} & \textbf{5,100,450} \\
+\hline
+\end{tabular}
+\caption{Monthly Operating Costs - Medium Team}
+\end{table}
+
+\subsection{Large Team (50 developers) - Monthly Costs}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Item} & \textbf{Monthly Cost (LKR)} \\
+\hline
+Personnel (50 developers) & 11,600,000 \\
+Cursor AI (50 licenses) & 640,000 \\
+Vercel Hosting & 39,550 \\
+Supabase Database & 12,900 \\
+Monitoring \& Tools & 83,000 \\
+\hline
+\textbf{Total Monthly} & \textbf{12,375,450} \\
+\hline
+\end{tabular}
+\caption{Monthly Operating Costs - Large Team}
+\end{table}
+
+\section{Additional Considerations}
+
+\subsection{Hidden Costs}
+
+\begin{itemize}
+    \item \textbf{Training}: Initial Cursor AI training: 200,000 - 500,000 LKR
+    \item \textbf{Office Space}: 500,000 - 2,000,000 LKR/month (depending on location)
+    \item \textbf{Utilities}: Internet, electricity: 100,000 - 300,000 LKR/month
+    \item \textbf{Legal \& Compliance}: 500,000 - 1,000,000 LKR/year
+    \item \textbf{Insurance}: 200,000 - 500,000 LKR/year
+    \item \textbf{Marketing \& Sales}: 1,000,000 - 5,000,000 LKR/year
+    \item \textbf{Contingency Fund}: 10-15\% of total budget
+\end{itemize}
+
+\subsection{Cost Optimization Strategies}
+
+\begin{enumerate}
+    \item \textbf{Start with Free Tiers}: Use Vercel Hobby and Supabase Free tier during development
+    \item \textbf{Gradual Scaling}: Start with small team, scale as needed
+    \item \textbf{Bulk Licensing}: Negotiate enterprise discounts for Cursor AI
+    \item \textbf{Resource Optimization}: Monitor and optimize cloud resource usage
+    \item \textbf{Remote Work}: Reduce office space costs with remote teams
+    \item \textbf{Automated Testing}: Reduce bug fix costs with comprehensive testing
+\end{enumerate}
+
+\section{Recommendations}
+
+\subsection{For Startups (0-10 employees)}
+
+\begin{itemize}
+    \item Start with \textbf{Small Team} configuration
+    \item Use free tiers initially (Vercel Hobby, Supabase Free)
+    \item Focus on MVP development (2.5 months)
+    \item Budget: \textbf{10-12 million LKR} for first year
+    \item Target profit margin: 20-30\%
+\end{itemize}
+
+\subsection{For Growing Companies (10-50 employees)}
+
+\begin{itemize}
+    \item Use \textbf{Medium Team} configuration
+    \item Invest in Pro plans for stability
+    \item Allocate 20\% budget for maintenance
+    \item Budget: \textbf{27-30 million LKR} for first year
+    \item Target profit margin: 30-50\%
+\end{itemize}
+
+\subsection{For Established Companies (50-100 employees)}
+
+\begin{itemize}
+    \item Use \textbf{Large Team} configuration
+    \item Enterprise plans for all services
+    \item Dedicated maintenance team
+    \item Budget: \textbf{64-68 million LKR} for first year
+    \item Target profit margin: 40-60\%
+\end{itemize}
+
+\section{Conclusion}
+
+This budget plan provides a comprehensive financial overview for developing and maintaining software using modern tools and cloud services in Sri Lanka. The development timeline is \textbf{2 months and 15 days (2.5 months)}, which significantly reduces initial costs compared to longer development cycles. Key takeaways:
+
+\begin{itemize}
+    \item Personnel costs represent 87-94\% of total budget
+    \item Infrastructure costs (Vercel + Supabase) are relatively small (0.2-1.1\%)
+    \item Cursor AI adds 1.3-2.4\% to total costs but significantly improves productivity, enabling faster 2.5-month development
+    \item Maintenance costs should be budgeted at 20-25\% of development costs
+    \item Profit margins of 30-50\% are recommended for sustainable business
+    \item \textbf{2.5-month development timeline} reduces first-year costs by approximately 30-33\% compared to 6-month development
+\end{itemize}
+
+\vspace{1cm}
+
+\begin{center}
+\textbf{--- End of Budget Plan ---}\\
+\vspace{0.5cm}
+\textit{Prepared for: Sri Lankan Software Development Company}\\
+\textit{Date: \today}\\
+\textit{Currency: Sri Lankan Rupees (LKR)}
+\end{center}
+
+\end{document}

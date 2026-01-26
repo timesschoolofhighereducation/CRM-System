@@ -329,11 +329,10 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
   // Auto-copy phone number to WhatsApp number when WhatsApp checkbox is checked (only if whatsappNumber is empty)
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      // Only auto-fill if:
-      // 1. Phone field changed
+      // Auto-fill WhatsApp number when:
+      // 1. Phone field changes
       // 2. WhatsApp checkbox is checked
-      // 3. There's a phone value
-      // 4. WhatsApp number field is empty (don't overwrite user input)
+      // 3. WhatsApp number field is empty (don't overwrite manual entries)
       if (name === 'phone' && form.getValues('whatsapp') && value.phone) {
         const currentWhatsAppNumber = form.getValues('whatsappNumber')
         if (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '') {
@@ -743,7 +742,8 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         emailNotAnswering: data.emailNotAnswering ?? false,
         consent: data.consent,
         registerNow: data.registerNow ?? false,
-        whatsappNumber: data.whatsappNumber?.trim() || undefined,
+        // Always send whatsappNumber if it has a value (even if checkbox is unchecked)
+        whatsappNumber: data.whatsappNumber?.trim() || null,
       }
 
       // Check if we have multiple programs - if so, create separate inquiry for each
@@ -981,14 +981,16 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
                   checked={form.watch('whatsapp')}
                   onCheckedChange={(checked) => {
                     form.setValue('whatsapp', checked as boolean)
-                    // Only auto-fill if checkbox is checked AND whatsappNumber is empty
-                    // Don't overwrite if user has already entered a different number
-                    if (checked && form.getValues('phone')) {
+                    // When checkbox is checked, auto-fill WhatsApp number with phone number
+                    // Only if WhatsApp number is empty (don't overwrite manual entries)
+                    if (checked) {
+                      const phoneNumber = form.getValues('phone')
                       const currentWhatsAppNumber = form.getValues('whatsappNumber')
-                      if (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '') {
-                        form.setValue('whatsappNumber', form.getValues('phone'))
+                      if (phoneNumber && (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '')) {
+                        form.setValue('whatsappNumber', phoneNumber)
                       }
                     }
+                    // When unchecked, don't clear the WhatsApp number - let user keep it if they want
                   }}
                 />
                 <Label htmlFor="whatsapp" className="text-sm font-normal cursor-pointer">
@@ -1001,7 +1003,12 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
               <Label htmlFor="whatsappNumber" className="text-xs sm:text-sm font-medium">WhatsApp Number</Label>
               <Input
                 id="whatsappNumber"
-                {...form.register('whatsappNumber')}
+                {...form.register('whatsappNumber', {
+                  onChange: (e) => {
+                    // Allow manual entry - don't auto-overwrite if user is typing
+                    form.setValue('whatsappNumber', e.target.value, { shouldValidate: true })
+                  }
+                })}
                 placeholder="WhatsApp number"
                 onKeyDown={handleEnterAdvance}
                 className="w-full"
