@@ -29,7 +29,8 @@ import {
   FileText,
   BookOpen,
   Sparkles,
-  Gamepad2
+  Gamepad2,
+  Ticket
 } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -92,6 +93,12 @@ const navigation: NavigationItem[] = [
     href: '/campaigns', 
     icon: Megaphone,
     permissions: ['READ_CAMPAIGN']
+  },
+  { 
+    name: 'Promotion Codes', 
+    href: '/promotion-codes', 
+    icon: Ticket,
+    permissions: ['READ_SEEKER', 'READ_CAMPAIGN'] // Accessible to users who can view inquiries/campaigns
   },
   { 
     name: 'Social Media Posts', 
