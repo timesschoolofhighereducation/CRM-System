@@ -25,7 +25,7 @@ const promotionCodeSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
     'Payment amount must be a valid number'
   ),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 })
 
 type PromotionCodeFormData = z.infer<typeof promotionCodeSchema>

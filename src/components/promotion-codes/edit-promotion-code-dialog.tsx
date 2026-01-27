@@ -25,7 +25,7 @@ const promotionCodeSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
     'Payment amount must be a valid number'
   ),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 })
 
 type PromotionCodeFormData = z.infer<typeof promotionCodeSchema>
@@ -39,7 +39,7 @@ interface PromotionCode {
   promoterIdNumber: string
   discountAmountLKR: number
   paymentAmountLKR: number
-  isActive: boolean
+  isActive?: boolean
 }
 
 interface EditPromotionCodeDialogProps {
@@ -65,8 +65,8 @@ export function EditPromotionCodeDialog({
       promoterIdNumber: promotionCode.promoterIdNumber,
       discountAmountLKR: promotionCode.discountAmountLKR.toString(),
       paymentAmountLKR: promotionCode.paymentAmountLKR.toString(),
-      isActive: promotionCode.isActive,
-    },
+      isActive: promotionCode.isActive ?? true,
+    } as PromotionCodeFormData,
   })
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export function EditPromotionCodeDialog({
         promoterIdNumber: promotionCode.promoterIdNumber,
         discountAmountLKR: promotionCode.discountAmountLKR.toString(),
         paymentAmountLKR: promotionCode.paymentAmountLKR.toString(),
-        isActive: promotionCode.isActive,
+        isActive: promotionCode.isActive ?? true,
       })
     }
   }, [open, promotionCode, form])

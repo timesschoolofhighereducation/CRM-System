@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    const code = params.code.toUpperCase().trim()
+    const { code: codeParam } = await params
+    const code = codeParam.toUpperCase().trim()
 
     const promotionCode = await prisma.promotionCode.findUnique({
       where: { code },

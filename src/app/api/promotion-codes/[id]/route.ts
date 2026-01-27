@@ -4,13 +4,14 @@ import { requireAuth } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     const promotionCode = await prisma.promotionCode.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         createdBy: {
           select: {
@@ -63,10 +64,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     const body = await request.json()
     const {
@@ -81,7 +83,7 @@ export async function PUT(
 
     // Check if promotion code exists
     const existing = await prisma.promotionCode.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existing) {
@@ -102,7 +104,7 @@ export async function PUT(
     if (isActive !== undefined) updateData.isActive = isActive
 
     const promotionCode = await prisma.promotionCode.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         createdBy: {
@@ -127,14 +129,15 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     // Check if promotion code exists
     const existing = await prisma.promotionCode.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -160,7 +163,7 @@ export async function DELETE(
     }
 
     await prisma.promotionCode.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ message: 'Promotion code deleted successfully' })
