@@ -388,12 +388,6 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
                         </div>
                       </div>
                     )}
-                    {inquiry.description && (
-                      <div className="mt-3 sm:mt-4">
-                        <span className="text-xs sm:text-sm font-medium text-gray-700">Description:</span>
-                        <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">{inquiry.description}</p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
@@ -472,6 +466,23 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Description Section */}
+              {inquiry.description && (
+                <Card className="w-full overflow-hidden border-l-4 border-l-blue-500">
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      Description
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                      {inquiry.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-2">
                 <Button onClick={() => setShowLogInteraction(true)} className="w-full sm:w-auto">
