@@ -166,6 +166,7 @@ export async function POST(request: NextRequest) {
       followUpTime: body.followUpTime || null,
       description: body.description || null,
       consent: body.consent || false,
+      promotionCodeId: body.promotionCodeId || null,
       createdById: _user.id,
       // Create many-to-many relationships for preferred programs
       preferredPrograms: {

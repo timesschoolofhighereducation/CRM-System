@@ -15,6 +15,7 @@ import { StatusBar } from '@/components/ui/status-bar'
 import { X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation'
+import { PromotionCodeClaim } from '@/components/promotion-codes/promotion-code-claim'
 
 const inquirySchema = z.object({
   fullName: z.string()
@@ -79,6 +80,7 @@ const inquirySchema = z.object({
   notAnswering: z.boolean().optional().default(false),
   emailNotAnswering: z.boolean().optional().default(false),
   consent: z.boolean().optional().default(false),
+  promotionCodeId: z.string().optional(),
   
   stage: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -441,6 +443,7 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         whatsappNumber: safeTrim(data.whatsappNumber) || null,
         stage: data.stage || 'NEW',
         preferredStatus: data.preferredStatus || undefined,
+        promotionCodeId: data.promotionCodeId || undefined,
       }
 
       const response = await fetch(`/api/inquiries/${inquiry.id}`, {
@@ -961,6 +964,17 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                   </Select>
                 </div>
               )}
+
+              {/* Promotion Code Claim */}
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <PromotionCodeClaim
+                  value={inquiry.promotionCode?.code || undefined}
+                  onChange={(codeId, discount) => {
+                    form.setValue('promotionCodeId', codeId || undefined)
+                  }}
+                  disabled={isLoading}
+                />
+              </div>
 
               {/* Preferred Status for Programs */}
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1">

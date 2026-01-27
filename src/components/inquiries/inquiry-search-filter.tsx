@@ -88,6 +88,8 @@ interface FilterState {
   registerNow: boolean | null
   completed: boolean | null
   hold: boolean | null
+  interested: boolean | null
+  notInterested: boolean | null
 }
 
 const stageOptions = [
@@ -123,6 +125,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     registerNow: null,
     completed: null,
     hold: null,
+    interested: null,
+    notInterested: null,
   })
 
   const [showFilters, setShowFilters] = useState(false)
@@ -283,6 +287,25 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       })
     }
 
+    // Interested filter (high preferredStatus or positive stages)
+    if (filters.interested !== null) {
+      filtered = filtered.filter(inquiry => {
+        const interestedStages = ['CONNECTED', 'QUALIFIED', 'COUNSELING_SCHEDULED', 'CONSIDERING', 'READY_TO_REGISTER']
+        const isInterested = interestedStages.includes(inquiry.stage) || 
+                            (inquiry.preferredStatus !== null && inquiry.preferredStatus !== undefined && inquiry.preferredStatus >= 5)
+        return isInterested === filters.interested
+      })
+    }
+
+    // Not Interested filter (LOST stage or low preferredStatus)
+    if (filters.notInterested !== null) {
+      filtered = filtered.filter(inquiry => {
+        const isNotInterested = inquiry.stage === 'LOST' || 
+                               (inquiry.preferredStatus !== null && inquiry.preferredStatus !== undefined && inquiry.preferredStatus < 5)
+        return isNotInterested === filters.notInterested
+      })
+    }
+
     return filtered
   }, [inquiries, filters])
 
@@ -322,6 +345,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
       registerNow: null,
       completed: null,
       hold: null,
+      interested: null,
+      notInterested: null,
     })
   }
 
@@ -343,6 +368,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
     if (filters.registerNow !== null) count++
     if (filters.completed !== null) count++
     if (filters.hold !== null) count++
+    if (filters.interested !== null) count++
+    if (filters.notInterested !== null) count++
     return count
   }
 
@@ -748,6 +775,42 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                       />
                       <span className="text-sm">Hold</span>
                     </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.interested === true && "bg-emerald-50 border border-emerald-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        interested: prev.interested === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.interested === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Interested</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.notInterested === true && "bg-rose-50 border border-rose-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ 
+                        ...prev, 
+                        notInterested: prev.notInterested === true ? null : true 
+                      }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.notInterested === true}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Not Interested</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -912,6 +975,24 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                   <X 
                     className="h-3 w-3 cursor-pointer" 
                     onClick={() => setFilters(prev => ({ ...prev, hold: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.interested === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-emerald-100 text-emerald-700">
+                  <span>Interested</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, interested: null }))}
+                  />
+                </Badge>
+              )}
+              {filters.notInterested === true && (
+                <Badge variant="secondary" className="flex items-center space-x-1 bg-rose-100 text-rose-700">
+                  <span>Not Interested</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, notInterested: null }))}
                   />
                 </Badge>
               )}

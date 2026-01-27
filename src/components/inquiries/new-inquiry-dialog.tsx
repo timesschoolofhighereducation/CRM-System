@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation'
 import { QAQuickViewDialog } from './qa-quick-view-dialog'
 import { ProgramDetailsQuickViewDialog } from './program-details-quick-view-dialog'
+import { PromotionCodeClaim } from '@/components/promotion-codes/promotion-code-claim'
 
 const inquirySchema = z.object({
   fullName: z.string()
@@ -100,6 +101,7 @@ const inquirySchema = z.object({
   emailNotAnswering: z.boolean().optional().default(false),
   consent: z.boolean().optional().default(false),
   registerNow: z.boolean().optional().default(false),
+  promotionCodeId: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Marketing source is required unless "Not Answering" is checked
   if (!data.notAnswering && (!data.marketingSource || !data.marketingSource.trim())) {
@@ -744,6 +746,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         registerNow: data.registerNow ?? false,
         // Always send whatsappNumber if it has a value (even if checkbox is unchecked)
         whatsappNumber: data.whatsappNumber?.trim() || null,
+        promotionCodeId: data.promotionCodeId || undefined,
       }
 
       // Check if we have multiple programs - if so, create separate inquiry for each
@@ -1653,6 +1656,16 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
                 </Select>
               </div>
             )}
+
+            {/* Promotion Code Claim */}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+              <PromotionCodeClaim
+                onChange={(codeId, discount) => {
+                  form.setValue('promotionCodeId', codeId || undefined)
+                }}
+                disabled={isLoading}
+              />
+            </div>
 
             {/* Preferred Status for Programs */}
             <div className="space-y-1.5 sm:col-span-2 lg:col-span-3 xl:col-span-4 pt-1">

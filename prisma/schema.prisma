@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -48,15 +48,16 @@ model User {
   createdClients     Client[]         @relation("ClientCreatedBy")
 
   // Post approval system relations
-  createdPosts  SocialMediaPost[] @relation("PostCreatedBy")
-  postApprovals PostApproval[]    @relation("PostApprover")
-  postComments  PostComment[]     @relation("PostCommenter")
-  notifications Notification[]    @relation("UserNotifications")
+  createdPosts      SocialMediaPost[]  @relation("PostCreatedBy")
+  postApprovals     PostApproval[]     @relation("PostApprover")
+  postComments      PostComment[]      @relation("PostCommenter")
+  notifications     Notification[]     @relation("UserNotifications")
   pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
 
   // Notebook system relations
-  createdNotebooks Notebook[] @relation("NotebookCreatedBy")
-  createdNotes     Note[]     @relation("NoteCreatedBy")
+  createdNotebooks      Notebook[]      @relation("NotebookCreatedBy")
+  createdNotes          Note[]          @relation("NoteCreatedBy")
+  createdPromotionCodes PromotionCode[] @relation("PromotionCodeCreatedBy")
 
   @@map("users")
 }
@@ -128,8 +129,8 @@ model Program {
   level            String?
   campus           String
   nextIntakeDate   DateTime?
-  description      String?           // Rich text description
-  imageUrl         String?           // Program image URL
+  description      String? // Rich text description
+  imageUrl         String? // Program image URL
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   levelRelation    Level?            @relation(fields: [levelId], references: [id])
@@ -182,6 +183,8 @@ model Seeker {
   campaigns            CampaignSeeker[]
   whatsappRecipients   WhatsAppRecipient[]
   emailRecipients      EmailRecipient[]
+  promotionCodeId      String?
+  promotionCode        PromotionCode?      @relation(fields: [promotionCodeId], references: [id])
 
   @@map("seekers")
 }
@@ -565,18 +568,18 @@ model WhatsAppMessage {
 }
 
 model WhatsAppTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  content   String
+  id            String   @id @default(cuid())
+  name          String
+  content       String
   mediaType     String?
   mediaFilename String?
   mediaFilePath String?
   mediaSize     Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@index([userId])
@@ -1114,16 +1117,16 @@ enum NotificationType {
 
 // Push Notification Subscriptions for Web Push
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation("UserPushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
-  
-  endpoint  String   @unique // Push subscription endpoint URL
-  keys      Json     // { p256dh: string, auth: string } - encryption keys
-  
-  userAgent String?  // Browser/device info
-  deviceInfo Json?   // { browser, os, device, isMobile }
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("UserPushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint String @unique // Push subscription endpoint URL
+  keys     Json // { p256dh: string, auth: string } - encryption keys
+
+  userAgent  String? // Browser/device info
+  deviceInfo Json? // { browser, os, device, isMobile }
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1158,8 +1161,8 @@ model Notebook {
   id          String   @id @default(cuid())
   title       String
   description String?
-  icon        String?  // Emoji or icon identifier
-  color       String?  // Hex color for visual identification
+  icon        String? // Emoji or icon identifier
+  color       String? // Hex color for visual identification
   isArchived  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1176,27 +1179,27 @@ model Notebook {
 
 // Note Model (like Notion page/block)
 model Note {
-  id          String   @id @default(cuid())
-  title       String
-  content     String?  // Rich text content (JSON or Markdown)
-  icon        String?  // Emoji or icon identifier
-  coverImage  String?  // Cover image URL
-  isArchived  Boolean  @default(false)
-  isFavorite  Boolean  @default(false)
-  order       Int      @default(0) // For sorting notes
-  
+  id         String  @id @default(cuid())
+  title      String
+  content    String? // Rich text content (JSON or Markdown)
+  icon       String? // Emoji or icon identifier
+  coverImage String? // Cover image URL
+  isArchived Boolean @default(false)
+  isFavorite Boolean @default(false)
+  order      Int     @default(0) // For sorting notes
+
   // Reminder fields (Google Reminder-like)
-  hasReminder Boolean  @default(false)
+  hasReminder  Boolean   @default(false)
   reminderDate DateTime? // Date and time for the reminder
-  reminderSent Boolean  @default(false) // Track if reminder has been sent
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  reminderSent Boolean   @default(false) // Track if reminder has been sent
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  notebookId  String?
-  notebook    Notebook? @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-  
+  notebookId String?
+  notebook   Notebook? @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
   parentNoteId String? // For nested notes (hierarchical structure)
   parentNote   Note?   @relation("NoteHierarchy", fields: [parentNoteId], references: [id], onDelete: Cascade)
   childNotes   Note[]  @relation("NoteHierarchy")
@@ -1205,4 +1208,26 @@ model Note {
   createdBy   User   @relation("NoteCreatedBy", fields: [createdById], references: [id])
 
   @@map("notes")
+}
+
+model PromotionCode {
+  id                 String   @id @default(cuid())
+  code               String   @unique // A0001, A0002, etc.
+  promoterName       String
+  promoterAddress    String
+  promoterPhone      String
+  promoterIdNumber   String
+  discountAmountLKR  Float // Discount given to child in LKR
+  paymentAmountLKR   Float // Amount paid to promoter in LKR
+  isActive           Boolean  @default(true)
+  totalInquiries     Int      @default(0) // Total inquiries using this code
+  totalRegistrations Int      @default(0) // Total registrations using this code
+  totalPaidLKR       Float    @default(0) // Total amount paid to promoter
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdById        String?
+  createdBy          User?    @relation("PromotionCodeCreatedBy", fields: [createdById], references: [id])
+  seekers            Seeker[] // Seekers who used this promotion code
+
+  @@map("promotion_codes")
 }

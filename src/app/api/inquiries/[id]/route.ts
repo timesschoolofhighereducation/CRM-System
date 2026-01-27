@@ -30,6 +30,13 @@ export async function GET(
             name: true,
           },
         },
+        promotionCode: {
+          select: {
+            id: true,
+            code: true,
+            discountAmountLKR: true,
+          },
+        },
         interactions: {
           include: {
             user: {
