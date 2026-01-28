@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Edit, Trash2, Copy, CheckCircle2, XCircle, Search, RefreshCw } from 'lucide-react'
+import { Edit, Trash2, Copy, CheckCircle2, XCircle, Search, RefreshCw, FileSpreadsheet, FileText } from 'lucide-react'
 import { EditPromotionCodeDialog } from './edit-promotion-code-dialog'
 import { toast } from 'sonner'
 
@@ -37,6 +37,7 @@ export function PromotionCodesTable() {
   const [searchQuery, setSearchQuery] = useState('')
   const [editingCode, setEditingCode] = useState<PromotionCode | null>(null)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
 
   useEffect(() => {
     fetchPromotionCodes()
@@ -90,6 +91,34 @@ export function PromotionCodesTable() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    try {
+      setExporting(format)
+      const response = await fetch(`/api/promotion-codes/export?format=${format}`)
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Export failed' }))
+        toast.error(err.error || 'Failed to export promotion codes')
+        return
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = format === 'excel' ? 'xlsx' : 'pdf'
+      a.download = `promotion-codes-report-${new Date().toISOString().split('T')[0]}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      a.remove()
+      toast.success(`Promotion codes report exported as ${format.toUpperCase()}`)
+    } catch (error) {
+      console.error('Error exporting promotion codes:', error)
+      toast.error('Failed to export promotion codes')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   const filteredCodes = promotionCodes.filter((code) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
@@ -115,17 +144,37 @@ export function PromotionCodesTable() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-2">
             <CardTitle>All Promotion Codes</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchPromotionCodes}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchPromotionCodes}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport('excel')}
+                disabled={exporting !== null}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                {exporting === 'excel' ? 'Exporting…' : 'Export Excel'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport('pdf')}
+                disabled={exporting !== null}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -13,6 +13,7 @@
  * VAPID_SUBJECT=mailto:your-email@example.com
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- standalone Node script
 const webpush = require('web-push')
 
 try {

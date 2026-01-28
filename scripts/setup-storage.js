@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- standalone Node script
 const fs = require('fs')
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- standalone Node script
 const path = require('path')
 
 console.log('🔧 WhatsApp Media Storage Setup')
