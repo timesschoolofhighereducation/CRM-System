@@ -44,6 +44,23 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { 
+  FOLLOW_UP_STATUS_COLUMNS,
+  getTaskStatusInfo,
+  isTaskReadOnly,
+  normalizeStatusHelper
+} from '@/lib/task-constants'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Trash2 } from 'lucide-react'
 
 interface FollowUpTask {
   id: string
@@ -90,6 +107,8 @@ export function FollowUpsView() {
   const [moveDialogOpen, setMoveDialogOpen] = useState(false)
   const [pendingMove, setPendingMove] = useState<{ taskId: string; newStatus: string; fromStatus: string } | null>(null)
   const [moveComment, setMoveComment] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<FollowUpTask | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -99,50 +118,8 @@ export function FollowUpsView() {
     })
   )
 
-  const statusColumns = [
-    { 
-      id: 'OPEN', 
-      title: 'Open', 
-      color: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-      icon: Clock,
-      headerColor: 'bg-yellow-100 border-yellow-200'
-    },
-    { 
-      id: 'TODO', 
-      title: 'To Do', 
-      color: 'bg-blue-50 text-blue-700 border-blue-200',
-      icon: Clock,
-      headerColor: 'bg-blue-100 border-blue-200'
-    },
-    { 
-      id: 'IN_PROGRESS', 
-      title: 'In Progress', 
-      color: 'bg-amber-50 text-amber-700 border-amber-200',
-      icon: Clock,
-      headerColor: 'bg-amber-100 border-amber-200'
-    },
-    { 
-      id: 'DONE', 
-      title: 'Done', 
-      color: 'bg-green-50 text-green-700 border-green-200',
-      icon: CheckCircle,
-      headerColor: 'bg-green-100 border-green-200'
-    },
-    { 
-      id: 'COMPLETED', 
-      title: 'Completed', 
-      color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      icon: CheckCircle,
-      headerColor: 'bg-emerald-100 border-emerald-200'
-    },
-    { 
-      id: 'ON_HOLD', 
-      title: 'On Hold', 
-      color: 'bg-gray-50 text-gray-700 border-gray-200',
-      icon: AlertCircle,
-      headerColor: 'bg-gray-100 border-gray-200'
-    },
-  ]
+  // Use shared status columns
+  const statusColumns = FOLLOW_UP_STATUS_COLUMNS
 
   useEffect(() => {
     fetchTasks()
@@ -220,24 +197,8 @@ export function FollowUpsView() {
     return match
   }
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'OPEN':
-        return { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Open' }
-      case 'TODO':
-        return { color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Clock, label: 'To Do' }
-      case 'IN_PROGRESS':
-        return { color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock, label: 'In Progress' }
-      case 'DONE':
-        return { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle, label: 'Done' }
-      case 'COMPLETED':
-        return { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle, label: 'Completed' }
-      case 'OVERDUE':
-        return { color: 'bg-red-50 text-red-700 border-red-200', icon: AlertCircle, label: 'Overdue' }
-      default:
-        return { color: 'bg-gray-50 text-gray-700 border-gray-200', icon: Clock, label: status }
-    }
-  }
+  // Use shared helper function
+  const getStatusInfo = getTaskStatusInfo
 
   const isOverdue = (dueAt: string) => {
     return new Date(dueAt) < new Date() && statusFilter !== 'DONE' && statusFilter !== 'COMPLETED'
@@ -359,6 +320,49 @@ export function FollowUpsView() {
     setMoveComment('')
   }, [pendingMove, moveComment, updateTaskStatus])
 
+  const handleDeleteClick = (task: FollowUpTask, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    setTaskToDelete(task)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return
+
+    try {
+      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Remove from local state
+        setAllTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
+        setFilteredTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
+        toast.success('Follow-up deleted successfully')
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error(errorData.error || 'Failed to delete follow-up')
+      }
+    } catch (error) {
+      console.error('Error deleting follow-up:', error)
+      toast.error('Failed to delete follow-up')
+    } finally {
+      setDeleteDialogOpen(false)
+      setTaskToDelete(null)
+    }
+  }
+
+  const handlePhoneCall = (phone: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    window.location.href = `tel:${phone}`
+  }
+
   const handleToggleRegister = async (task: FollowUpTask, registerNow: boolean) => {
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -444,7 +448,9 @@ export function FollowUpsView() {
     getFollowUpNumber,
     isOverdue,
     getDaysUntilDue,
-    activeTaskId
+    activeTaskId,
+    onDeleteClick,
+    onPhoneCall
   }: { 
     column: { id: string; title: string; color: string; icon: any; headerColor: string }
     tasks: FollowUpTask[]
@@ -457,6 +463,8 @@ export function FollowUpsView() {
     isOverdue: (dueAt: string) => boolean
     getDaysUntilDue: (dueAt: string) => number
     activeTaskId?: string
+    onDeleteClick: (task: FollowUpTask, e?: React.MouseEvent) => void
+    onPhoneCall: (phone: string, e?: React.MouseEvent) => void
   }) {
     const { setNodeRef, isOver } = useDroppable({
       id: column.id,
@@ -501,6 +509,8 @@ export function FollowUpsView() {
                 isOverdue={isOverdue}
                 getDaysUntilDue={getDaysUntilDue}
                 isDragging={activeTaskId === task.id}
+                onDeleteClick={onDeleteClick}
+                onPhoneCall={onPhoneCall}
               />
             ))}
             {tasks.length === 0 && (
@@ -529,7 +539,9 @@ export function FollowUpsView() {
     getFollowUpNumber,
     isOverdue,
     getDaysUntilDue,
-    isDragging
+    isDragging,
+    onDeleteClick,
+    onPhoneCall
   }: { 
     task: FollowUpTask
     onViewHistory: (task: FollowUpTask) => void
@@ -541,6 +553,8 @@ export function FollowUpsView() {
     isOverdue: (dueAt: string) => boolean
     getDaysUntilDue: (dueAt: string) => number
     isDragging: boolean
+    onDeleteClick: (task: FollowUpTask, e?: React.MouseEvent) => void
+    onPhoneCall: (phone: string, e?: React.MouseEvent) => void
   }) {
     const {
       attributes,
@@ -665,6 +679,19 @@ export function FollowUpsView() {
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
+                    onPhoneCall(task.seeker.phone, e)
+                  }}
+                >
+                  <Phone className="h-3 w-3 mr-1" />
+                  Call
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
                     onViewHistory(task)
                   }}
                 >
@@ -684,6 +711,20 @@ export function FollowUpsView() {
                   <Eye className="h-3 w-3 mr-1" />
                   View
                 </Button>
+                {!isTaskReadOnly(task.seeker.stage) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      onDeleteClick(task, e)
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             )}
 
@@ -844,6 +885,8 @@ export function FollowUpsView() {
                     isOverdue={isOverdue}
                     getDaysUntilDue={getDaysUntilDue}
                     activeTaskId={activeTask?.id}
+                    onDeleteClick={handleDeleteClick}
+                    onPhoneCall={handlePhoneCall}
                   />
                 )
               })}
@@ -1075,6 +1118,40 @@ export function FollowUpsView() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Follow-up Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              {taskToDelete && (
+                <>
+                  Are you sure you want to delete the follow-up task for{' '}
+                  <strong>{taskToDelete.seeker.fullName}</strong>?
+                  <br />
+                  <br />
+                  This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false)
+              setTaskToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* History Dialog */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
