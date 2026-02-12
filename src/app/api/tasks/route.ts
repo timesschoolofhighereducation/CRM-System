@@ -5,6 +5,16 @@ import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     const _user = await requireAuth(request)
+    const { searchParams } = new URL(request.url)
+    
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const skip = (page - 1) * limit
+    
+    // Filter parameters
+    const status = searchParams.get('status')
+    const purpose = searchParams.get('purpose')
     
     // Build where clause based on user role
     const where: any = {}
@@ -13,6 +23,17 @@ export async function GET(request: NextRequest) {
     if (!isAdminRole(_user.role)) {
       where.assignedTo = _user.id
     }
+    
+    // Add filter parameters
+    if (status) {
+      where.status = status
+    }
+    if (purpose) {
+      where.purpose = purpose
+    }
+    
+    // Get total count for pagination
+    const total = await prisma.followUpTask.count({ where })
     
     const tasks = await prisma.followUpTask.findMany({
       where,
@@ -24,6 +45,7 @@ export async function GET(request: NextRequest) {
             phone: true,
             createdById: true,
             registerNow: true,
+            stage: true,
           },
         },
         user: {
@@ -47,6 +69,8 @@ export async function GET(request: NextRequest) {
       orderBy: {
         dueAt: 'asc',
       },
+      skip,
+      take: limit,
     })
 
     // For non-admin users, filter to only show tasks for inquiries created by the current user
@@ -54,7 +78,18 @@ export async function GET(request: NextRequest) {
       ? tasks 
       : tasks.filter(task => task.seeker.createdById === _user.id)
 
-    return NextResponse.json(userTasks)
+    // Return paginated response
+    return NextResponse.json({
+      tasks: userTasks,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    })
   } catch (error) {
     console.error('Error fetching tasks:', error)
     if (error instanceof AuthenticationError) {

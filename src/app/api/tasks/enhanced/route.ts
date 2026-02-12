@@ -6,9 +6,17 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request)
     const { searchParams } = new URL(request.url)
+    
+    // Pagination parameters
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const skip = (page - 1) * limit
+    
+    // Filter parameters
     const projectId = searchParams.get('projectId')
     const status = searchParams.get('status')
     const assignedTo = searchParams.get('assignedTo')
+    const priority = searchParams.get('priority')
 
     const whereClause: Record<string, any> = {}
     
@@ -32,6 +40,13 @@ export async function GET(request: NextRequest) {
     if (assignedTo) {
       whereClause.assignedToId = assignedTo
     }
+    
+    if (priority) {
+      whereClause.priority = priority
+    }
+
+    // Get total count for pagination
+    const total = await prisma.task.count({ where: whereClause })
 
     const tasks = await prisma.task.findMany({
       where: whereClause,
@@ -88,10 +103,23 @@ export async function GET(request: NextRequest) {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      skip,
+      take: limit
     })
 
-    return NextResponse.json(tasks)
+    // Return paginated response
+    return NextResponse.json({
+      tasks,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    })
   } catch (error) {
     console.error('Error fetching tasks:', error)
     if (error instanceof AuthenticationError) {

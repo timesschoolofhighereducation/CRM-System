@@ -7,7 +7,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TaskSearchFilter } from './task-search-filter'
-import { CheckCircle, Clock, AlertCircle, User, Phone, Calendar } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, User, Phone, Calendar, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface FollowUpTask {
   id: string
@@ -71,6 +82,8 @@ export function TasksInbox() {
   const [allTasks, setAllTasks] = useState<TaskItem[]>([])
   const [filteredTasks, setFilteredTasks] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<FollowUpTask | null>(null)
 
   useEffect(() => {
     fetchTasks()
@@ -81,8 +94,10 @@ export function TasksInbox() {
       const response = await fetch('/api/tasks')
       if (response.ok) {
         const data = await response.json()
-        setAllTasks(data)
-        setFilteredTasks(data)
+        // Handle both old format (array) and new format (object with tasks)
+        const tasks = Array.isArray(data) ? data : (data.tasks || [])
+        setAllTasks(tasks)
+        setFilteredTasks(tasks)
       }
     } catch (error) {
       console.error('Error fetching tasks:', error)
@@ -116,10 +131,48 @@ export function TasksInbox() {
             task.id === taskId ? { ...task, status } : task
           )
         )
+        toast.success('Task status updated')
+      } else {
+        toast.error('Failed to update task status')
       }
     } catch (error) {
       console.error('Error updating task status:', error)
+      toast.error('Error updating task status')
     }
+  }
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return
+
+    try {
+      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast.success('Task deleted successfully')
+        
+        // Remove task from local state
+        setAllTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
+        setFilteredTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
+        
+        setDeleteDialogOpen(false)
+        setTaskToDelete(null)
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error('Failed to delete task', {
+          description: errorData.error || 'Could not delete task',
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      toast.error('Error deleting task')
+    }
+  }
+
+  const handleDeleteClick = (task: FollowUpTask) => {
+    setTaskToDelete(task)
+    setDeleteDialogOpen(true)
   }
 
   const getStatusColor = (status: string) => {
@@ -203,6 +256,7 @@ export function TasksInbox() {
           tasks={todayTasks} 
           title="Today's Tasks"
           onUpdateStatus={updateTaskStatus}
+          onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
         />
@@ -213,6 +267,7 @@ export function TasksInbox() {
           tasks={overdueTasks} 
           title="Overdue Tasks"
           onUpdateStatus={updateTaskStatus}
+          onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
         />
@@ -223,6 +278,7 @@ export function TasksInbox() {
           tasks={upcomingTasks} 
           title="Upcoming Tasks"
           onUpdateStatus={updateTaskStatus}
+          onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
         />
@@ -233,11 +289,39 @@ export function TasksInbox() {
           tasks={followUpFilteredTasks} 
           title="All Tasks"
           onUpdateStatus={updateTaskStatus}
+          onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
         />
       </TabsContent>
     </Tabs>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Task</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this task? This action cannot be undone.
+            {taskToDelete && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                <p className="font-medium text-gray-900">{taskToDelete.seeker.fullName}</p>
+                <p className="text-sm text-gray-600 mt-1">{taskToDelete.seeker.phone}</p>
+              </div>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={handleDeleteTask}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div>
   )
 }
@@ -246,11 +330,12 @@ interface TaskTableProps {
   tasks: FollowUpTask[]
   title: string
   onUpdateStatus: (taskId: string, status: string) => void
+  onDelete: (task: FollowUpTask) => void
   getStatusColor: (status: string) => string
   getStatusIcon: (status: string) => React.ReactNode
 }
 
-function TaskTable({ tasks, title, onUpdateStatus, getStatusColor, getStatusIcon }: TaskTableProps) {
+function TaskTable({ tasks, title, onUpdateStatus, onDelete, getStatusColor, getStatusIcon }: TaskTableProps) {
   return (
     <Card>
       <CardHeader>
@@ -314,8 +399,22 @@ function TaskTable({ tasks, title, onUpdateStatus, getStatusColor, getStatusIcon
                           Mark Done
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => window.location.href = `tel:${task.seeker.phone}`}
+                        title={`Call ${task.seeker.fullName}`}
+                      >
                         <Phone className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onDelete(task)}
+                        className="hover:bg-red-50 hover:text-red-600"
+                        title="Delete Task"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

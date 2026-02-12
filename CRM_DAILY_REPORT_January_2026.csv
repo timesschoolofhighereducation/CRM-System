@@ -1,0 +1,13 @@
+Date,Day,Work Summary,Key Deliverables
+2026-01-03,Sat,"Web push notifications fix, inquiry filter fix, build errors fix","Push notifications, filters, build stability"
+2026-01-05,Mon,"Vercel Analytics integration","Analytics, docs"
+2026-01-06,Sun,"Request Inquiry section (new feature), data fetch fix, build fix","Request inquiry module, API, UI"
+2026-01-07,Mon,"Convert request-to-inquiry flow fixes","Conversion logic, request-inquiries table"
+2026-01-08,Tue,"Kanban board fixes, status automation, mark-converted API","Kanban, task status, request-inquiry"
+2026-01-09,Wed,"Notification indicator (favicon badge)","Favicon badge, notification UX"
+2026-01-10,Thu,"Notification indicator refinements","Favicon badge polish"
+2026-01-19,Sun,"Request Inquiry / Exhibition registration, convert-to-inquiries API","Registration flow, batch convert, UI"
+2026-01-20,Mon,"WhatsApp errors fix, inquiry validation, phone uniqueness","WhatsApp, inquiry validation, schema"
+2026-01-26,Sun,"Inquiry filter fix, WhatsApp section fix, WhatsApp number save fix","Filters, WhatsApp section, number save"
+2026-01-27,Mon,"Promotion code section, sidebar, inquiry section mod, Vercel build fix","Promotion codes feature, build fix"
+2026-01-28,Tue,"Promotion code Excel export and section fix","Promo code export, section fixes"

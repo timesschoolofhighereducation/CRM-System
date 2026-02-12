@@ -2,6 +2,74 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, isAdminRole } from '@/lib/auth'
 
+// GET individual follow-up task by ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const _user = await requireAuth(request)
+    const { id } = await params
+
+    const task = await prisma.followUpTask.findUnique({
+      where: { id },
+      include: {
+        seeker: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            createdById: true,
+            registerNow: true,
+          },
+        },
+        user: {
+          select: {
+            name: true,
+          },
+        },
+        actionHistory: {
+          include: {
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            actionAt: 'desc',
+          },
+        },
+      },
+    })
+
+    if (!task) {
+      return NextResponse.json(
+        { error: 'Task not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if user has permission to view this task
+    if (!isAdminRole(_user.role)) {
+      if (task.assignedTo !== _user.id && task.seeker.createdById !== _user.id) {
+        return NextResponse.json(
+          { error: 'Access denied. You can only view tasks assigned to you for inquiries you created.' },
+          { status: 403 }
+        )
+      }
+    }
+
+    return NextResponse.json(task)
+  } catch (error) {
+    console.error('Error fetching task:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch task' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -151,6 +219,70 @@ export async function PATCH(
     console.error('Error updating task:', error)
     return NextResponse.json(
       { error: 'Failed to update task' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE follow-up task (soft delete - mark as deleted)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const _user = await requireAuth(request)
+    const { id } = await params
+
+    // Get the current task to check permissions
+    const currentTask = await prisma.followUpTask.findUnique({
+      where: { id },
+      select: { 
+        assignedTo: true,
+        seeker: {
+          select: {
+            createdById: true
+          }
+        }
+      }
+    })
+
+    if (!currentTask) {
+      return NextResponse.json(
+        { error: 'Task not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if user has permission to delete this task
+    if (!isAdminRole(_user.role)) {
+      // Non-admin users can only delete tasks assigned to them for inquiries they created
+      if (currentTask.assignedTo !== _user.id || currentTask.seeker.createdById !== _user.id) {
+        return NextResponse.json(
+          { error: 'Access denied. You can only delete tasks assigned to you for inquiries you created.' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Soft delete: Update status to a deleted state or add deletedAt field
+    // For now, we'll hard delete. In production, consider soft delete:
+    // await prisma.followUpTask.update({
+    //   where: { id },
+    //   data: { deletedAt: new Date(), deletedBy: _user.id }
+    // })
+
+    await prisma.followUpTask.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Task deleted successfully' 
+    })
+  } catch (error) {
+    console.error('Error deleting task:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete task' },
       { status: 500 }
     )
   }
