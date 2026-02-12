@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
     const _user = await requireAuth(request)
     
     const body = await request.json()
+    const registerNowValue =
+      body.registerNow === true || body.registerNow === 'true'
     console.log('Received body:', body)
 
     // Check for duplicate phone number (skip if allowDuplicatePhone is true)
@@ -212,10 +214,10 @@ export async function POST(request: NextRequest) {
         // Use Prisma's update with type assertion as workaround
         await (prisma.seeker.update as any)({
           where: { id: seeker.id },
-          data: { registerNow: body.registerNow || false },
+          data: { registerNow: registerNowValue },
         })
         // Update the seeker object to include registerNow in response
-        ;(seeker as any).registerNow = body.registerNow || false
+        ;(seeker as any).registerNow = registerNowValue
       } catch (updateError) {
         console.warn('Could not update registerNow field (Prisma client may need regeneration):', updateError)
         // Continue without failing the request
@@ -317,7 +319,7 @@ export async function POST(request: NextRequest) {
 
     // Automatically create 2 follow-up tasks for new inquiries
     // BUT skip if registerNow is true (seeker is already registered)
-    const shouldCreateTasks = !body.registerNow
+    const shouldCreateTasks = !registerNowValue
     if (shouldCreateTasks) {
       try {
         const now = new Date()
