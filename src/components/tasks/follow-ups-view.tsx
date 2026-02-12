@@ -473,7 +473,7 @@ export function FollowUpsView() {
     const IconComponent = column.icon
 
     return (
-      <div className="w-full min-w-[280px] max-w-[320px] flex-shrink-0">
+      <div className="w-full min-w-[300px] max-w-[360px] flex-shrink-0">
         <div className={`flex items-center justify-between mb-3 px-3 py-2.5 rounded-t-lg border-b-2 ${column.headerColor} shadow-sm`}>
           <div className="flex items-center gap-2">
             <IconComponent className="h-4 w-4 text-gray-600" />
@@ -588,9 +588,9 @@ export function FollowUpsView() {
         {...attributes}
         {...listeners}
       >
-        <CardContent className="p-3">
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-2">
+        <CardContent className="p-3 min-w-0 overflow-visible">
+          <div className="space-y-2 min-w-0">
+            <div className="flex items-start justify-between gap-2 min-w-0">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate leading-tight">
                   {task.seeker.fullName}
@@ -607,16 +607,16 @@ export function FollowUpsView() {
               )}
             </div>
             
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge className={`${statusInfo.color} text-xs font-medium px-2 py-0.5`}>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <Badge className={`${statusInfo.color} text-xs font-medium px-2 py-0.5 flex-shrink-0`}>
                 <StatusIcon className="h-3 w-3 mr-1" />
                 {statusInfo.label}
               </Badge>
-              <Badge variant="outline" className="text-xs">
-                {task.purpose.replace('_', ' ')}
+              <Badge variant="outline" className="text-xs whitespace-nowrap flex-shrink-0">
+                {task.purpose.replace(/_/g, ' ')}
               </Badge>
               <div 
-                className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200"
+                className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200 flex-shrink-0 overflow-visible"
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
@@ -640,21 +640,21 @@ export function FollowUpsView() {
                     e.stopPropagation()
                     e.preventDefault()
                   }}
-                  className="h-3.5 w-3.5"
+                  className="h-4 w-4 flex-shrink-0 rounded border-2"
                 />
-                <span className="font-medium text-green-700">Register</span>
+                <span className="font-medium text-green-700 whitespace-nowrap">Register</span>
               </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
+            <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md min-w-0">
               <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
-              <span className="truncate font-medium">
+              <span className="truncate font-medium min-w-0">
                 {new Date(task.dueAt).toLocaleDateString()}
               </span>
             </div>
 
             {task.notes && (
-              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+              <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed break-words">
                 {task.notes}
               </p>
             )}
@@ -662,7 +662,7 @@ export function FollowUpsView() {
             {/* Only show action buttons when not dragging */}
             {!isDragging && (
               <div 
-                className="flex gap-2 pt-2 border-t"
+                className="flex flex-wrap gap-1.5 pt-2 border-t min-w-0"
                 onPointerDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
@@ -675,54 +675,54 @@ export function FollowUpsView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 h-7 text-xs"
+                  className="h-7 text-xs min-w-[52px] px-2"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onPhoneCall(task.seeker.phone, e)
                   }}
                 >
-                  <Phone className="h-3 w-3 mr-1" />
+                  <Phone className="h-3 w-3 mr-1 shrink-0" />
                   Call
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 h-7 text-xs"
+                  className="h-7 text-xs min-w-[52px] px-2"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onViewHistory(task)
                   }}
                 >
-                  <History className="h-3 w-3 mr-1" />
+                  <History className="h-3 w-3 mr-1 shrink-0" />
                   History
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 h-7 text-xs"
+                  className="h-7 text-xs min-w-[52px] px-2"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onViewTask(task)
                   }}
                 >
-                  <Eye className="h-3 w-3 mr-1" />
+                  <Eye className="h-3 w-3 mr-1 shrink-0" />
                   View
                 </Button>
                 {!isTaskReadOnly(task.seeker.stage) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="h-7 w-7 p-0 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       e.preventDefault()
                       onDeleteClick(task, e)
                     }}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
@@ -895,7 +895,7 @@ export function FollowUpsView() {
             <DragOverlay>
               {activeTask ? (
                 <div className="rotate-2 opacity-95 pointer-events-none shadow-2xl">
-                  <Card className={`w-[280px] border-l-4 shadow-xl ${
+                  <Card className={`w-[320px] border-l-4 shadow-xl ${
                     isAutomatic(activeTask) ? 'border-l-blue-500 bg-white' : 'border-l-purple-500 bg-white'
                   }`}>
                     <CardContent className="p-3">
