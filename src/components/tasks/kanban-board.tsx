@@ -458,12 +458,12 @@ export function KanbanBoard() {
         })
       ])
 
-      const followUpData = followUpTasksResponse.ok ? await followUpTasksResponse.json() : { tasks: [] }
-      const regularData = regularTasksResponse.ok ? await regularTasksResponse.json() : { tasks: [] }
+      const followUpData = followUpTasksResponse.ok ? await followUpTasksResponse.json() : []
+      const regularData = regularTasksResponse.ok ? await regularTasksResponse.json() : []
       
-      // Handle both old format (array) and new format (object with tasks)
-      const followUpTasks: FollowUpTask[] = Array.isArray(followUpData) ? followUpData : (followUpData.tasks || [])
-      const regularTasks: RegularTask[] = Array.isArray(regularData) ? regularData : (regularData.tasks || [])
+      // Handle both array and object formats
+      const followUpTasks: FollowUpTask[] = Array.isArray(followUpData) ? followUpData : []
+      const regularTasks: RegularTask[] = Array.isArray(regularData) ? regularData : []
 
       // Mark task types and normalize - ensure status is valid
       const markedFollowUpTasks: TaskItem[] = followUpTasks

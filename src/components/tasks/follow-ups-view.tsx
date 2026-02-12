@@ -157,10 +157,13 @@ export function FollowUpsView() {
       const response = await fetch('/api/tasks')
       if (response.ok) {
         const data = await response.json()
-        setAllTasks(data)
+        // Handle array format (API returns array by default)
+        const tasks = Array.isArray(data) ? data : []
+        setAllTasks(tasks)
       }
     } catch (error) {
       console.error('Error fetching tasks:', error)
+      setAllTasks([])
     } finally {
       setLoading(false)
     }

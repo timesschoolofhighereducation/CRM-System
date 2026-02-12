@@ -78,18 +78,26 @@ export async function GET(request: NextRequest) {
       ? tasks 
       : tasks.filter(task => task.seeker.createdById === _user.id)
 
-    // Return paginated response
-    return NextResponse.json({
-      tasks: userTasks,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      }
-    })
+    // Check if client wants paginated response (has page param) or simple array (backward compatible)
+    const wantsPagination = searchParams.get('page') || searchParams.get('limit')
+    
+    if (wantsPagination) {
+      // Return paginated response
+      return NextResponse.json({
+        tasks: userTasks,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1
+        }
+      })
+    } else {
+      // Return simple array for backward compatibility (no pagination params = all tasks)
+      return NextResponse.json(userTasks)
+    }
   } catch (error) {
     console.error('Error fetching tasks:', error)
     if (error instanceof AuthenticationError) {

@@ -94,13 +94,15 @@ export function TasksInbox() {
       const response = await fetch('/api/tasks')
       if (response.ok) {
         const data = await response.json()
-        // Handle both old format (array) and new format (object with tasks)
-        const tasks = Array.isArray(data) ? data : (data.tasks || [])
+        // Handle array format (API returns array by default)
+        const tasks = Array.isArray(data) ? data : []
         setAllTasks(tasks)
         setFilteredTasks(tasks)
       }
     } catch (error) {
       console.error('Error fetching tasks:', error)
+      setAllTasks([])
+      setFilteredTasks([])
     } finally {
       setLoading(false)
     }
