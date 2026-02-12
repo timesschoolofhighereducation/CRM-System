@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "prisma generate && npm run db:generate:request-inquiry && prisma migrate deploy",
+    "predev": "prisma generate && npm run db:generate:request-inquiry",
     "dev": "next dev",
     "build": "prisma generate && npm run db:generate:request-inquiry && next build",
     "start": "next start",
