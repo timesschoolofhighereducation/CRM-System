@@ -1,3 +1,5 @@
+'use client'
+
 import dynamic from 'next/dynamic'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
