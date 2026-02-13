@@ -133,7 +133,8 @@ export function FollowUpsView() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Default to "automatic" so section shows tasks created with Add Inquiry
+  const [typeFilter, setTypeFilter] = useState<string>('automatic')
   const [selectedTask, setSelectedTask] = useState<FollowUpTask | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [viewTask, setViewTask] = useState<FollowUpTask | null>(null)
@@ -850,7 +851,7 @@ export function FollowUpsView() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Automatic</p>
+                  <p className="text-sm text-gray-600">From new inquiry</p>
                   <p className="text-2xl font-bold text-blue-600">{automaticCount}</p>
                 </div>
                 <Sparkles className="h-8 w-8 text-blue-500" />
@@ -914,9 +915,9 @@ export function FollowUpsView() {
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="automatic">Automatic</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="all">All follow-ups</SelectItem>
+                  <SelectItem value="automatic">From new inquiry</SelectItem>
+                  <SelectItem value="manual">Manual only</SelectItem>
                 </SelectContent>
               </Select>
             </div>

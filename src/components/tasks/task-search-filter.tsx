@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon, Search, Filter, X, Clock, User, CheckCircle, AlertCircle, Play, Pause } from 'lucide-react'
+import { CalendarIcon, Search, Filter, X, Clock, User, CheckCircle, AlertCircle, Play, Pause, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -83,6 +83,8 @@ interface FilterState {
   purpose: string[]
   showOverdue: boolean
   showToday: boolean
+  /** When true, show only tasks created when adding an inquiry (automatic follow-ups) */
+  showFromInquiryOnly: boolean
 }
 
 const statusOptions = [
@@ -112,6 +114,7 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
     purpose: [],
     showOverdue: false,
     showToday: false,
+    showFromInquiryOnly: false,
   })
 
   const [showFilters, setShowFilters] = useState(false)
@@ -225,6 +228,19 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
       })
     }
 
+    // From new inquiry: only follow-up tasks created when adding an inquiry (notes contain automatic follow-up for inquiry)
+    if (filters.showFromInquiryOnly) {
+      filtered = filtered.filter(task => {
+        if (task.type === 'regular') return false
+        const notes = 'notes' in task ? task.notes : undefined
+        return Boolean(
+          notes &&
+            (notes.includes('Initial contact follow-up for inquiry') ||
+              notes.includes('Secondary follow-up for inquiry'))
+        )
+      })
+    }
+
     return filtered
   }, [tasks, filters])
 
@@ -273,6 +289,7 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
       purpose: [],
       showOverdue: false,
       showToday: false,
+      showFromInquiryOnly: false,
     })
   }
 
@@ -285,6 +302,7 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
     if (filters.dateRange.from || filters.dateRange.to) count++
     if (filters.showOverdue) count++
     if (filters.showToday) count++
+    if (filters.showFromInquiryOnly) count++
     return count
   }
 
@@ -479,6 +497,22 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
                       <AlertCircle className="h-4 w-4" />
                       <span className="text-sm">Overdue</span>
                     </div>
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-50",
+                        filters.showFromInquiryOnly && "bg-blue-50 border border-blue-200"
+                      )}
+                      onClick={() => setFilters(prev => ({ ...prev, showFromInquiryOnly: !prev.showFromInquiryOnly }))}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.showFromInquiryOnly}
+                        onChange={() => {}}
+                        className="rounded"
+                      />
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-sm">From new inquiry</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -553,6 +587,15 @@ export function TaskSearchFilter({ tasks, onFilteredTasks, className }: TaskSear
                   <X 
                     className="h-3 w-3 cursor-pointer" 
                     onClick={() => setFilters(prev => ({ ...prev, showOverdue: false }))}
+                  />
+                </Badge>
+              )}
+              {filters.showFromInquiryOnly && (
+                <Badge variant="secondary" className="flex items-center space-x-1">
+                  <span>From new inquiry</span>
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setFilters(prev => ({ ...prev, showFromInquiryOnly: false }))}
                   />
                 </Badge>
               )}
