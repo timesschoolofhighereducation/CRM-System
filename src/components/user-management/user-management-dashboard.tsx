@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Users, Shield, Key, Plus } from 'lucide-react'
+import { Users, Shield, Key, Plus, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { UsersTable } from './users-table'
 import { RolesTable } from './roles-table'
@@ -11,6 +10,8 @@ import { PermissionsTable } from './permissions-table'
 import { NewUserDialog } from './new-user-dialog'
 import { NewRoleDialog } from './new-role-dialog'
 import { PermissionGate } from '@/hooks/use-permissions'
+import { PromotionCodesTable } from '@/components/promotion-codes/promotion-codes-table'
+import { NewPromotionCodeButton } from '@/components/promotion-codes/new-promotion-code-button'
 
 export function UserManagementDashboard() {
   const [activeTab, setActiveTab] = useState('users')
@@ -20,7 +21,7 @@ export function UserManagementDashboard() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <PermissionGate permissions={['READ_USER']}>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -37,6 +38,12 @@ export function UserManagementDashboard() {
             <TabsTrigger value="permissions" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               Permissions
+            </TabsTrigger>
+          </PermissionGate>
+          <PermissionGate permissions={['READ_ROLE']}>
+            <TabsTrigger value="promotion-codes" className="flex items-center gap-2">
+              <Ticket className="h-4 w-4" />
+              Promotion Codes
             </TabsTrigger>
           </PermissionGate>
         </TabsList>
@@ -89,6 +96,20 @@ export function UserManagementDashboard() {
               </div>
             </div>
             <PermissionsTable />
+          </TabsContent>
+        </PermissionGate>
+
+        {/* Promotion Codes Tab */}
+        <PermissionGate permissions={['READ_ROLE']}>
+          <TabsContent value="promotion-codes" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-semibold">Promotion Codes</h2>
+                <p className="text-sm text-gray-600">Manage promotion codes and track promoter payments</p>
+              </div>
+              <NewPromotionCodeButton />
+            </div>
+            <PromotionCodesTable />
           </TabsContent>
         </PermissionGate>
       </Tabs>
