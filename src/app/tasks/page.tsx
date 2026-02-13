@@ -1,9 +1,31 @@
+import dynamic from 'next/dynamic'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { KanbanBoard } from '@/components/tasks/kanban-board'
-import { TasksInbox } from '@/components/tasks/tasks-inbox'
-import { FollowUpsView } from '@/components/tasks/follow-ups-view'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Kanban, List, Calendar } from 'lucide-react'
+
+// Lazy-load heavy tab content to reduce INP and initial JS (only active tab loads first)
+function TabLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[320px]" aria-hidden>
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+    </div>
+  )
+}
+
+const FollowUpsView = dynamic(
+  () => import('@/components/tasks/follow-ups-view').then((m) => ({ default: m.FollowUpsView })),
+  { loading: TabLoader, ssr: false }
+)
+
+const KanbanBoard = dynamic(
+  () => import('@/components/tasks/kanban-board').then((m) => ({ default: m.KanbanBoard })),
+  { loading: TabLoader, ssr: false }
+)
+
+const TasksInbox = dynamic(
+  () => import('@/components/tasks/tasks-inbox').then((m) => ({ default: m.TasksInbox })),
+  { loading: TabLoader, ssr: false }
+)
 
 export default function TasksPage() {
   return (

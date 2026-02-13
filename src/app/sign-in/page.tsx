@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, startTransition } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,8 +35,10 @@ function SignInForm() {
 
       if (response.ok) {
         toast.success('Signed in successfully')
-        console.log('Redirecting to:', redirectTo)
-        router.push(redirectTo)
+        // Defer navigation to keep INP low: browser paints before heavy route change
+        startTransition(() => {
+          router.push(redirectTo)
+        })
       } else {
         toast.error(data.error || 'Sign in failed')
       }
@@ -51,13 +54,16 @@ function SignInForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-        <div className="flex justify-center">
-    <img
-      src="/tshelogo.jpg" 
-      alt="TSHE CRM Logo"
-      className="w-40 h-40 rounded-full"
-    />
-  </div>
+          <div className="flex justify-center">
+            <Image
+              src="/tshelogo.jpg"
+              alt="TSHE CRM Logo"
+              width={160}
+              height={160}
+              className="w-40 h-40 rounded-full"
+              priority
+            />
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
             Sign in to TSHE CRM
           </CardTitle>
@@ -111,7 +117,13 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        </div>
+      }
+    >
       <SignInForm />
     </Suspense>
   )

@@ -1,12 +1,30 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/hooks/use-auth'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { NewInquiryButton } from '@/components/inquiries/new-inquiry-button'
-import { InquiriesTable } from '@/components/inquiries/inquiries-table'
-import { RequestInquiriesTable } from '@/components/inquiries/request-inquiries-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+// Lazy-load heavy tables to reduce INP and initial bundle (target INP ≤200ms)
+function TableLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[320px]" aria-hidden>
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+    </div>
+  )
+}
+
+const InquiriesTable = dynamic(
+  () => import('@/components/inquiries/inquiries-table').then((m) => ({ default: m.InquiriesTable })),
+  { loading: TableLoader, ssr: false }
+)
+
+const RequestInquiriesTable = dynamic(
+  () => import('@/components/inquiries/request-inquiries-table').then((m) => ({ default: m.RequestInquiriesTable })),
+  { loading: TableLoader, ssr: false }
+)
 
 export default function InquiriesPage() {
   const { user, loading: authLoading } = useAuth()
@@ -70,7 +88,7 @@ export default function InquiriesPage() {
             <TabsTrigger value="requests">Request Inquiries</TabsTrigger>
           </TabsList>
           <TabsContent value="inquiries" className="mt-4">
-        <InquiriesTable />
+            <InquiriesTable />
           </TabsContent>
           <TabsContent value="requests" className="mt-4">
             <RequestInquiriesTable />
