@@ -25,6 +25,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -46,7 +47,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { 
   FOLLOW_UP_STATUS_COLUMNS,
   getTaskStatusInfo,
-  isTaskReadOnly
+  isTaskReadOnly,
+  normalizeStatusHelper
 } from '@/lib/task-constants'
 import {
   AlertDialog,
@@ -58,7 +60,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Trash2, UserCheck, UserX } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 
 interface FollowUpTask {
   id: string
@@ -361,38 +363,51 @@ export function FollowUpsView() {
     window.location.href = `tel:${phone}`
   }
 
-  const handleSeekerAction = async (task: FollowUpTask, actionType: 'REGISTER' | 'NOT_INTERESTED') => {
+  const handleToggleRegister = async (task: FollowUpTask, registerNow: boolean) => {
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ actionType }),
+        body: JSON.stringify({ 
+          status: task.status, // Keep current status
+          registerNow 
+        }),
       })
 
       if (response.ok) {
-        toast.success('Follow-up updated', {
-          description:
-            actionType === 'REGISTER'
-              ? `${task.seeker.fullName} marked as Registered`
-              : `${task.seeker.fullName} marked as Not Interested`,
+        // Optimistically update the local state
+        setAllTasks(prev => prev.map(t => 
+          t.id === task.id
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        setFilteredTasks(prev => prev.map(t => 
+          t.id === task.id
+            ? { ...t, seeker: { ...t.seeker, registerNow } }
+            : t
+        ))
+        
+        toast.success('Registration updated', {
+          description: `${task.seeker.fullName} marked as ${registerNow ? 'Registered' : 'Not Registered'}`,
           duration: 3000,
         })
-
+        
+        // Refresh to get latest data
         await fetchTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        toast.error('Failed to update follow-up', {
-          description: errorData.error || 'Could not update follow-up status',
+        toast.error('Failed to update registration', {
+          description: errorData.error || 'Could not update registration status',
           duration: 4000,
         })
         await fetchTasks()
       }
     } catch (error) {
-      console.error('Error updating follow-up action:', error)
-      toast.error('Error updating follow-up', {
-        description: 'An error occurred while applying follow-up action',
+      console.error('Error updating registration:', error)
+      toast.error('Error updating registration', {
+        description: 'An error occurred while updating the registration status',
         duration: 4000,
       })
       await fetchTasks()
@@ -427,7 +442,7 @@ export function FollowUpsView() {
     tasks, 
     onViewHistory,
     onViewTask,
-    onSeekerAction,
+    onToggleRegister,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -441,7 +456,7 @@ export function FollowUpsView() {
     tasks: FollowUpTask[]
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
-    onSeekerAction: (task: FollowUpTask, actionType: 'REGISTER' | 'NOT_INTERESTED') => void
+    onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -458,7 +473,7 @@ export function FollowUpsView() {
     const IconComponent = column.icon
 
     return (
-      <div className="w-full min-w-[300px] max-w-[360px] flex-shrink-0">
+      <div className="w-full min-w-[280px] max-w-[320px] flex-shrink-0">
         <div className={`flex items-center justify-between mb-3 px-3 py-2.5 rounded-t-lg border-b-2 ${column.headerColor} shadow-sm`}>
           <div className="flex items-center gap-2">
             <IconComponent className="h-4 w-4 text-gray-600" />
@@ -487,7 +502,7 @@ export function FollowUpsView() {
                 task={task}
                 onViewHistory={onViewHistory}
                 onViewTask={onViewTask}
-                onSeekerAction={onSeekerAction}
+                onToggleRegister={onToggleRegister}
                 getStatusInfo={getStatusInfo}
                 isAutomatic={isAutomatic}
                 getFollowUpNumber={getFollowUpNumber}
@@ -518,7 +533,7 @@ export function FollowUpsView() {
     task, 
     onViewHistory, 
     onViewTask,
-    onSeekerAction,
+    onToggleRegister,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -531,7 +546,7 @@ export function FollowUpsView() {
     task: FollowUpTask
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
-    onSeekerAction: (task: FollowUpTask, actionType: 'REGISTER' | 'NOT_INTERESTED') => void
+    onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -573,9 +588,9 @@ export function FollowUpsView() {
         {...attributes}
         {...listeners}
       >
-        <CardContent className="p-3 min-w-0 overflow-visible">
-          <div className="space-y-2 min-w-0">
-            <div className="flex items-start justify-between gap-2 min-w-0">
+        <CardContent className="p-3">
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate leading-tight">
                   {task.seeker.fullName}
@@ -592,53 +607,54 @@ export function FollowUpsView() {
               )}
             </div>
             
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <Badge className={`${statusInfo.color} text-xs font-medium px-2 py-0.5 flex-shrink-0`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={`${statusInfo.color} text-xs font-medium px-2 py-0.5 shrink-0`}>
                 <StatusIcon className="h-3 w-3 mr-1" />
                 {statusInfo.label}
               </Badge>
-              <Badge variant="outline" className="text-xs whitespace-nowrap flex-shrink-0">
-                {task.purpose.replace(/_/g, ' ')}
+              <Badge variant="outline" className="text-xs shrink-0 whitespace-nowrap" title={task.purpose.replace(/_/g, ' ')}>
+                {task.purpose.replace('_', ' ')}
               </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs px-2 text-green-700 border-green-200 bg-green-50 hover:bg-green-100"
-                disabled={isTaskReadOnly(task.seeker.stage, task.seeker.registerNow)}
+              <div 
+                className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200 shrink-0"
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  onSeekerAction(task, 'REGISTER')
+                  onToggleRegister(task, !task.seeker.registerNow)
                 }}
-              >
-                <UserCheck className="h-3 w-3 mr-1 shrink-0" />
-                Register
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs px-2 text-orange-700 border-orange-200 bg-orange-50 hover:bg-orange-100"
-                disabled={isTaskReadOnly(task.seeker.stage, task.seeker.registerNow)}
-                onClick={(e) => {
+                onPointerDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  onSeekerAction(task, 'NOT_INTERESTED')
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
                 }}
               >
-                <UserX className="h-3 w-3 mr-1 shrink-0" />
-                Not Interested
-              </Button>
+                <Checkbox
+                  checked={task.seeker.registerNow}
+                  onCheckedChange={(checked) => {
+                    onToggleRegister(task, checked === true)
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  className="h-3.5 w-3.5"
+                />
+                <span className="font-medium text-green-700">Register</span>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md min-w-0">
+            <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
               <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
-              <span className="truncate font-medium min-w-0">
+              <span className="truncate font-medium">
                 {new Date(task.dueAt).toLocaleDateString()}
               </span>
             </div>
 
             {task.notes && (
-              <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed break-words">
+              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
                 {task.notes}
               </p>
             )}
@@ -646,7 +662,7 @@ export function FollowUpsView() {
             {/* Only show action buttons when not dragging */}
             {!isDragging && (
               <div 
-                className="flex flex-wrap gap-1.5 pt-2 border-t min-w-0"
+                className="flex flex-wrap gap-2 pt-2 border-t"
                 onPointerDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
@@ -659,54 +675,54 @@ export function FollowUpsView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs min-w-[52px] px-2"
+                  className="h-7 text-xs shrink-0 whitespace-nowrap"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onPhoneCall(task.seeker.phone, e)
                   }}
                 >
-                  <Phone className="h-3 w-3 mr-1 shrink-0" />
+                  <Phone className="h-3 w-3 mr-1" />
                   Call
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs min-w-[52px] px-2"
+                  className="h-7 text-xs shrink-0 whitespace-nowrap"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onViewHistory(task)
                   }}
                 >
-                  <History className="h-3 w-3 mr-1 shrink-0" />
+                  <History className="h-3 w-3 mr-1" />
                   History
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs min-w-[52px] px-2"
+                  className="h-7 text-xs shrink-0 whitespace-nowrap"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
                     onViewTask(task)
                   }}
                 >
-                  <Eye className="h-3 w-3 mr-1 shrink-0" />
+                  <Eye className="h-3 w-3 mr-1" />
                   View
                 </Button>
-                {!isTaskReadOnly(task.seeker.stage, task.seeker.registerNow) && (
+                {!isTaskReadOnly(task.seeker.stage) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 w-7 p-0 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       e.preventDefault()
                       onDeleteClick(task, e)
                     }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                 )}
               </div>
@@ -862,7 +878,7 @@ export function FollowUpsView() {
                     tasks={columnTasks}
                     onViewHistory={handleViewHistory}
                     onViewTask={handleViewTask}
-                    onSeekerAction={handleSeekerAction}
+                    onToggleRegister={handleToggleRegister}
                     getStatusInfo={getStatusInfo}
                     isAutomatic={isAutomatic}
                     getFollowUpNumber={getFollowUpNumber}
@@ -879,7 +895,7 @@ export function FollowUpsView() {
             <DragOverlay>
               {activeTask ? (
                 <div className="rotate-2 opacity-95 pointer-events-none shadow-2xl">
-                  <Card className={`w-[320px] border-l-4 shadow-xl ${
+                  <Card className={`w-[280px] border-l-4 shadow-xl ${
                     isAutomatic(activeTask) ? 'border-l-blue-500 bg-white' : 'border-l-purple-500 bg-white'
                   }`}>
                     <CardContent className="p-3">

@@ -77,29 +77,21 @@ export async function PATCH(
   try {
     const _user = await requireAuth(request)
     const body = await request.json()
-    const { status, notes, registerNow, actionType } = body as {
-      status?: string
-      notes?: string
-      registerNow?: boolean | string
-      actionType?: 'REGISTER' | 'NOT_INTERESTED'
-    }
+    const { status, notes, registerNow } = body
     const { id } = await params
 
     // Get the current task to track the status change
     const currentTask = await prisma.followUpTask.findUnique({
       where: { id },
       select: { 
-        id: true,
         status: true,
-        notes: true,
         assignedTo: true,
         seekerId: true,
         seeker: {
           select: {
             id: true,
             createdById: true,
-            registerNow: true,
-            stage: true,
+            registerNow: true
           }
         }
       }
@@ -123,145 +115,102 @@ export async function PATCH(
       }
     }
 
-    const buildTaskResponse = async () => {
-      return prisma.followUpTask.findUnique({
-        where: { id },
-        include: {
-          seeker: {
-            select: {
-              id: true,
-              fullName: true,
-              phone: true,
-              createdById: true,
-              registerNow: true,
-              stage: true,
-            },
-          },
-          user: {
-            select: {
-              name: true,
-            },
-          },
-          actionHistory: {
-            include: {
-              user: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-            orderBy: {
-              actionAt: 'desc',
-            },
-          },
-        },
-      })
-    }
-
-    // New action-based workflow: Register / Not Interested
-    if (actionType === 'REGISTER' || actionType === 'NOT_INTERESTED') {
-      const isAutoTask1 = currentTask.notes?.includes('Automatic follow-up #1') ?? false
-      const isAutoTask2 = currentTask.notes?.includes('Automatic follow-up #2') ?? false
-
-      await prisma.seeker.update({
-        where: { id: currentTask.seekerId },
-        data:
-          actionType === 'REGISTER'
-            ? { registerNow: true }
-            : { stage: 'LOST', registerNow: false },
-      })
-
-      // Rule A:
-      // - action on auto #1 => close #1 + #2
-      // - action on auto #2 => close only #2
-      // - non-auto => close only current task
-      const tasksToConsider = await prisma.followUpTask.findMany({
-        where: { seekerId: currentTask.seekerId },
-        select: { id: true, status: true, notes: true },
-      })
-
-      const taskIdsToClose = new Set<string>([currentTask.id])
-      if (isAutoTask1) {
-        const auto2 = tasksToConsider.find(task => task.notes?.includes('Automatic follow-up #2'))
-        if (auto2) {
-          taskIdsToClose.add(auto2.id)
-        }
-      } else if (isAutoTask2) {
-        taskIdsToClose.clear()
-        taskIdsToClose.add(currentTask.id)
-      }
-
-      const closeCandidates = tasksToConsider.filter(task => taskIdsToClose.has(task.id))
-      for (const task of closeCandidates) {
-        if (task.status !== 'COMPLETED') {
-          await prisma.followUpTask.update({
-            where: { id: task.id },
-            data: { status: 'COMPLETED' },
-          })
-          await prisma.taskActionHistory.create({
-            data: {
-              taskId: task.id,
-              fromStatus: task.status,
-              toStatus: 'COMPLETED',
-              actionBy: _user.id,
-              notes:
-                actionType === 'REGISTER'
-                  ? 'Task completed after Register action'
-                  : 'Task completed after Not Interested action',
-            },
-          })
-        }
-      }
-
-      await prisma.taskActionHistory.create({
-        data: {
-          taskId: currentTask.id,
-          fromStatus: null,
-          toStatus: 'COMPLETED',
-          actionBy: _user.id,
-          notes:
-            actionType === 'REGISTER'
-              ? 'Seeker marked as Registered (registerNow=true)'
-              : 'Seeker marked as Not Interested (stage=LOST)',
-        },
-      })
-
-      const updatedTask = await buildTaskResponse()
-      if (!updatedTask) {
-        return NextResponse.json({ error: 'Task not found after update' }, { status: 404 })
-      }
-      return NextResponse.json(updatedTask)
-    }
-
-    // Backward-compatible status update workflow
-    const validStatuses = ['OPEN', 'TODO', 'OVERDUE', 'IN_PROGRESS', 'ON_HOLD', 'DONE', 'COMPLETED'] as const
-    const nextStatus = (status && validStatuses.includes(status as (typeof validStatuses)[number])
-      ? status
-      : currentTask.status) as (typeof validStatuses)[number]
+    // Update the task status
     const updatedTask = await prisma.followUpTask.update({
       where: { id },
-      data: { status: nextStatus },
+      data: { status },
+      include: {
+        seeker: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            createdById: true,
+            registerNow: true,
+          },
+        },
+        user: {
+          select: {
+            name: true,
+          },
+        },
+        actionHistory: {
+          include: {
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            actionAt: 'desc',
+          },
+        },
+      },
     })
 
+    // Update seeker's registerNow field if registerNow is provided
     if (registerNow !== undefined && currentTask.seekerId) {
       const isRegistering = registerNow === true || registerNow === 'true'
+      
       await prisma.seeker.update({
         where: { id: currentTask.seekerId },
-        data: { registerNow: isRegistering },
+        data: { registerNow: isRegistering }
       })
+      
+      // Update the response to reflect the change
+      ;(updatedTask.seeker as any).registerNow = isRegistering
+      
+      // If registering, automatically move this task and all other tasks for the same seeker to COMPLETED
+      if (isRegistering) {
+        // Find all tasks for this seeker
+        const allSeekerTasks = await prisma.followUpTask.findMany({
+          where: {
+            seekerId: currentTask.seekerId,
+            status: { not: 'COMPLETED' } // Only update tasks that aren't already completed
+          },
+          select: { id: true, status: true }
+        })
+        
+        // Update all tasks to COMPLETED
+        await Promise.all(
+          allSeekerTasks.map(async (task) => {
+            await prisma.followUpTask.update({
+              where: { id: task.id },
+              data: { status: 'COMPLETED' }
+            })
+            
+            // Create action history for each task
+            await prisma.taskActionHistory.create({
+              data: {
+                taskId: task.id,
+                fromStatus: task.status,
+                toStatus: 'COMPLETED',
+                actionBy: _user.id,
+                notes: `Task automatically completed - Seeker registered (registerNow=true)`
+              }
+            })
+          })
+        )
+        
+        // Update the current task status in the response
+        updatedTask.status = 'COMPLETED'
+      }
     }
 
+    // Create action history entry
+    const historyNotes = notes || 
+      (registerNow !== undefined 
+        ? `Status changed to ${status}. Registration marked as ${registerNow ? 'Yes' : 'No'}.`
+        : `Status changed from ${currentTask.status} to ${status}`)
+    
     await prisma.taskActionHistory.create({
       data: {
         taskId: id,
         fromStatus: currentTask.status,
-        toStatus: nextStatus,
+        toStatus: status,
         actionBy: _user.id,
-        notes:
-          notes ||
-          (registerNow !== undefined
-            ? `Status changed to ${nextStatus}. Registration marked as ${registerNow ? 'Yes' : 'No'}.`
-            : `Status changed from ${currentTask.status} to ${nextStatus}`),
+        notes: historyNotes,
       },
     })
 

@@ -168,12 +168,11 @@ export const normalizeStatusHelper = (status: string): string => {
 }
 
 // Check if task is read-only (seeker has final status)
-export const isTaskReadOnly = (seekerStage?: string, registerNow?: boolean): boolean => {
-  if (registerNow) return true
+export const isTaskReadOnly = (seekerStage?: string): boolean => {
   if (!seekerStage) return false
   
   const normalizedStatus = normalizeStatusHelper(seekerStage)
-  const finalStatuses = ['REGISTERED', 'NOT_INTERESTED', 'COMPLETED', 'LOST']
+  const finalStatuses = ['REGISTERED', 'NOT_INTERESTED', 'COMPLETED']
   return finalStatuses.includes(normalizedStatus)
 }
 
