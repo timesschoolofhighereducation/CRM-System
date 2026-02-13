@@ -89,6 +89,12 @@ export function TasksInbox() {
     fetchTasks()
   }, [])
 
+  useEffect(() => {
+    const onTasksCreated = () => fetchTasks()
+    window.addEventListener('tasks-created', onTasksCreated)
+    return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
   const fetchTasks = async () => {
     try {
       const response = await fetch('/api/tasks')

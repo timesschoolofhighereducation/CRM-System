@@ -90,6 +90,41 @@ interface FollowUpTask {
       name: string
     }
   }[]
+  /** 'regular' = created from Create Task (enhanced API); undefined/'followup' = seeker follow-up */
+  taskType?: 'followup' | 'regular'
+}
+
+/** Normalized regular task from /api/tasks/enhanced for display in follow-ups list */
+function normalizeRegularTask(raw: {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  dueDate?: string | null
+  createdAt: string
+  assignedTo?: { name: string } | null
+  createdBy?: { name: string } | null
+}): FollowUpTask {
+  return {
+    id: raw.id,
+    purpose: 'Task',
+    status: raw.status,
+    dueAt: raw.dueDate || raw.createdAt,
+    notes: raw.description || undefined,
+    createdAt: raw.createdAt,
+    seeker: {
+      id: '',
+      fullName: raw.title,
+      phone: '',
+      registerNow: false,
+      stage: '',
+    },
+    user: {
+      name: raw.assignedTo?.name || raw.createdBy?.name || 'Unassigned',
+    },
+    actionHistory: [],
+    taskType: 'regular',
+  }
 }
 
 export function FollowUpsView() {
@@ -125,19 +160,49 @@ export function FollowUpsView() {
     fetchTasks()
   }, [])
 
+  // Refetch when a task is created from Kanban so new task appears in Follow-ups too
+  useEffect(() => {
+    const onTasksCreated = () => fetchTasks()
+    window.addEventListener('tasks-created', onTasksCreated)
+    return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
   useEffect(() => {
     filterTasks()
   }, [allTasks, searchQuery, statusFilter, typeFilter])
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch('/api/tasks')
-      if (response.ok) {
-        const data = await response.json()
-        // Handle array format (API returns array by default)
-        const tasks = Array.isArray(data) ? data : []
-        setAllTasks(tasks)
-      }
+      setLoading(true)
+      // Fetch both follow-up tasks and regular tasks so newly created tasks appear here too
+      const [followUpRes, enhancedRes] = await Promise.all([
+        fetch('/api/tasks', { cache: 'no-store' }),
+        fetch('/api/tasks/enhanced', { cache: 'no-store' }),
+      ])
+
+      const followUpData = followUpRes.ok ? await followUpRes.json() : []
+      const enhancedData = enhancedRes.ok ? await enhancedRes.json() : []
+
+      const followUpList: FollowUpTask[] = Array.isArray(followUpData)
+        ? followUpData
+        : (followUpData?.tasks ?? [])
+      const rawRegular = Array.isArray(enhancedData)
+        ? enhancedData
+        : (enhancedData?.tasks ?? [])
+
+      const followUpWithType: FollowUpTask[] = followUpList
+        .filter((t: FollowUpTask) => t?.id && t?.status)
+        .map((t: FollowUpTask) => ({ ...t, taskType: 'followup' as const }))
+      const regularNormalized: FollowUpTask[] = rawRegular
+        .filter((t: { id?: string; status?: string }) => t?.id && t?.status)
+        .map((t: { id: string; title: string; description?: string | null; status: string; dueDate?: string | null; createdAt: string; assignedTo?: { name: string } | null; createdBy?: { name: string } | null }) =>
+          normalizeRegularTask(t)
+        )
+
+      const merged = [...followUpWithType, ...regularNormalized].sort(
+        (a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()
+      )
+      setAllTasks(merged)
     } catch (error) {
       console.error('Error fetching tasks:', error)
       setAllTasks([])
@@ -222,9 +287,10 @@ export function FollowUpsView() {
     setViewOpen(true)
   }
 
-  const updateTaskStatus = async (taskId: string, newStatus: string, notes?: string) => {
+  const updateTaskStatus = async (taskId: string, newStatus: string, notes?: string, taskType?: 'followup' | 'regular') => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const url = taskType === 'regular' ? `/api/tasks/enhanced/${taskId}` : `/api/tasks/${taskId}`
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -313,12 +379,12 @@ export function FollowUpsView() {
 
   const handleConfirmMove = useCallback(async () => {
     if (!pendingMove) return
-
-    await updateTaskStatus(pendingMove.taskId, pendingMove.newStatus, moveComment || undefined)
+    const task = allTasks.find(t => t.id === pendingMove.taskId)
+    await updateTaskStatus(pendingMove.taskId, pendingMove.newStatus, moveComment || undefined, task?.taskType)
     setMoveDialogOpen(false)
     setPendingMove(null)
     setMoveComment('')
-  }, [pendingMove, moveComment, updateTaskStatus])
+  }, [pendingMove, moveComment, allTasks, updateTaskStatus])
 
   const handleDeleteClick = (task: FollowUpTask, e?: React.MouseEvent) => {
     if (e) {
@@ -333,7 +399,10 @@ export function FollowUpsView() {
     if (!taskToDelete) return
 
     try {
-      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+      const url = taskToDelete.taskType === 'regular'
+        ? `/api/tasks/enhanced/${taskToDelete.id}`
+        : `/api/tasks/${taskToDelete.id}`
+      const response = await fetch(url, {
         method: 'DELETE',
       })
 
@@ -615,35 +684,37 @@ export function FollowUpsView() {
               <Badge variant="outline" className="text-xs shrink-0 whitespace-nowrap" title={task.purpose.replace(/_/g, ' ')}>
                 {task.purpose.replace('_', ' ')}
               </Badge>
-              <div 
-                className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200 shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onToggleRegister(task, !task.seeker.registerNow)
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                }}
-              >
-                <Checkbox
-                  checked={task.seeker.registerNow}
-                  onCheckedChange={(checked) => {
-                    onToggleRegister(task, checked === true)
-                  }}
+              {task.taskType !== 'regular' && (
+                <div 
+                  className="flex items-center gap-1.5 text-xs text-gray-700 bg-green-50 px-2 py-1 rounded-md border border-green-200 shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
+                    onToggleRegister(task, !task.seeker.registerNow)
                   }}
-                  className="h-3.5 w-3.5"
-                />
-                <span className="font-medium text-green-700">Register</span>
-              </div>
+                  onPointerDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                >
+                  <Checkbox
+                    checked={task.seeker.registerNow}
+                    onCheckedChange={(checked) => {
+                      onToggleRegister(task, checked === true)
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                    }}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="font-medium text-green-700">Register</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
@@ -1103,7 +1174,7 @@ export function FollowUpsView() {
                           size="sm"
                           className="text-xs sm:text-sm"
                           onClick={() => {
-                            updateTaskStatus(viewTask.id, status)
+                            updateTaskStatus(viewTask.id, status, undefined, viewTask.taskType)
                           }}
                         >
                           <StatusIcon className="h-3 w-3 mr-1" />

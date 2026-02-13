@@ -446,24 +446,28 @@ export function KanbanBoard() {
   const fetchTasks = async () => {
     try {
       setLoading(true)
-      // Fetch both FollowUpTasks and regular Tasks
+      // Fetch both FollowUpTasks and regular Tasks (no-store so new tasks show after create)
       const [followUpTasksResponse, regularTasksResponse] = await Promise.all([
-        fetch('/api/tasks').catch(err => {
+        fetch('/api/tasks', { cache: 'no-store' }).catch(err => {
           console.error('Error fetching followup tasks:', err)
-          return { ok: false, json: async () => ({ tasks: [] }) }
+          return { ok: false, json: async () => [] }
         }),
-        fetch('/api/tasks/enhanced').catch(err => {
+        fetch('/api/tasks/enhanced', { cache: 'no-store' }).catch(err => {
           console.error('Error fetching regular tasks:', err)
-          return { ok: false, json: async () => ({ tasks: [] }) }
+          return { ok: false, json: async () => [] }
         })
       ])
 
       const followUpData = followUpTasksResponse.ok ? await followUpTasksResponse.json() : []
       const regularData = regularTasksResponse.ok ? await regularTasksResponse.json() : []
       
-      // Handle both array and object formats
-      const followUpTasks: FollowUpTask[] = Array.isArray(followUpData) ? followUpData : []
-      const regularTasks: RegularTask[] = Array.isArray(regularData) ? regularData : []
+      // Handle both array and { tasks, pagination } response formats
+      const followUpTasks: FollowUpTask[] = Array.isArray(followUpData)
+        ? followUpData
+        : (followUpData?.tasks ?? [])
+      const regularTasks: RegularTask[] = Array.isArray(regularData)
+        ? regularData
+        : (regularData?.tasks ?? [])
 
       // Mark task types and normalize - ensure status is valid
       const markedFollowUpTasks: TaskItem[] = followUpTasks

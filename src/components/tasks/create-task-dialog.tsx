@@ -85,6 +85,10 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
           assignedToId: 'unassigned',
         })
         onTaskCreated()
+        // Notify other task views (Follow-ups, Inbox) to refetch so new task appears everywhere
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tasks-created'))
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         const errorMessage = errorData.error || 'Failed to create task'
