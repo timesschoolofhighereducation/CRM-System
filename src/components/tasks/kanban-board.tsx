@@ -443,6 +443,13 @@ export function KanbanBoard() {
     fetchTasks()
   }, [])
 
+  // Refetch when follow-up or regular tasks are created elsewhere (e.g. new inquiry, Create Task dialog)
+  useEffect(() => {
+    const onTasksCreated = () => fetchTasks()
+    window.addEventListener('tasks-created', onTasksCreated)
+    return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
   const fetchTasks = async () => {
     try {
       setLoading(true)

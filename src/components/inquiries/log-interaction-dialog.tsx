@@ -57,6 +57,10 @@ export function LogInteractionDialog({ inquiry, open, onOpenChange, onSuccess }:
       toast.success('Interaction logged successfully')
       form.reset()
       onSuccess()
+      // NO_ANSWER etc. may create a follow-up task; notify Kanban to refetch
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tasks-created'))
+      }
     } catch (error) {
       toast.error('Failed to log interaction')
       console.error('Error logging interaction:', error)

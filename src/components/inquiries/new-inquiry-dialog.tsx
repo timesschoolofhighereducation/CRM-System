@@ -819,6 +819,10 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         if (initialData && onInquiryCreated && successCount > 0) {
           onInquiryCreated(initialData.id)
         }
+        // Notify Tasks/Kanban to refetch so newly created follow-up tasks appear
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tasks-created'))
+        }
       } else {
         // Single inquiry (0 or 1 program) - original behavior
         const formData = {
@@ -865,6 +869,10 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         // If this was created from an exhibition visitor, mark it as converted
         if (initialData && onInquiryCreated) {
           onInquiryCreated(initialData.id)
+        }
+        // Notify Tasks/Kanban to refetch so newly created follow-up tasks appear
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tasks-created'))
         }
       }
       
