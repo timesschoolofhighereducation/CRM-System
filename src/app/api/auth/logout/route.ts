@@ -4,13 +4,12 @@ import { verifyToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user info from token for logging
+    // Get user id from token for logging (do not pass token - never store JWTs in logs)
     const token = request.cookies.get('auth-token')?.value
     if (token) {
       const decoded = verifyToken(token)
       if (decoded) {
-        // Log logout activity
-        await logLogout(decoded.id, request, token)
+        await logLogout(decoded.id, request)
       }
     }
   } catch (error) {

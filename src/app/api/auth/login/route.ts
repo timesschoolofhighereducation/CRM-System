@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { login } from '@/lib/auth'
 import { logLogin, logFailedLogin } from '@/lib/activity-logger'
+import { rateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit login attempts (e.g. 10 per minute per IP)
+    const clientIp = getClientIp(request)
+    if (!rateLimit(clientIp, { limit: 10, windowSeconds: 60 })) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
     const { email, password } = await request.json()
 
     if (!email || !password) {
@@ -25,8 +35,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log successful login
-    await logLogin(user.id, request, user.token)
+    // Log successful login (do not pass token - never store JWTs in logs)
+    await logLogin(user.id, request)
 
     const response = NextResponse.json({
       user: {

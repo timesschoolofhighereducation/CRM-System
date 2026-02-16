@@ -19,6 +19,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/contexts/notification-context'
+import { SanitizedHtml } from '@/components/ui/sanitized-html'
 
 interface User {
   id: string
@@ -410,11 +411,10 @@ export function CommentSystem({
                     </div>
                   ) : (
                     <div>
-                      <p 
+                      <SanitizedHtml
+                        html={renderCommentContent(comment.content, comment.mentions)}
                         className="text-sm text-gray-900 mb-2"
-                        dangerouslySetInnerHTML={{ 
-                          __html: renderCommentContent(comment.content, comment.mentions) 
-                        }}
+                        as="p"
                       />
                       
                       {comment.mentions && comment.mentions.length > 0 && (

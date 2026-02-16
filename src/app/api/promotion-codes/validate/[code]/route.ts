@@ -1,69 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { rateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    // Rate limit to prevent code enumeration (e.g. 30 requests per minute per IP)
+    const clientIp = getClientIp(request)
+    if (!rateLimit(clientIp, { limit: 30, windowSeconds: 60 })) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
     const { code: codeParam } = await params
     const code = codeParam.toUpperCase().trim()
 
     const promotionCode = await prisma.promotionCode.findUnique({
       where: { code },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+      select: {
+        id: true,
+        code: true,
+        discountAmountLKR: true,
+        paymentAmountLKR: true,
+        isActive: true,
       },
     })
 
     if (!promotionCode) {
       return NextResponse.json(
-        { error: 'Promotion code not found' },
+        { valid: false, error: 'Promotion code not found' },
         { status: 404 }
       )
     }
 
     if (!promotionCode.isActive) {
       return NextResponse.json(
-        { error: 'Promotion code is not active' },
+        { valid: false, error: 'Promotion code is not active' },
         { status: 400 }
       )
     }
 
-    // Calculate statistics
-    const seekers = await prisma.seeker.findMany({
-      where: { promotionCodeId: promotionCode.id },
-      select: {
-        id: true,
-        stage: true,
-      },
-    })
-
-    const totalInquiries = seekers.length
-    const totalRegistrations = seekers.filter(
-      (s) => s.stage === 'READY_TO_REGISTER'
-    ).length
-
+    // Return only data needed for checkout - no internal stats (totalInquiries, totalRegistrations, promoterName)
     return NextResponse.json({
-      id: promotionCode.id,
+      valid: true,
       code: promotionCode.code,
       discountAmountLKR: promotionCode.discountAmountLKR,
       paymentAmountLKR: promotionCode.paymentAmountLKR,
-      isActive: promotionCode.isActive,
-      promoterName: promotionCode.promoterName,
-      totalInquiries,
-      totalRegistrations,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error validating promotion code:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to validate promotion code' },
+      { error: 'Failed to validate promotion code' },
       { status: 500 }
     )
   }

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Phone, MessageSquare, Mail, Calendar, User, MapPin, Clock, Sparkles, HelpCircle, FileText } from 'lucide-react'
 import { LogInteractionDialog } from '@/components/inquiries/log-interaction-dialog'
+import { SanitizedHtml } from '@/components/ui/sanitized-html'
 
 interface Inquiry {
   id: string
@@ -541,9 +542,9 @@ export function InquiryViewDialog({ inquiry, open, onOpenChange }: InquiryViewDi
                                 </div>
                               )}
                               {program.description && (
-                                <div 
+                                <SanitizedHtml
+                                  html={program.description}
                                   className="prose prose-sm max-w-none dark:prose-invert text-gray-700 dark:text-gray-300"
-                                  dangerouslySetInnerHTML={{ __html: program.description }}
                                 />
                               )}
                             </CardContent>

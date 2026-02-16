@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { isAdminRole, requireRole, hashPassword } from '@/lib/auth'
 import { UserRole } from '@prisma/client'
+import { getSafeErrorMessage } from '@/lib/safe-api-error'
 
 export async function GET(
   request: NextRequest,
@@ -35,7 +36,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching user:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch user' },
+      { error: getSafeErrorMessage(error, 'Failed to fetch user') },
       { status: 500 }
     )
   }
@@ -132,7 +133,7 @@ export async function PUT(
     }
     
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update user' },
+      { error: getSafeErrorMessage(error, 'Failed to update user') },
       { status: 500 }
     )
   }
@@ -191,7 +192,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting user:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete user' },
+      { error: getSafeErrorMessage(error, 'Failed to delete user') },
       { status: 500 }
     )
   }

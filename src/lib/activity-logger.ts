@@ -7,6 +7,7 @@ interface LogActivityParams {
   userId: string
   activityType: ActivityType
   request: NextRequest
+  /** Optional opaque session identifier for correlation only. Must never be a JWT or other secret. */
   sessionId?: string
   isSuccessful?: boolean
   failureReason?: string

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+import { getJwtSecretOrNull } from '@/lib/get-jwt-secret'
 
 // Public routes that don't require authentication
 const publicRoutes = [
@@ -17,10 +16,12 @@ function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => pathname.startsWith(route))
 }
 
-// Verify JWT token
+// Verify JWT token (returns null if secret not configured or token invalid)
 function verifyToken(token: string): { id: string; email: string; role: string } | null {
+  const secret = getJwtSecretOrNull()
+  if (!secret) return null
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string }
+    return jwt.verify(token, secret) as { id: string; email: string; role: string }
   } catch {
     return null
   }
@@ -35,44 +36,47 @@ export function middleware(request: NextRequest) {
   }
 
   // Extract token from cookie or Authorization header
-  const token = 
+  const token =
     request.cookies.get('auth-token')?.value ||
     request.headers.get('authorization')?.replace('Bearer ', '')
 
-  // If no token and not a public route, continue (let API routes handle auth)
+  // No token: redirect to sign-in for protected page routes
   if (!token) {
-    return NextResponse.next()
+    const signInUrl = new URL('/sign-in', request.url)
+    signInUrl.searchParams.set('returnTo', pathname)
+    return NextResponse.redirect(signInUrl)
   }
 
   // Verify token and extract user info
   const decoded = verifyToken(token)
-  
-  if (decoded) {
-    // Create a new response
-    const response = NextResponse.next()
-    
-    // Set user headers for API routes to use
-    response.headers.set('x-user-id', decoded.id)
-    response.headers.set('x-user-email', decoded.email)
-    response.headers.set('x-user-role', decoded.role)
-    
-    // Update session activity for API routes (only for API calls)
-    if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/')) {
-      const sessionExpiry = Date.now() + (60 * 60 * 1000) // 1 hour
-      response.cookies.set('session-activity', sessionExpiry.toString(), {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60, // 1 hour
-        path: '/',
-      })
-    }
-    
+
+  if (!decoded) {
+    // Invalid or expired token: clear auth cookie and redirect to sign-in
+    const signInUrl = new URL('/sign-in', request.url)
+    signInUrl.searchParams.set('returnTo', pathname)
+    const response = NextResponse.redirect(signInUrl)
+    response.cookies.set('auth-token', '', { maxAge: 0, path: '/' })
+    response.cookies.set('session-activity', '', { maxAge: 0, path: '/' })
     return response
   }
 
-  // Invalid token - continue (let API routes handle auth errors)
-  return NextResponse.next()
+  // Valid token: continue and set user headers for downstream use
+  const response = NextResponse.next()
+  response.headers.set('x-user-id', decoded.id)
+  response.headers.set('x-user-email', decoded.email)
+  response.headers.set('x-user-role', decoded.role)
+
+  // Update session activity cookie for page requests (client may read for inactivity UI)
+  const sessionExpiry = Date.now() + (60 * 60 * 1000) // 1 hour
+  response.cookies.set('session-activity', sessionExpiry.toString(), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60,
+    path: '/',
+  })
+
+  return response
 }
 
 export const config = {

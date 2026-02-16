@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const _user = await requireRole('ADMIN')
+    const _user = await requireRole('ADMIN', request)
     
     const levels = await prisma.level.findMany({
       include: {
@@ -31,7 +31,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const _user = await requireRole('ADMIN')
+    const _user = await requireRole('ADMIN', request)
     
     const body = await request.json()
     const { name, description, isVisible, sortOrder } = body

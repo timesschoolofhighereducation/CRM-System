@@ -3,9 +3,14 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { UserRole } from '@prisma/client'
 import { cookies as nextCookies } from 'next/headers'
+import { getJwtSecret } from '@/lib/get-jwt-secret'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const JWT_EXPIRES_IN = '7d'
+
+// Lazy so build/import doesn't require JWT_SECRET; first auth use will validate.
+function getSecret(): string {
+  return getJwtSecret()
+}
 
 // Custom error class for authentication errors
 export class AuthenticationError extends Error {
@@ -34,12 +39,12 @@ export interface AuthUser extends User {
 // Generate JWT token
 export function generateToken(user: User): string {
   return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email, 
-      role: user.role 
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
     },
-    JWT_SECRET,
+    getSecret(),
     { expiresIn: JWT_EXPIRES_IN }
   )
 }
@@ -47,7 +52,7 @@ export function generateToken(user: User): string {
 // Verify JWT token
 export function verifyToken(token: string): { id: string; email: string; role: string } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string }
+    return jwt.verify(token, getSecret()) as { id: string; email: string; role: string }
   } catch {
     return null
   }
@@ -181,12 +186,13 @@ export async function login(email: string, password: string): Promise<AuthUser |
     return null
   }
 
-  // For development, we'll skip password check if no password is set
-  if (user.password) {
-    const isValidPassword = await comparePassword(password, user.password)
-    if (!isValidPassword) {
-      return null
-    }
+  // Require password verification: never allow login without a stored password hash
+  if (!user.password || user.password.trim() === '') {
+    return null
+  }
+  const isValidPassword = await comparePassword(password, user.password)
+  if (!isValidPassword) {
+    return null
   }
 
   const token = generateToken({

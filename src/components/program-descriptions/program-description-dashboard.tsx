@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EditProgramDescriptionDialog } from './edit-program-description-dialog'
 import { GraduationCap, FileText, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { SanitizedHtml } from '@/components/ui/sanitized-html'
 
 interface Program {
   id: string
@@ -140,7 +141,15 @@ export function ProgramDescriptionDashboard() {
                               if (parent) {
                                 const errorDiv = document.createElement('div')
                                 errorDiv.className = 'p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400'
-                                errorDiv.innerHTML = `Failed to load image: ${imageUrl}<br><a href="${imageUrl}" target="_blank" class="underline mt-2 inline-block">Try opening in new tab</a>`
+                                errorDiv.textContent = 'Failed to load image.'
+                                const link = document.createElement('a')
+                                link.href = imageUrl.startsWith('http://') || imageUrl.startsWith('https://') ? imageUrl : '#'
+                                link.target = '_blank'
+                                link.rel = 'noopener noreferrer'
+                                link.className = 'underline mt-2 inline-block'
+                                link.textContent = 'Try opening in new tab'
+                                errorDiv.appendChild(document.createElement('br'))
+                                errorDiv.appendChild(link)
                                 parent.replaceChild(errorDiv, target)
                               }
                             }}
@@ -173,9 +182,9 @@ export function ProgramDescriptionDashboard() {
                     <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                     <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Description</span>
                   </div>
-                  <div 
+                  <SanitizedHtml
+                    html={selectedProgram.description}
                     className="prose prose-sm max-w-none dark:prose-invert text-purple-800 dark:text-purple-200"
-                    dangerouslySetInnerHTML={{ __html: selectedProgram.description }}
                   />
                 </div>
               ) : (

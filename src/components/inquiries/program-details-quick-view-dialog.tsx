@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FileText, Loader2, GraduationCap, Image as ImageIcon } from 'lucide-react'
+import { SanitizedHtml } from '@/components/ui/sanitized-html'
 
 interface ProgramDetails {
   programId: string
@@ -180,9 +181,9 @@ export function ProgramDetailsQuickViewDialog({
                           <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                           <span className="text-sm font-medium">Description</span>
                         </div>
-                        <div 
+                        <SanitizedHtml
+                          html={programsDetails[0].description}
                           className="prose prose-sm max-w-none dark:prose-invert text-gray-700 dark:text-gray-300"
-                          dangerouslySetInnerHTML={{ __html: programsDetails[0].description }}
                         />
                       </div>
                     )}
@@ -262,9 +263,9 @@ export function ProgramDetailsQuickViewDialog({
                               <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                               <span className="text-sm font-medium">Description</span>
                             </div>
-                            <div 
+                            <SanitizedHtml
+                              html={program.description}
                               className="prose prose-sm max-w-none dark:prose-invert text-gray-700 dark:text-gray-300"
-                              dangerouslySetInnerHTML={{ __html: program.description }}
                             />
                           </div>
                         )}

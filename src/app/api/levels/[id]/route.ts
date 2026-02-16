@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN')
+    const _user = await requireRole('ADMIN', request)
     
     const { id } = await params
     const level = await prisma.level.findUnique({
@@ -52,7 +52,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN')
+    const _user = await requireRole('ADMIN', request)
     
     const body = await request.json()
     const { name, description, isVisible, sortOrder } = body
@@ -83,7 +83,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN')
+    const _user = await requireRole('ADMIN', request)
     
     const { id } = await params
     // Check if level has programs

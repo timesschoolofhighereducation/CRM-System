@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
+import { SanitizedHtml } from '@/components/ui/sanitized-html'
 import { safeJsonParse } from '@/lib/utils'
 import { 
   Mail, 
@@ -857,11 +858,9 @@ export default function EmailCampaignPage() {
                       <strong>Sent:</strong> {new Date(previewEmail.sentAt).toLocaleString()}
                     </div>
                   </div>
-                  <div 
+                  <SanitizedHtml
+                    html={previewEmail.message.split('\n').map((line: string) => `<p>${line}</p>`).join('')}
                     className="prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ 
-                      __html: previewEmail.message.split('\n').map(line => `<p>${line}</p>`).join('') 
-                    }}
                   />
                 </div>
 

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, isAdminRole } from '@/lib/auth'
+import { getSafeErrorMessage } from '@/lib/safe-api-error'
+
+function canAccessPromotionCode(userId: string, userRole: string, createdById: string | null): boolean {
+  return isAdminRole(userRole) || createdById === userId
+}
 
 export async function GET(
   request: NextRequest,
@@ -40,6 +45,13 @@ export async function GET(
       )
     }
 
+    if (!canAccessPromotionCode(user.id, user.role, promotionCode.createdById)) {
+      return NextResponse.json(
+        { error: 'You do not have permission to access this promotion code' },
+        { status: 403 }
+      )
+    }
+
     // Calculate actual statistics
     const totalInquiries = promotionCode.seekers.length
     const totalRegistrations = promotionCode.seekers.filter(
@@ -53,10 +65,10 @@ export async function GET(
       totalRegistrations,
       totalPaidLKR,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching promotion code:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch promotion code' },
+      { error: getSafeErrorMessage(error, 'Failed to fetch promotion code') },
       { status: 500 }
     )
   }
@@ -81,7 +93,7 @@ export async function PUT(
       isActive,
     } = body
 
-    // Check if promotion code exists
+    // Check if promotion code exists and user can access it
     const existing = await prisma.promotionCode.findUnique({
       where: { id },
     })
@@ -90,6 +102,13 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Promotion code not found' },
         { status: 404 }
+      )
+    }
+
+    if (!canAccessPromotionCode(user.id, user.role, existing.createdById)) {
+      return NextResponse.json(
+        { error: 'You do not have permission to update this promotion code' },
+        { status: 403 }
       )
     }
 
@@ -118,10 +137,10 @@ export async function PUT(
     })
 
     return NextResponse.json(promotionCode)
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating promotion code:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update promotion code' },
+      { error: getSafeErrorMessage(error, 'Failed to update promotion code') },
       { status: 500 }
     )
   }
@@ -154,6 +173,13 @@ export async function DELETE(
       )
     }
 
+    if (!canAccessPromotionCode(user.id, user.role, existing.createdById)) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete this promotion code' },
+        { status: 403 }
+      )
+    }
+
     // Check if code has been used
     if (existing._count.seekers > 0) {
       return NextResponse.json(
@@ -167,10 +193,10 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'Promotion code deleted successfully' })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deleting promotion code:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete promotion code' },
+      { error: getSafeErrorMessage(error, 'Failed to delete promotion code') },
       { status: 500 }
     )
   }
