@@ -44,7 +44,7 @@ export async function createNotification({
     sendPushNotification(userId, {
       title,
       body: message,
-      url: postId ? `/posts/${postId}` : '/dashboard',
+      url: postId ? `/posts?postId=${postId}` : '/dashboard',
       notificationId: notification.id,
       type: type.toLowerCase(),
       requireInteraction: type === 'POST_APPROVAL_REQUEST',

@@ -26,105 +26,124 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim(); // Take control of all pages immediately
 });
 
-// Push event - handle incoming push notifications
+// Push event - handle incoming push notifications (event.data.json() is async)
 self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push received', event);
-
-  let notificationData = {
+  const defaultData = {
     title: 'New Notification',
     body: 'You have a new notification',
     icon: NOTIFICATION_ICON,
     badge: NOTIFICATION_BADGE,
-    data: {
-      url: '/',
-      timestamp: Date.now()
-    }
+    data: { url: '/', timestamp: Date.now() }
   };
 
-  // Parse push data
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      notificationData = {
-        title: data.title || notificationData.title,
-        body: data.body || data.message || notificationData.body,
+  const parseAndShow = (eventData) => {
+    if (!eventData) {
+      return self.registration.showNotification(defaultData.title, {
+        body: defaultData.body,
+        icon: defaultData.icon,
+        badge: defaultData.badge,
+        data: defaultData.data,
+        dir: 'auto',
+        lang: 'en'
+      });
+    }
+    return eventData.json().then(function (data) {
+      const payload = {
+        title: data.title || defaultData.title,
+        body: data.body || data.message || defaultData.body,
         icon: data.icon || NOTIFICATION_ICON,
         badge: data.badge || NOTIFICATION_BADGE,
         image: data.image,
-        tag: data.tag || `notification-${Date.now()}`,
-        requireInteraction: data.requireInteraction || false,
-        silent: data.silent || false,
+        tag: data.tag || 'notification-' + Date.now(),
+        requireInteraction: !!data.requireInteraction,
+        silent: !!data.silent,
         vibrate: data.vibrate || [200, 100, 200],
         data: {
           url: data.url || data.actionUrl || '/',
           notificationId: data.notificationId || data.id,
           type: data.type || 'info',
-          ...data.data
+          timestamp: Date.now()
         },
-        actions: data.actions || []
+        actions: data.actions || [],
+        dir: 'auto',
+        lang: (data.lang || 'en').substring(0, 2)
       };
-    } catch (e) {
-      // If JSON parsing fails, try as text
-      try {
-        const text = event.data.text();
-        if (text) {
-          notificationData.body = text;
-        }
-      } catch (e2) {
-        console.error('Error parsing push data:', e2);
-      }
-    }
-  }
+      return self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: payload.icon,
+        badge: payload.badge,
+        image: payload.image,
+        tag: payload.tag,
+        requireInteraction: payload.requireInteraction,
+        silent: payload.silent,
+        vibrate: payload.vibrate,
+        data: payload.data,
+        actions: payload.actions,
+        dir: payload.dir,
+        lang: payload.lang,
+        timestamp: Date.now()
+      });
+    }).catch(function () {
+      return eventData.text().then(function (text) {
+        return self.registration.showNotification(defaultData.title, {
+          body: text || defaultData.body,
+          icon: defaultData.icon,
+          badge: defaultData.badge,
+          data: defaultData.data,
+          dir: 'auto',
+          lang: 'en'
+        });
+      }).catch(function () {
+        return self.registration.showNotification(defaultData.title, {
+          body: defaultData.body,
+          icon: defaultData.icon,
+          badge: defaultData.badge,
+          data: defaultData.data,
+          dir: 'auto',
+          lang: 'en'
+        });
+      });
+    });
+  };
 
-  // Show notification
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
-      body: notificationData.body,
-      icon: notificationData.icon,
-      badge: notificationData.badge,
-      image: notificationData.image,
-      tag: notificationData.tag,
-      requireInteraction: notificationData.requireInteraction,
-      silent: notificationData.silent,
-      vibrate: notificationData.vibrate,
-      data: notificationData.data,
-      actions: notificationData.actions,
-      // Cross-browser compatibility
-      dir: 'auto',
-      lang: 'en',
-      timestamp: Date.now()
-    })
-  );
+  event.waitUntil(parseAndShow(event.data));
 });
 
-// Notification click event
+// Notification click event - open app at full URL (works across origins/locales)
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification clicked', event);
-
   event.notification.close();
 
   const data = event.notification.data || {};
-  const url = data.url || '/';
-
-  // Handle action buttons
-  if (event.action) {
-    // Handle specific action
-    console.log('Action clicked:', event.action);
-    // You can add custom logic here for different actions
-    return;
+  let url = data.url || '/';
+  // Ensure absolute URL so it works when app is deployed (any origin)
+  if (url.startsWith('/')) {
+    try {
+      const base = self.registration.scope.replace(/\/$/, '');
+      const origin = new URL(base).origin;
+      url = origin + url;
+    } catch (e) {
+      url = (self.location && self.location.origin) ? self.location.origin + url : url;
+    }
   }
 
-  // Open or focus the app
+  if (event.action) {
+    // Custom action handling if needed
+  }
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url === url && 'focus' in client) {
-          return client.focus();
-        }
+        try {
+          const clientUrl = new URL(client.url);
+          const targetUrl = new URL(url);
+          if (clientUrl.origin === targetUrl.origin && clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
+            client.focus();
+            if (targetUrl.hash) client.navigate(url).catch(() => {});
+            return;
+          }
+        } catch (e) {}
       }
-      // If no window is open, open a new one
       if (clients.openWindow) {
         return clients.openWindow(url);
       }

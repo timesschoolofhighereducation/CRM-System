@@ -1,96 +1,49 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Bell, CheckCheck, Eye, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-
-interface Notification {
-  id: string
-  type: string
-  title: string
-  message: string
-  read: boolean
-  createdAt: string
-  post?: {
-    id: string
-    caption: string
-    status: string
-  }
-}
+import { useApiNotifications, type ApiNotification } from '@/hooks/use-api-notifications'
 
 interface NotificationListProps {
   onNotificationRead?: () => void
+  popoverOpen?: boolean
 }
 
-export function NotificationList({ onNotificationRead }: NotificationListProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(false)
+export function NotificationList({ onNotificationRead, popoverOpen }: NotificationListProps) {
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    refetch,
+    markAsRead,
+    markAllAsRead,
+  } = useApiNotifications()
   const router = useRouter()
 
-  const fetchNotifications = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/notifications')
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data.notifications)
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    fetchNotifications()
-  }, [])
-
-  const handleMarkAsRead = async (notificationId: string) => {
-    try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n.id === notificationId ? { ...n, read: true } : n))
-        )
-        onNotificationRead?.()
-      }
-    } catch (error) {
-      console.error('Error marking notification as read:', error)
-    }
-  }
+    if (popoverOpen) refetch()
+  }, [popoverOpen, refetch])
 
   const handleMarkAllAsRead = async () => {
-    try {
-      const response = await fetch('/api/notifications/read-all', {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-        onNotificationRead?.()
-        toast.success('All notifications marked as read')
-      }
-    } catch (error) {
-      console.error('Error marking all as read:', error)
+    const ok = await markAllAsRead()
+    if (ok) {
+      toast.success('All notifications marked as read')
+      onNotificationRead?.()
+    } else {
       toast.error('Failed to mark all as read')
     }
   }
 
-  const handleNotificationClick = async (notification: Notification) => {
-    // Mark as read
+  const handleNotificationClick = async (notification: ApiNotification) => {
     if (!notification.read) {
-      await handleMarkAsRead(notification.id)
+      await markAsRead(notification.id)
+      onNotificationRead?.()
     }
-
-    // Navigate to related post if exists
     if (notification.post?.id) {
       router.push(`/posts?postId=${notification.post.id}`)
     }
@@ -112,15 +65,14 @@ export function NotificationList({ onNotificationRead }: NotificationListProps) 
 
   return (
     <div className="flex flex-col h-[500px]">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div>
           <h3 className="font-semibold">Notifications</h3>
           <p className="text-xs text-muted-foreground">
-            {notifications.filter(n => !n.read).length} unread
+            {unreadCount} unread
           </p>
         </div>
-        {notifications.some(n => !n.read) && (
+        {unreadCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -132,7 +84,6 @@ export function NotificationList({ onNotificationRead }: NotificationListProps) 
         )}
       </div>
 
-      {/* Notifications List */}
       <ScrollArea className="flex-1">
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
@@ -180,14 +131,13 @@ export function NotificationList({ onNotificationRead }: NotificationListProps) 
         )}
       </ScrollArea>
 
-      {/* Footer */}
       {notifications.length > 0 && (
         <div className="border-t p-2">
           <Button
             variant="ghost"
             size="sm"
             className="w-full"
-            onClick={() => router.push('/notifications')}
+            onClick={() => router.push('/dashboard')}
           >
             View all notifications
           </Button>
@@ -196,4 +146,3 @@ export function NotificationList({ onNotificationRead }: NotificationListProps) 
     </div>
   )
 }
-

@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
       isMobile: userAgent?.includes('Mobile') || userAgent?.includes('Android') || userAgent?.includes('iPhone') || false
     }
 
-    // Upsert subscription (update if exists, create if not)
+    // Upsert subscription (update if exists, create if not). Always tie to current user.
     const subscription = await prisma.pushSubscription.upsert({
       where: { endpoint },
       update: {
+        userId: user.id,
         keys,
         userAgent: userAgent || request.headers.get('user-agent') || null,
         deviceInfo: deviceInfo as any,

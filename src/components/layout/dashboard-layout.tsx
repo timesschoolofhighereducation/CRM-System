@@ -3,6 +3,7 @@
 import { Sidebar } from './sidebar'
 import { HeaderSettings } from './header-settings'
 import { NotificationPanel } from '@/components/notifications/notification-panel'
+import { NotificationBadgeSync } from '@/components/notifications/notification-badge-sync'
 import { useUnifiedReminderService } from '@/services/unified-reminder-service'
 import { ClientOnly } from '@/components/ui/client-only'
 import { useState } from 'react'
@@ -27,9 +28,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Initialize unified reminder service (meetings, tasks, notebooks) only on client side */}
+      {/* Initialize unified reminder service and sync notification badge with API */}
       <ClientOnly>
         <UnifiedReminderService />
+        <NotificationBadgeSync />
       </ClientOnly>
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>

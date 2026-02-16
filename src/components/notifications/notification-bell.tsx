@@ -31,11 +31,18 @@ export function NotificationBell() {
 
   useEffect(() => {
     fetchUnreadCount()
-
-    // Poll for new notifications every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000)
-
     return () => clearInterval(interval)
+  }, [])
+
+  // Refetch when tab becomes visible (e.g. user returns from web push click)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchUnreadCount()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
 
   const handleNotificationRead = () => {
@@ -90,7 +97,10 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="end">
-        <NotificationList onNotificationRead={handleNotificationRead} />
+        <NotificationList
+          onNotificationRead={handleNotificationRead}
+          popoverOpen={open}
+        />
       </PopoverContent>
     </Popover>
     </div>

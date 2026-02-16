@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { SafeNotification } from '@/lib/notification-utils'
 import { PushNotificationClient } from '@/lib/push-notification-client'
-import { updateNotificationBadge } from '@/lib/favicon-badge'
 
 export interface Notification {
   id: string
@@ -91,14 +90,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  // Update favicon badge and document title when unread count changes
-  useEffect(() => {
-    if (isClient) {
-      // Use 'dot' style for simple red dot indicator
-      // Options: 'dot' (red dot only), 'count' (with number), 'both' (dot + number)
-      updateNotificationBadge(unreadCount, 'TSHE CRM', 'dot')
-    }
-  }, [unreadCount, isClient])
+  // Favicon badge is updated by NotificationBadgeSync from API count when on dashboard
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {
