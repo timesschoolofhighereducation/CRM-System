@@ -186,9 +186,6 @@ npm run dev
 - [`COMPREHENSIVE_README.md`](./COMPREHENSIVE_README.md) - Technical details
 - [`TECHNICAL_DOCS.md`](./TECHNICAL_DOCS.md) - System architecture
 - [`IMPLEMENTATION_COMPLETE.md`](./IMPLEMENTATION_COMPLETE.md) - Implementation summary
-- [`docs/NOTIFICATIONS_AND_SECURITY.md`](./docs/NOTIFICATIONS_AND_SECURITY.md) - Notifications architecture & security
-- [`docs/PUSH_NOTIFICATIONS_SETUP.md`](./docs/PUSH_NOTIFICATIONS_SETUP.md) - Push notifications setup guide
-- [`docs/PUSH_DEPLOYMENT_CHECKLIST.md`](./docs/PUSH_DEPLOYMENT_CHECKLIST.md) - Quick deployment checklist
 
 **Total:** 25+ documentation files, 300+ pages
 
