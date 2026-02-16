@@ -305,7 +305,7 @@ export default function EmailCampaignPage() {
           message: result.error || 'Failed to send emails'
         })
       }
-    } catch (error) {
+    } catch (_error) {
       setSendStatus({
         type: 'error',
         message: 'Network error. Please try again.'

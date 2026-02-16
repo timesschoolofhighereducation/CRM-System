@@ -134,7 +134,7 @@ export function AnalyticsDialog({ open, onOpenChange, campaign, onSuccess }: Ana
         if (data.audienceDemographics) {
           audienceDemographics = JSON.parse(data.audienceDemographics)
         }
-      } catch (error) {
+      } catch (_error) {
         toast.error('Invalid JSON format in one of the data fields')
         return
       }

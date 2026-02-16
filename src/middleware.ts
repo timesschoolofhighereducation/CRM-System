@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import jwt from 'jsonwebtoken'
+import { jwtVerify } from 'jose'
 import { getJwtSecretOrNull } from '@/lib/get-jwt-secret'
 
 // Public routes that don't require authentication
@@ -16,18 +16,24 @@ function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => pathname.startsWith(route))
 }
 
-// Verify JWT token (returns null if secret not configured or token invalid)
-function verifyToken(token: string): { id: string; email: string; role: string } | null {
+// Edge-compatible JWT verify (middleware runs in Edge Runtime; jsonwebtoken is Node-only)
+async function verifyToken(token: string): Promise<{ id: string; email: string; role: string } | null> {
   const secret = getJwtSecretOrNull()
   if (!secret) return null
   try {
-    return jwt.verify(token, secret) as { id: string; email: string; role: string }
+    const key = new TextEncoder().encode(secret)
+    const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] })
+    const id = payload.id ?? payload.sub
+    if (typeof id !== 'string' || typeof payload.email !== 'string' || typeof payload.role !== 'string') {
+      return null
+    }
+    return { id, email: payload.email, role: payload.role }
   } catch {
     return null
   }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public routes
@@ -47,8 +53,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl)
   }
 
-  // Verify token and extract user info
-  const decoded = verifyToken(token)
+  // Verify token and extract user info (async for jose)
+  const decoded = await verifyToken(token)
 
   if (!decoded) {
     // Invalid or expired token: clear auth cookie and redirect to sign-in

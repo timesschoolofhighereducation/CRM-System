@@ -526,7 +526,7 @@ export default function WhatsAppCampaignPage() {
           message: result.error || 'Failed to send messages'
         })
       }
-    } catch (error) {
+    } catch (_error) {
       setSendStatus({
         type: 'error',
         message: 'Network error. Please try again.'
