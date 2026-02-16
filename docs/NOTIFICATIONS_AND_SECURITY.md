@@ -115,6 +115,8 @@ For notifications and related security to work, ensure:
 
 Generate VAPID keys with: `npx web-push generate-vapid-keys`
 
+**📖 For detailed setup instructions (development and production), see: [PUSH_NOTIFICATIONS_SETUP.md](./PUSH_NOTIFICATIONS_SETUP.md)**
+
 ---
 
 *Last updated: February 2026*
