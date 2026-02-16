@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
       "font-src 'self' data:",
       "connect-src 'self' https:",
       "frame-ancestors 'self'",
+      "worker-src 'self' blob:", // Allow service workers
     ].join('; ');
     const mainHeaders = [
       ...securityHeaders,
@@ -52,9 +53,19 @@ const nextConfig: NextConfig = {
       {
         source: '/sw.js',
         headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
           { key: 'Service-Worker-Allowed', value: '/' },
         ],
+      },
+    ];
+  },
+  // Ensure static files are served correctly
+  async rewrites() {
+    return [
+      {
+        source: '/sw.js',
+        destination: '/sw.js',
       },
     ];
   },

@@ -60,18 +60,36 @@ export class PushNotificationClient {
     }
 
     try {
+      // Check if service worker file is accessible
+      const swResponse = await fetch('/sw.js', { method: 'HEAD' })
+      if (!swResponse.ok) {
+        console.error('Service worker file not accessible:', swResponse.status)
+        return null
+      }
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+        scope: '/',
+        updateViaCache: 'none' // Always check for updates
       })
+
+      console.log('Service Worker: Registration initiated')
 
       // Wait for service worker to be ready
       await navigator.serviceWorker.ready
 
       this.serviceWorkerRegistration = registration
-      console.log('Service Worker registered successfully')
+      console.log('Service Worker: Registered and ready')
       return registration
     } catch (error) {
       console.error('Error registering service worker:', error)
+      // Provide more helpful error message
+      if (error instanceof Error) {
+        if (error.message.includes('redirect')) {
+          console.error('Service worker registration failed due to redirect. Check Next.js configuration.')
+        } else if (error.message.includes('SecurityError')) {
+          console.error('Service worker registration blocked by browser security. HTTPS required in production.')
+        }
+      }
       return null
     }
   }
