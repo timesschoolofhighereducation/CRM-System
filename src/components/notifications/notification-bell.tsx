@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,43 +10,16 @@ import {
 } from '@/components/ui/popover'
 import { NotificationList } from './notification-list'
 import { useNotifications } from '@/contexts/notification-context'
+import { useApiNotifications } from '@/hooks/use-api-notifications'
 
 export function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0)
   const [open, setOpen] = useState(false)
   const { isPushSupported, subscribeToPush, unsubscribeFromPush, isPushSubscribed } = useNotifications()
+  const { unreadCount, refetch } = useApiNotifications()
   const [isSubscribing, setIsSubscribing] = useState(false)
 
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await fetch('/api/notifications/unread-count')
-      if (response.ok) {
-        const data = await response.json()
-        setUnreadCount(data.count)
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error)
-    }
-  }
-
-  useEffect(() => {
-    fetchUnreadCount()
-    const interval = setInterval(fetchUnreadCount, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Refetch when tab becomes visible (e.g. user returns from web push click)
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchUnreadCount()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
   const handleNotificationRead = () => {
-    fetchUnreadCount()
+    refetch()
   }
 
   const handlePushToggle = async (e: React.MouseEvent) => {
