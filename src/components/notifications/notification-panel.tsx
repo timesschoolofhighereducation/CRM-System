@@ -181,11 +181,12 @@ export function NotificationPanel() {
               onClick={handlePushToggle}
               disabled={isSubscribing}
               className="h-8"
+              title={isPushSubscribed ? 'Disable push' : 'Enable push'}
             >
               {isPushSubscribed ? (
-                <Bell className="h-4 w-4 text-green-600" title="Disable push" />
+                <Bell className="h-4 w-4 text-green-600" />
               ) : (
-                <BellOff className="h-4 w-4 text-muted-foreground" title="Enable push" />
+                <BellOff className="h-4 w-4 text-muted-foreground" />
               )}
             </Button>
           </div>
