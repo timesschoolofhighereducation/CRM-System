@@ -87,9 +87,10 @@ export function DashboardFilterBar({
 
   const isCustomDateRange =
     filters.preset === 'custom' && (filters.dateFrom != null || filters.dateTo != null)
+  const isAllPreset = filters.preset === 'all'
   const hasNonDefaultFilters =
     filters.preset !== 'this_week' ||
-    filters.preset === 'all' ||
+    isAllPreset ||
     filters.userId !== '' ||
     filters.campaignId !== '' ||
     isCustomDateRange
