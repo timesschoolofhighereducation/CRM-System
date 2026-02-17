@@ -7,20 +7,18 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon, Filter, X, User, MessageSquare } from 'lucide-react'
+import { CalendarIcon, Filter, X, User, Megaphone } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { DashboardFilterState, DashboardPreset } from './dashboard-types'
-import {
-  DASHBOARD_PRESET_LABELS,
-  DASHBOARD_CHANNEL_OPTIONS,
-} from './dashboard-types'
+import { DASHBOARD_PRESET_LABELS } from './dashboard-types'
 
 export interface DashboardFilterBarProps {
   filters: DashboardFilterState
   onFiltersChange: (filters: DashboardFilterState) => void
   isAdmin: boolean
   users: { id: string; name: string }[]
+  campaigns: { id: string; name: string }[]
   className?: string
 }
 
@@ -38,13 +36,14 @@ export function DashboardFilterBar({
   onFiltersChange,
   isAdmin,
   users,
+  campaigns,
   className,
 }: DashboardFilterBarProps) {
   const [showFilters, setShowFilters] = useState(false)
 
   const activeFiltersCount = [
     filters.userId ? 1 : 0,
-    filters.channel ? 1 : 0,
+    filters.campaignId ? 1 : 0,
   ].reduce((a, b) => a + b, 0)
 
   const setPreset = (preset: DashboardPreset) => {
@@ -80,7 +79,7 @@ export function DashboardFilterBar({
       dateFrom: null,
       dateTo: null,
       userId: '',
-      channel: '',
+      campaignId: '',
     })
     setShowFilters(false)
   }
@@ -90,7 +89,7 @@ export function DashboardFilterBar({
   const hasNonDefaultFilters =
     filters.preset !== 'this_week' ||
     filters.userId !== '' ||
-    filters.channel !== '' ||
+    filters.campaignId !== '' ||
     isCustomDateRange
 
   return (
@@ -214,25 +213,26 @@ export function DashboardFilterBar({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Channel</span>
+                  <Megaphone className="h-4 w-4" />
+                  <span>Campaign</span>
                 </label>
                 <Select
-                  value={filters.channel || 'all'}
+                  value={filters.campaignId || 'all'}
                   onValueChange={(v) =>
                     onFiltersChange({
                       ...filters,
-                      channel: v === 'all' ? '' : v,
+                      campaignId: v === 'all' ? '' : v,
                     })
                   }
                 >
                   <SelectTrigger className="w-full border-gray-300 shadow-sm">
-                    <SelectValue placeholder="All channels" />
+                    <SelectValue placeholder="All campaigns" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DASHBOARD_CHANNEL_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value || 'all'} value={opt.value || 'all'}>
-                        {opt.label}
+                    <SelectItem value="all">All campaigns</SelectItem>
+                    {campaigns.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -259,10 +259,9 @@ export function DashboardFilterBar({
                   User: {users.find((u) => u.id === filters.userId)?.name ?? filters.userId}
                 </Badge>
               )}
-              {filters.channel && (
+              {filters.campaignId && (
                 <Badge variant="secondary" className="font-normal">
-                  {DASHBOARD_CHANNEL_OPTIONS.find((c) => c.value === filters.channel)?.label ??
-                    filters.channel}
+                  Campaign: {campaigns.find((c) => c.id === filters.campaignId)?.name ?? filters.campaignId}
                 </Badge>
               )}
             </div>

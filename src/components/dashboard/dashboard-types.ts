@@ -6,7 +6,7 @@ export interface DashboardFilterState {
   dateFrom: Date | null
   dateTo: Date | null
   userId: string
-  channel: string
+  campaignId: string
 }
 
 export const DASHBOARD_PRESET_LABELS: Record<DashboardPreset, string> = {
@@ -17,11 +17,3 @@ export const DASHBOARD_PRESET_LABELS: Record<DashboardPreset, string> = {
   last_30: 'Last 30 days',
   custom: 'Custom',
 }
-
-export const DASHBOARD_CHANNEL_OPTIONS = [
-  { value: '', label: 'All channels' },
-  { value: 'CALL', label: 'Call' },
-  { value: 'WHATSAPP', label: 'WhatsApp' },
-  { value: 'EMAIL', label: 'Email' },
-  { value: 'WALK_IN', label: 'Walk-in' },
-] as const

@@ -24,10 +24,6 @@ const DashboardStats = dynamic(
     ),
   }
 )
-const RecentActivity = dynamic(
-  () => import('@/components/dashboard/recent-activity').then((m) => ({ default: m.RecentActivity })),
-  { loading: () => <div className="h-64 rounded-lg bg-muted animate-pulse" /> }
-)
 const UserInquiryAnalytics = dynamic(
   () => import('@/components/dashboard/user-inquiry-analytics').then((m) => ({ default: m.UserInquiryAnalytics })),
   { loading: () => <div className="h-64 rounded-lg bg-muted animate-pulse" /> }
@@ -42,7 +38,7 @@ const DEFAULT_FILTERS: DashboardFilterState = {
   dateFrom: null,
   dateTo: null,
   userId: '',
-  channel: '',
+  campaignId: '',
 }
 
 function buildDashboardQuery(filters: DashboardFilterState): string {
@@ -53,7 +49,7 @@ function buildDashboardQuery(filters: DashboardFilterState): string {
     params.set('dateTo', filters.dateTo.toISOString().slice(0, 10))
   }
   if (filters.userId) params.set('userId', filters.userId)
-  if (filters.channel) params.set('channel', filters.channel)
+  if (filters.campaignId) params.set('campaignId', filters.campaignId)
   params.set('limit', '20')
   return params.toString()
 }
@@ -69,6 +65,7 @@ function DashboardPageContent() {
     activities: any[]
     userInquiryStats: any[] | null
     users: { id: string; name: string }[]
+    campaigns: { id: string; name: string }[]
     isAdmin: boolean
   } | null>(null)
   const [dashboardLoading, setDashboardLoading] = useState(true)
@@ -94,6 +91,7 @@ function DashboardPageContent() {
           activities: data.activities ?? [],
           userInquiryStats: data.userInquiryStats ?? null,
           users: data.users ?? [],
+          campaigns: data.campaigns ?? [],
           isAdmin: data.isAdmin ?? false,
         })
       } catch {
@@ -111,7 +109,7 @@ function DashboardPageContent() {
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
     const userId = searchParams.get('userId') ?? ''
-    const channel = searchParams.get('channel') ?? ''
+    const campaignId = searchParams.get('campaignId') ?? ''
 
     const initial: DashboardFilterState = {
       preset: ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom'].includes(preset)
@@ -120,7 +118,7 @@ function DashboardPageContent() {
       dateFrom: dateFrom ? new Date(dateFrom) : null,
       dateTo: dateTo ? new Date(dateTo) : null,
       userId,
-      channel,
+      campaignId,
     }
     setFilters(initial)
     fetchDashboard(initial)
@@ -179,6 +177,7 @@ function DashboardPageContent() {
           onFiltersChange={handleFiltersChange}
           isAdmin={isAdmin}
           users={dashboardData?.users ?? []}
+          campaigns={dashboardData?.campaigns ?? []}
         />
 
         <DashboardStats
@@ -189,11 +188,6 @@ function DashboardPageContent() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className={cn('space-y-6', compactMode ? 'space-y-4' : 'space-y-6', 'lg:col-span-2')}>
-            <RecentActivity
-              activities={dashboardData?.activities ?? null}
-              loading={dashboardLoading}
-              error={dashboardError}
-            />
             {isAdmin && (
               <UserInquiryAnalytics
                 userInquiryStats={dashboardData?.userInquiryStats ?? null}

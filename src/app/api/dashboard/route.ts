@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { isAdminRole, requireAuth } from '@/lib/auth'
-import { FollowUpStatus, InteractionChannel } from '@prisma/client'
+import { FollowUpStatus } from '@prisma/client'
 
 export type DashboardPreset = 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
 
@@ -86,7 +86,6 @@ function getDateRange(
 }
 
 const VALID_PRESETS: DashboardPreset[] = ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom']
-const VALID_CHANNELS: InteractionChannel[] = ['CALL', 'WHATSAPP', 'EMAIL', 'WALK_IN']
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,22 +100,23 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom') ?? undefined
     const dateTo = searchParams.get('dateTo') ?? undefined
     const userIdFilter = searchParams.get('userId') ?? undefined
-    const channelParam = searchParams.get('channel') ?? undefined
-    const channelFilter = channelParam && VALID_CHANNELS.includes(channelParam as InteractionChannel)
-      ? (channelParam as InteractionChannel)
-      : undefined
+    const campaignIdFilter = searchParams.get('campaignId') ?? undefined
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '10', 10), 1), 50)
 
     const { start, end, prevStart, prevEnd } = getDateRange(preset, dateFrom, dateTo)
 
     const applyUserId = isAdmin && userIdFilter && userIdFilter.trim() !== ''
-    const applyChannel = !!channelFilter
+    const applyCampaign = !!campaignIdFilter?.trim()
 
-    const seekerWhere: Record<string, unknown> = applyUserId
+    const baseSeekerWhere: Record<string, unknown> = applyUserId
       ? { createdById: userIdFilter }
       : isAdmin
         ? {}
         : { createdById: user.id }
+
+    const seekerWhere: Record<string, unknown> = applyCampaign
+      ? { ...baseSeekerWhere, campaigns: { some: { campaignId: campaignIdFilter } } }
+      : baseSeekerWhere
 
     const campaignWhere = isAdmin
       ? { isDeleted: false }
@@ -128,20 +128,11 @@ export async function GET(request: NextRequest) {
         ? {}
         : { assignedTo: user.id }
 
-    const interactionWhere: Record<string, unknown> = {
-      ...(applyUserId ? { userId: userIdFilter } : isAdmin ? {} : { userId: user.id }),
-      ...(applyChannel ? { channel: channelFilter } : {}),
-    }
+    const interactionWhere: Record<string, unknown> =
+      applyUserId ? { userId: userIdFilter } : isAdmin ? {} : { userId: user.id }
 
-    const interactionFilterForSeekers:
-      | { userId: string }
-      | { channel: InteractionChannel }
-      | Record<string, never> = isAdmin
-      ? applyUserId
-        ? { userId: userIdFilter }
-        : applyChannel && channelFilter
-          ? { channel: channelFilter }
-          : {}
+    const interactionFilterForSeekers: { userId: string } | Record<string, never> = isAdmin
+      ? applyUserId ? { userId: userIdFilter } : {}
       : { userId: user.id }
 
     const [
@@ -328,6 +319,13 @@ export async function GET(request: NextRequest) {
     let userInquiryStats: any[] | null = null
     let users: { id: string; name: string }[] = []
 
+    const campaignsList = await prisma.campaign.findMany({
+      where: campaignWhere,
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+    const campaigns = campaignsList.map((c) => ({ id: c.id, name: c.name }))
+
     const now = new Date()
     if (isAdmin) {
       const usersList = await prisma.user.findMany({
@@ -384,6 +382,7 @@ export async function GET(request: NextRequest) {
       userInquiryStats,
       isAdmin,
       users,
+      campaigns,
       filterMeta: {
         preset,
         dateFrom: start.toISOString(),
