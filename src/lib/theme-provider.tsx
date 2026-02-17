@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, startTransition } from 'react'
 
 type Theme = 'dark' | 'light' | 'system'
 
@@ -121,15 +121,22 @@ export function ThemeProvider({
     localStorage.setItem('crm-show-avatars', showAvatars.toString())
   }, [showAvatars])
 
+  // Wrap setters in startTransition to improve INP: lets the browser paint the next frame
+  // before React applies state updates (per Vercel Speed Insights / Core Web Vitals).
+  const setThemeDeferred = (t: Theme) => startTransition(() => setTheme(t))
+  const setSidebarCollapsedDeferred = (v: boolean) => startTransition(() => setSidebarCollapsed(v))
+  const setCompactModeDeferred = (v: boolean) => startTransition(() => setCompactMode(v))
+  const setShowAvatarsDeferred = (v: boolean) => startTransition(() => setShowAvatars(v))
+
   const value = {
     theme,
-    setTheme,
+    setTheme: setThemeDeferred,
     sidebarCollapsed,
-    setSidebarCollapsed,
+    setSidebarCollapsed: setSidebarCollapsedDeferred,
     compactMode,
-    setCompactMode,
+    setCompactMode: setCompactModeDeferred,
     showAvatars,
-    setShowAvatars,
+    setShowAvatars: setShowAvatarsDeferred,
     mounted,
   }
 

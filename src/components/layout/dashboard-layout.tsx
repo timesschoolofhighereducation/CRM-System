@@ -6,7 +6,7 @@ import { NotificationPanel } from '@/components/notifications/notification-panel
 import { NotificationBadgeSync } from '@/components/notifications/notification-badge-sync'
 import { useUnifiedReminderService } from '@/services/unified-reminder-service'
 import { ClientOnly } from '@/components/ui/client-only'
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/lib/theme-provider'
@@ -35,7 +35,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </ClientOnly>
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50" onClick={() => startTransition(() => setSidebarOpen(false))} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col">
           <Sidebar />
         </div>
@@ -57,7 +57,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => startTransition(() => setSidebarOpen(true))}
             >
               <Menu className="h-6 w-6" />
             </Button>

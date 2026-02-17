@@ -1,7 +1,12 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { ChatInterface } from '@/components/chat/chat-interface'
+
+const ChatInterface = dynamic(
+  () => import('@/components/chat/chat-interface').then(m => ({ default: m.ChatInterface })),
+  { loading: () => <div className="h-[calc(100vh-250px)] min-h-[600px] border rounded-lg bg-muted animate-pulse flex items-center justify-center">Loading chat...</div> }
+)
 
 export default function ChatPage() {
   return (

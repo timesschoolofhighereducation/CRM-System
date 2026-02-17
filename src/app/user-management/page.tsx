@@ -1,7 +1,15 @@
+import dynamic from 'next/dynamic'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { UserManagementDashboard } from '@/components/user-management/user-management-dashboard'
-import { RoleManagementDashboard } from '@/components/user-management/role-management-dashboard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+const UserManagementDashboard = dynamic(
+  () => import('@/components/user-management/user-management-dashboard').then(m => ({ default: m.UserManagementDashboard })),
+  { loading: () => <div className="h-96 bg-muted rounded animate-pulse" /> }
+)
+const RoleManagementDashboard = dynamic(
+  () => import('@/components/user-management/role-management-dashboard').then(m => ({ default: m.RoleManagementDashboard })),
+  { loading: () => <div className="h-96 bg-muted rounded animate-pulse" /> }
+)
 
 export default function UserManagementPage() {
   return (

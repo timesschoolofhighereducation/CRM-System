@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
@@ -211,14 +211,16 @@ export function Sidebar() {
   }, [pathname, isReportsActive])
 
   const toggleExpanded = (itemName: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(itemName)) {
-        newSet.delete(itemName)
-      } else {
-        newSet.add(itemName)
-      }
-      return newSet
+    startTransition(() => {
+      setExpandedItems(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(itemName)) {
+          newSet.delete(itemName)
+        } else {
+          newSet.add(itemName)
+        }
+        return newSet
+      })
     })
   }
 
@@ -361,7 +363,7 @@ export function Sidebar() {
         {/* WhatsApp Campaign Button */}
         {hasAnyPermission(['READ_CAMPAIGN', 'READ_SEEKER']) && (
           <button
-            onClick={() => router.push('/whatsapp-campaign')}
+            onClick={() => startTransition(() => router.push('/whatsapp-campaign'))}
             className={cn(
               'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors w-full',
               'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
@@ -384,7 +386,7 @@ export function Sidebar() {
         {/* Email Campaign Button */}
         {hasAnyPermission(['READ_CAMPAIGN', 'READ_SEEKER']) && (
           <button
-            onClick={() => router.push('/email-campaign')}
+            onClick={() => startTransition(() => router.push('/email-campaign'))}
             className={cn(
               'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors w-full',
               'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
@@ -411,7 +413,7 @@ export function Sidebar() {
             "w-full justify-start text-sidebar-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 border border-transparent transition-all duration-200 group",
             isCollapsed && "justify-center px-2"
           )}
-          onClick={logout}
+          onClick={() => startTransition(() => logout())}
           title={isCollapsed ? "Sign out" : undefined}
         >
           <LogOut className={cn(
