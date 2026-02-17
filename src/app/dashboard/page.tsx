@@ -112,7 +112,7 @@ function DashboardPageContent() {
     const campaignId = searchParams.get('campaignId') ?? ''
 
     const initial: DashboardFilterState = {
-      preset: ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom'].includes(preset)
+      preset: ['all', 'today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom'].includes(preset)
         ? preset
         : 'this_week',
       dateFrom: dateFrom ? new Date(dateFrom) : null,

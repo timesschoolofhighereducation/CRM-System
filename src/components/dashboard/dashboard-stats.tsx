@@ -9,7 +9,13 @@ export interface DashboardStatsData {
   totalSeekers: { value: number; change: number; changeType: string }
   newThisWeek: { value: number; change: number; changeType: string }
   contactRate: { value: number; change: number; changeType: string }
-  pendingTasks: { value: number; change: number; changeType: string }
+  pendingTasks: {
+    value: number
+    change: number
+    changeType: string
+    followUp?: number
+    notFollowUp?: number
+  }
 }
 
 interface DashboardStatsProps {
@@ -71,7 +77,13 @@ export function DashboardStats({ stats: statsProp, loading: loadingProp, error: 
     )
   }
 
-  const stats = [
+  const formatChange = (change: number) => {
+    if (change === 0) return '0%'
+    const sign = change > 0 ? '+' : ''
+    return `${sign}${change}%`
+  }
+
+  const statsCards = [
     {
       title: 'Total Seekers',
       value: data.stats.totalSeekers.value.toLocaleString(),
@@ -93,24 +105,15 @@ export function DashboardStats({ stats: statsProp, loading: loadingProp, error: 
       changeType: data.stats.contactRate.changeType,
       icon: Phone,
     },
-    {
-      title: 'Pending Tasks',
-      value: data.stats.pendingTasks.value.toLocaleString(),
-      change: data.stats.pendingTasks.change,
-      changeType: data.stats.pendingTasks.changeType,
-      icon: CheckSquare,
-    },
   ]
 
-  const formatChange = (change: number) => {
-    if (change === 0) return '0%'
-    const sign = change > 0 ? '+' : ''
-    return `${sign}${change}%`
-  }
+  const pendingTasks = data.stats.pendingTasks
+  const followUp = pendingTasks.followUp ?? 0
+  const notFollowUp = pendingTasks.notFollowUp ?? 0
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat) => (
+      {statsCards.map((stat) => (
         <Card key={stat.title} className="shadow-sm border-gray-200 hover:shadow-md transition-shadow dark:border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gray-50/50 border-b border-gray-200 dark:bg-gray-800/50 dark:border-gray-700">
             <CardTitle className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -136,6 +139,44 @@ export function DashboardStats({ stats: statsProp, loading: loadingProp, error: 
           </CardContent>
         </Card>
       ))}
+
+      {/* Pending Tasks card with Follow-up / Not follow-up breakdown */}
+      <Card className="shadow-sm border-gray-200 hover:shadow-md transition-shadow dark:border-gray-700">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gray-50/50 border-b border-gray-200 dark:bg-gray-800/50 dark:border-gray-700">
+          <CardTitle className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Pending Tasks
+          </CardTitle>
+          <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
+            <CheckSquare className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            {pendingTasks.value.toLocaleString()}
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex items-center justify-between text-gray-600 dark:text-gray-400">
+              <span>Follow-up</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{followUp.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-gray-600 dark:text-gray-400">
+              <span>Not follow-up</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{notFollowUp.toLocaleString()}</span>
+            </div>
+          </div>
+          <p
+            className={`text-xs font-medium mt-2 ${
+              pendingTasks.changeType === 'positive'
+                ? 'text-green-600 dark:text-green-400'
+                : pendingTasks.changeType === 'negative'
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            {formatChange(pendingTasks.change)} vs previous period
+          </p>
+        </CardContent>
+      </Card>
     </div>
   )
 }

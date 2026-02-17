@@ -1,5 +1,5 @@
 /** Dashboard API preset; must match backend DashboardPreset */
-export type DashboardPreset = 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
+export type DashboardPreset = 'all' | 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
 
 export interface DashboardFilterState {
   preset: DashboardPreset
@@ -10,6 +10,7 @@ export interface DashboardFilterState {
 }
 
 export const DASHBOARD_PRESET_LABELS: Record<DashboardPreset, string> = {
+  all: 'All',
   today: 'Today',
   this_week: 'This week',
   this_month: 'This month',

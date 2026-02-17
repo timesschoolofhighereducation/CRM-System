@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { isAdminRole, requireAuth } from '@/lib/auth'
 import { FollowUpStatus } from '@prisma/client'
 
-export type DashboardPreset = 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
+export type DashboardPreset = 'all' | 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
 
 function getDateRange(
   preset: DashboardPreset,
@@ -29,6 +29,14 @@ function getDateRange(
     prevStart = new Date(prevEnd.getTime() - spanMs)
     prevStart.setHours(0, 0, 0, 0)
     return { start, end: endDate, prevStart, prevEnd }
+  }
+
+  if (preset === 'all') {
+    start = new Date(0)
+    start.setUTCHours(0, 0, 0, 0)
+    prevStart = start
+    prevEnd = end
+    return { start, end, prevStart, prevEnd }
   }
 
   switch (preset) {
@@ -85,7 +93,7 @@ function getDateRange(
   return { start, end, prevStart, prevEnd }
 }
 
-const VALID_PRESETS: DashboardPreset[] = ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom']
+const VALID_PRESETS: DashboardPreset[] = ['all', 'today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom']
 
 export async function GET(request: NextRequest) {
   try {
@@ -142,6 +150,8 @@ export async function GET(request: NextRequest) {
       _totalInteractions,
       totalSeekersWithInteractions,
       pendingTasks,
+      pendingTasksFollowUp,
+      pendingTasksNotFollowUp,
       completedTasksThisPeriod,
       totalCampaigns,
       activeCampaigns,
@@ -189,6 +199,26 @@ export async function GET(request: NextRequest) {
           status: {
             in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE],
           },
+        },
+      }),
+
+      prisma.followUpTask.count({
+        where: {
+          ...taskWhere,
+          status: {
+            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE],
+          },
+          seeker: { followUpAgain: true },
+        },
+      }),
+
+      prisma.followUpTask.count({
+        where: {
+          ...taskWhere,
+          status: {
+            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE],
+          },
+          seeker: { followUpAgain: false },
         },
       }),
 
@@ -293,6 +323,8 @@ export async function GET(request: NextRequest) {
         value: pendingTasks,
         change: tasksChange,
         changeType: (tasksChange >= 0 ? 'negative' : 'positive') as 'positive' | 'negative',
+        followUp: pendingTasksFollowUp,
+        notFollowUp: pendingTasksNotFollowUp,
       },
       campaigns: {
         total: totalCampaigns,

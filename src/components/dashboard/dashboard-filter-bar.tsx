@@ -23,6 +23,7 @@ export interface DashboardFilterBarProps {
 }
 
 const PRESET_ORDER: DashboardPreset[] = [
+  'all',
   'today',
   'this_week',
   'this_month',
@@ -88,6 +89,7 @@ export function DashboardFilterBar({
     filters.preset === 'custom' && (filters.dateFrom != null || filters.dateTo != null)
   const hasNonDefaultFilters =
     filters.preset !== 'this_week' ||
+    filters.preset === 'all' ||
     filters.userId !== '' ||
     filters.campaignId !== '' ||
     isCustomDateRange
