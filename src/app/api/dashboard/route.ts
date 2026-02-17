@@ -3,214 +3,305 @@ import { prisma } from '@/lib/prisma'
 import { isAdminRole, requireAuth } from '@/lib/auth'
 import { FollowUpStatus } from '@prisma/client'
 
+export type DashboardPreset = 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
+
+function getDateRange(
+  preset: DashboardPreset,
+  dateFrom?: string,
+  dateTo?: string
+): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
+  const now = new Date()
+  const end = new Date(now)
+  end.setHours(23, 59, 59, 999)
+
+  let start: Date
+  let prevStart: Date
+  let prevEnd: Date
+
+  if (preset === 'custom' && dateFrom && dateTo) {
+    start = new Date(dateFrom)
+    start.setHours(0, 0, 0, 0)
+    const endDate = new Date(dateTo)
+    endDate.setHours(23, 59, 59, 999)
+    const spanMs = endDate.getTime() - start.getTime()
+    prevEnd = new Date(start.getTime() - 1)
+    prevEnd.setHours(23, 59, 59, 999)
+    prevStart = new Date(prevEnd.getTime() - spanMs)
+    prevStart.setHours(0, 0, 0, 0)
+    return { start, end: endDate, prevStart, prevEnd }
+  }
+
+  switch (preset) {
+    case 'today': {
+      start = new Date(now)
+      start.setHours(0, 0, 0, 0)
+      prevEnd = new Date(start.getTime() - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      prevStart = new Date(prevEnd)
+      prevStart.setHours(0, 0, 0, 0)
+      break
+    }
+    case 'this_week': {
+      const day = now.getDay()
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+      start = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0)
+      prevEnd = new Date(start.getTime() - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      prevStart = new Date(prevEnd)
+      prevStart.setDate(prevStart.getDate() - 6)
+      prevStart.setHours(0, 0, 0, 0)
+      break
+    }
+    case 'this_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+      prevEnd = new Date(start.getTime() - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), 1, 0, 0, 0, 0)
+      break
+    }
+    case 'last_7': {
+      start = new Date(now)
+      start.setDate(now.getDate() - 7)
+      start.setHours(0, 0, 0, 0)
+      prevEnd = new Date(start.getTime() - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      prevStart = new Date(prevEnd.getTime() - 7 * 24 * 60 * 60 * 1000)
+      prevStart.setHours(0, 0, 0, 0)
+      break
+    }
+    case 'last_30':
+    default: {
+      start = new Date(now)
+      start.setDate(now.getDate() - 30)
+      start.setHours(0, 0, 0, 0)
+      prevEnd = new Date(start.getTime() - 1)
+      prevEnd.setHours(23, 59, 59, 999)
+      prevStart = new Date(prevEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
+      prevStart.setHours(0, 0, 0, 0)
+      break
+    }
+  }
+
+  return { start, end, prevStart, prevEnd }
+}
+
+const VALID_PRESETS: DashboardPreset[] = ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom']
+const VALID_CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'WALK_IN']
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request)
-    
-    // Determine if user should see all data
     const isAdmin = isAdminRole(user.role)
-    
-    // Build where clauses for user filtering
-    const seekerWhere = isAdmin ? {} : { createdById: user.id }
-    const campaignWhere = isAdmin ? { isDeleted: false } : { createdById: user.id, isDeleted: false }
-    const taskWhere = isAdmin ? {} : { assignedTo: user.id }
-    const interactionWhere = isAdmin ? {} : { userId: user.id }
-    
-    // Calculate date ranges
-    const now = new Date()
-    const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - 7)
-    startOfWeek.setHours(0, 0, 0, 0)
-    
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
 
-    // Fetch statistics in parallel
+    const { searchParams } = new URL(request.url)
+    const presetParam = searchParams.get('preset') ?? searchParams.get('range') ?? 'this_week'
+    const preset = VALID_PRESETS.includes(presetParam as DashboardPreset)
+      ? (presetParam as DashboardPreset)
+      : 'this_week'
+    const dateFrom = searchParams.get('dateFrom') ?? undefined
+    const dateTo = searchParams.get('dateTo') ?? undefined
+    const userIdFilter = searchParams.get('userId') ?? undefined
+    const channelFilter = searchParams.get('channel') ?? undefined
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '10', 10), 1), 50)
+
+    const { start, end, prevStart, prevEnd } = getDateRange(preset, dateFrom, dateTo)
+
+    const applyUserId = isAdmin && userIdFilter && userIdFilter.trim() !== ''
+    const applyChannel = channelFilter && VALID_CHANNELS.includes(channelFilter)
+
+    const seekerWhere: Record<string, unknown> = applyUserId
+      ? { createdById: userIdFilter }
+      : isAdmin
+        ? {}
+        : { createdById: user.id }
+
+    const campaignWhere = isAdmin
+      ? { isDeleted: false }
+      : { createdById: user.id, isDeleted: false }
+
+    const taskWhere: Record<string, unknown> = applyUserId
+      ? { assignedTo: userIdFilter }
+      : isAdmin
+        ? {}
+        : { assignedTo: user.id }
+
+    const interactionWhere: Record<string, unknown> = {
+      ...(applyUserId ? { userId: userIdFilter } : isAdmin ? {} : { userId: user.id }),
+      ...(applyChannel ? { channel: channelFilter } : {}),
+    }
+
+    const interactionFilterForSeekers = isAdmin
+      ? applyUserId ? { userId: userIdFilter } : applyChannel ? { channel: channelFilter } : {}
+      : { userId: user.id }
+
     const [
       totalSeekers,
-      newSeekersThisWeek,
-      newSeekersLastWeek,
+      newSeekersThisPeriod,
+      newSeekersPrevPeriod,
       totalInteractions,
       totalSeekersWithInteractions,
       pendingTasks,
-      completedTasks,
+      completedTasksThisPeriod,
       totalCampaigns,
       activeCampaigns,
       recentInteractions,
-      lastMonthTasks,
-      thisMonthTasks
+      completedTasksPrevPeriod,
+      pendingTasksPrevPeriod,
     ] = await Promise.all([
-      // Total seekers
       prisma.seeker.count({ where: seekerWhere }),
-      
-      // New seekers this week
+
       prisma.seeker.count({
         where: {
           ...seekerWhere,
-          createdAt: {
-            gte: startOfWeek
-          }
-        }
+          createdAt: { gte: start, lte: end },
+        },
       }),
-      
-      // New seekers last week (for comparison)
+
       prisma.seeker.count({
         where: {
           ...seekerWhere,
-          createdAt: {
-            gte: new Date(startOfWeek.getTime() - 7 * 24 * 60 * 60 * 1000),
-            lt: startOfWeek
-          }
-        }
+          createdAt: { gte: prevStart, lte: prevEnd },
+        },
       }),
-      
-      // Total interactions
-      prisma.interaction.count({ where: interactionWhere }),
-      
-      // Seekers with at least one interaction
+
+      prisma.interaction.count({
+        where: {
+          ...interactionWhere,
+          createdAt: { gte: start, lte: end },
+        },
+      }),
+
       prisma.seeker.count({
         where: {
           ...seekerWhere,
           interactions: {
-            some: isAdmin ? {} : { userId: user.id }
-          }
-        }
-      }),
-      
-      // Pending tasks (OPEN, TODO, IN_PROGRESS, OVERDUE)
-      prisma.followUpTask.count({
-        where: {
-          ...taskWhere,
-          status: {
-            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE]
-          }
-        }
-      }),
-      
-      // Completed tasks this month
-      prisma.followUpTask.count({
-        where: {
-          ...taskWhere,
-          status: {
-            in: [FollowUpStatus.DONE, FollowUpStatus.COMPLETED]
+            some: Object.keys(interactionFilterForSeekers).length
+              ? { ...interactionFilterForSeekers, createdAt: { gte: start, lte: end } }
+              : { createdAt: { gte: start, lte: end } },
           },
-          updatedAt: {
-            gte: startOfMonth
-          }
-        }
-      }),
-      
-      // Total campaigns
-      prisma.campaign.count({
-        where: campaignWhere
-      }),
-      
-      // Active campaigns
-      prisma.campaign.count({
-        where: {
-          ...campaignWhere,
-          status: 'ACTIVE'
-        }
-      }),
-      
-      // Recent interactions (last 10)
-      prisma.interaction.findMany({
-        where: interactionWhere,
-        take: 10,
-        orderBy: {
-          createdAt: 'desc'
         },
+      }),
+
+      prisma.followUpTask.count({
+        where: {
+          ...taskWhere,
+          status: {
+            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE],
+          },
+        },
+      }),
+
+      prisma.followUpTask.count({
+        where: {
+          ...taskWhere,
+          status: { in: [FollowUpStatus.DONE, FollowUpStatus.COMPLETED] },
+          updatedAt: { gte: start, lte: end },
+        },
+      }),
+
+      prisma.campaign.count({ where: campaignWhere }),
+
+      prisma.campaign.count({
+        where: { ...campaignWhere, status: 'ACTIVE' },
+      }),
+
+      prisma.interaction.findMany({
+        where: {
+          ...interactionWhere,
+          createdAt: { gte: start, lte: end },
+        },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
         include: {
-          seeker: {
-            select: {
-              id: true,
-              fullName: true,
-              phone: true
-            }
-          },
-          user: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
-        }
+          seeker: { select: { id: true, fullName: true, phone: true } },
+          user: { select: { id: true, name: true } },
+        },
       }),
 
-      // Last month tasks for comparison
+      prisma.followUpTask.count({
+        where: {
+          ...taskWhere,
+          status: { in: [FollowUpStatus.DONE, FollowUpStatus.COMPLETED] },
+          updatedAt: { gte: prevStart, lte: prevEnd },
+        },
+      }),
+
       prisma.followUpTask.count({
         where: {
           ...taskWhere,
           status: {
-            in: [FollowUpStatus.DONE, FollowUpStatus.COMPLETED]
+            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE],
           },
-          updatedAt: {
-            gte: lastMonth,
-            lte: endOfLastMonth
-          }
-        }
+        },
       }),
-
-      // This month tasks (duplicate for clarity)
-      prisma.followUpTask.count({
-        where: {
-          ...taskWhere,
-          status: {
-            in: [FollowUpStatus.OPEN, FollowUpStatus.TODO, FollowUpStatus.IN_PROGRESS, FollowUpStatus.OVERDUE]
-          }
-        }
-      })
     ])
 
-    // Calculate percentages and changes
-    const contactRate = totalSeekers > 0 
-      ? Math.round((totalSeekersWithInteractions / totalSeekers) * 100)
-      : 0
-    
-    const newSeekersChange = newSeekersLastWeek > 0
-      ? Math.round(((newSeekersThisWeek - newSeekersLastWeek) / newSeekersLastWeek) * 100)
-      : (newSeekersThisWeek > 0 ? 100 : 0)
-    
-    const contactRateChange = 3 // This would need historical data to calculate accurately
-    
-    const tasksChange = lastMonthTasks > 0
-      ? Math.round(((thisMonthTasks - lastMonthTasks) / lastMonthTasks) * 100)
-      : 0
+    const contactRate =
+      totalSeekers > 0 ? Math.round((totalSeekersWithInteractions / totalSeekers) * 100) : 0
+    const seekersWithInteractionsPrev = await prisma.seeker.count({
+      where: {
+        ...seekerWhere,
+        interactions: {
+          some: Object.keys(interactionFilterForSeekers).length
+            ? {
+                ...interactionFilterForSeekers,
+                createdAt: { gte: prevStart, lte: prevEnd },
+              }
+            : { createdAt: { gte: prevStart, lte: prevEnd } },
+        },
+      },
+    })
+    const totalSeekersPrev = await prisma.seeker.count({ where: seekerWhere })
+    const contactRatePrev =
+      totalSeekersPrev > 0 ? Math.round((seekersWithInteractionsPrev / totalSeekersPrev) * 100) : 0
+    const contactRateChange = contactRate - contactRatePrev
 
-    // Format statistics
+    const newSeekersChange =
+      newSeekersPrevPeriod > 0
+        ? Math.round(((newSeekersThisPeriod - newSeekersPrevPeriod) / newSeekersPrevPeriod) * 100)
+        : newSeekersThisPeriod > 0
+          ? 100
+          : 0
+
+    const tasksChange =
+      completedTasksPrevPeriod > 0
+        ? Math.round(
+            ((completedTasksThisPeriod - completedTasksPrevPeriod) / completedTasksPrevPeriod) * 100
+          )
+        : completedTasksThisPeriod > 0
+          ? 100
+          : 0
+
     const stats = {
       totalSeekers: {
         value: totalSeekers,
-        change: 0, // Would need historical data
-        changeType: 'neutral'
+        change: 0,
+        changeType: 'neutral' as const,
       },
       newThisWeek: {
-        value: newSeekersThisWeek,
+        value: newSeekersThisPeriod,
         change: newSeekersChange,
-        changeType: newSeekersChange >= 0 ? 'positive' : 'negative'
+        changeType: (newSeekersChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
       },
       contactRate: {
         value: contactRate,
         change: contactRateChange,
-        changeType: 'positive'
+        changeType: (contactRateChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
       },
       pendingTasks: {
         value: pendingTasks,
         change: tasksChange,
-        changeType: tasksChange <= 0 ? 'positive' : 'negative' // Less tasks is better
+        changeType: (tasksChange >= 0 ? 'negative' : 'positive') as 'positive' | 'negative',
       },
       campaigns: {
         total: totalCampaigns,
-        active: activeCampaigns
-      }
+        active: activeCampaigns,
+      },
     }
 
-    // Format recent activities
-    const activities = recentInteractions.map(interaction => {
+    const activities = recentInteractions.map((interaction) => {
       let outcomeText = interaction.outcome.replace(/_/g, ' ')
       outcomeText = outcomeText.charAt(0) + outcomeText.slice(1).toLowerCase()
-      
       return {
         id: interaction.id,
         type: interaction.channel.toLowerCase(),
@@ -220,73 +311,60 @@ export async function GET(request: NextRequest) {
         userName: interaction.user.name,
         time: interaction.createdAt,
         channel: interaction.channel,
-        notes: interaction.notes
+        notes: interaction.notes,
       }
     })
 
-    // Get user inquiry counts for admin users
     let userInquiryStats: any[] | null = null
+    let users: { id: string; name: string }[] = []
+
+    const now = new Date()
     if (isAdmin) {
-      const users = await prisma.user.findMany({
-        where: {
-          isActive: true,
-          role: {
-            not: 'SYSTEM'
-          }
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          _count: {
-            select: {
-              createdSeekers: true
-            }
-          }
-        },
-        orderBy: {
-          name: 'asc'
-        }
+      const usersList = await prisma.user.findMany({
+        where: { isActive: true, role: { not: 'SYSTEM' } },
+        select: { id: true, name: true, email: true, role: true },
+        orderBy: { name: 'asc' },
       })
 
-      // Get inquiry counts per user
-      const userInquiryCounts = await Promise.all(
-        users.map(async (u) => {
-          const totalInquiries = await prisma.seeker.count({
-            where: { createdById: u.id }
-          })
-          
-          const thisWeekInquiries = await prisma.seeker.count({
-            where: {
-              createdById: u.id,
-              createdAt: {
-                gte: startOfWeek
-              }
-            }
-          })
+      users = usersList.map((u) => ({ id: u.id, name: u.name }))
 
+      const userInquiryCounts = await Promise.all(
+        usersList.map(async (u) => {
+          if (applyUserId && u.id !== userIdFilter) {
+            return {
+              userId: u.id,
+              userName: u.name,
+              userEmail: u.email,
+              userRole: u.role,
+              totalInquiries: 0,
+              thisWeekInquiries: 0,
+              thisMonthInquiries: 0,
+            }
+          }
+          const totalInquiries = await prisma.seeker.count({ where: { createdById: u.id } })
+          const thisPeriodInquiries = await prisma.seeker.count({
+            where: { createdById: u.id, createdAt: { gte: start, lte: end } },
+          })
           const thisMonthInquiries = await prisma.seeker.count({
             where: {
               createdById: u.id,
               createdAt: {
-                gte: startOfMonth
-              }
-            }
+                gte: new Date(now.getFullYear(), now.getMonth(), 1),
+                lte: end,
+              },
+            },
           })
-
           return {
             userId: u.id,
             userName: u.name,
             userEmail: u.email,
             userRole: u.role,
             totalInquiries,
-            thisWeekInquiries,
-            thisMonthInquiries
+            thisWeekInquiries: thisPeriodInquiries,
+            thisMonthInquiries: thisMonthInquiries,
           }
         })
       )
-
       userInquiryStats = userInquiryCounts
     }
 
@@ -295,7 +373,15 @@ export async function GET(request: NextRequest) {
       activities,
       userInquiryStats,
       isAdmin,
-      timestamp: new Date().toISOString()
+      users,
+      filterMeta: {
+        preset,
+        dateFrom: start.toISOString(),
+        dateTo: end.toISOString(),
+        prevFrom: prevStart.toISOString(),
+        prevTo: prevEnd.toISOString(),
+      },
+      timestamp: now.toISOString(),
     })
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
@@ -305,4 +391,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
