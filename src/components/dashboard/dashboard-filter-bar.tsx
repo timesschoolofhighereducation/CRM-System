@@ -85,11 +85,13 @@ export function DashboardFilterBar({
     setShowFilters(false)
   }
 
+  const isCustomDateRange =
+    filters.preset === 'custom' && (filters.dateFrom != null || filters.dateTo != null)
   const hasNonDefaultFilters =
     filters.preset !== 'this_week' ||
     filters.userId !== '' ||
     filters.channel !== '' ||
-    (filters.preset === 'custom' && (filters.dateFrom != null || filters.dateTo != null))
+    isCustomDateRange
 
   return (
     <Card className={cn('shadow-sm border-gray-200', className)}>

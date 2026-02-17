@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
@@ -58,7 +58,7 @@ function buildDashboardQuery(filters: DashboardFilterState): string {
   return params.toString()
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const searchParams = useSearchParams()
   const { compactMode } = useTheme()
   const { user, loading: authLoading } = useAuth()
@@ -210,5 +210,22 @@ export default function DashboardPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+            <p className="mt-2 text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <DashboardPageContent />
+    </Suspense>
   )
 }

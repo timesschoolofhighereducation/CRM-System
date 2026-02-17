@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { isAdminRole, requireAuth } from '@/lib/auth'
-import { FollowUpStatus } from '@prisma/client'
+import { FollowUpStatus, InteractionChannel } from '@prisma/client'
 
 export type DashboardPreset = 'today' | 'this_week' | 'this_month' | 'last_7' | 'last_30' | 'custom'
 
@@ -86,7 +86,7 @@ function getDateRange(
 }
 
 const VALID_PRESETS: DashboardPreset[] = ['today', 'this_week', 'this_month', 'last_7', 'last_30', 'custom']
-const VALID_CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'WALK_IN']
+const VALID_CHANNELS: InteractionChannel[] = ['CALL', 'WHATSAPP', 'EMAIL', 'WALK_IN']
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,13 +101,16 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom') ?? undefined
     const dateTo = searchParams.get('dateTo') ?? undefined
     const userIdFilter = searchParams.get('userId') ?? undefined
-    const channelFilter = searchParams.get('channel') ?? undefined
+    const channelParam = searchParams.get('channel') ?? undefined
+    const channelFilter = channelParam && VALID_CHANNELS.includes(channelParam as InteractionChannel)
+      ? (channelParam as InteractionChannel)
+      : undefined
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '10', 10), 1), 50)
 
     const { start, end, prevStart, prevEnd } = getDateRange(preset, dateFrom, dateTo)
 
     const applyUserId = isAdmin && userIdFilter && userIdFilter.trim() !== ''
-    const applyChannel = channelFilter && VALID_CHANNELS.includes(channelFilter)
+    const applyChannel = !!channelFilter
 
     const seekerWhere: Record<string, unknown> = applyUserId
       ? { createdById: userIdFilter }
@@ -130,15 +133,22 @@ export async function GET(request: NextRequest) {
       ...(applyChannel ? { channel: channelFilter } : {}),
     }
 
-    const interactionFilterForSeekers = isAdmin
-      ? applyUserId ? { userId: userIdFilter } : applyChannel ? { channel: channelFilter } : {}
+    const interactionFilterForSeekers:
+      | { userId: string }
+      | { channel: InteractionChannel }
+      | Record<string, never> = isAdmin
+      ? applyUserId
+        ? { userId: userIdFilter }
+        : applyChannel && channelFilter
+          ? { channel: channelFilter }
+          : {}
       : { userId: user.id }
 
     const [
       totalSeekers,
       newSeekersThisPeriod,
       newSeekersPrevPeriod,
-      totalInteractions,
+      _totalInteractions,
       totalSeekersWithInteractions,
       pendingTasks,
       completedTasksThisPeriod,
@@ -146,7 +156,7 @@ export async function GET(request: NextRequest) {
       activeCampaigns,
       recentInteractions,
       completedTasksPrevPeriod,
-      pendingTasksPrevPeriod,
+      _pendingTasksPrevPeriod,
     ] = await Promise.all([
       prisma.seeker.count({ where: seekerWhere }),
 
