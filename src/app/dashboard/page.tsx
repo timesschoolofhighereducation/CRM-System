@@ -27,6 +27,10 @@ const UserInquiryAnalytics = dynamic(
   () => import('@/components/dashboard/user-inquiry-analytics').then((m) => ({ default: m.UserInquiryAnalytics })),
   { loading: () => <div className="h-64 rounded-lg bg-muted animate-pulse" /> }
 )
+const DashboardReportCharts = dynamic(
+  () => import('@/components/dashboard/dashboard-report-charts').then((m) => ({ default: m.DashboardReportCharts })),
+  { loading: () => <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="h-[350px] rounded-lg bg-muted animate-pulse" /><div className="h-[350px] rounded-lg bg-muted animate-pulse" /></div> }
+)
 
 const DEFAULT_FILTERS: DashboardFilterState = {
   preset: 'this_week',
@@ -188,6 +192,8 @@ function DashboardPageContent() {
             error={dashboardError}
           />
         )}
+
+        <DashboardReportCharts />
       </div>
     </DashboardLayout>
   )
