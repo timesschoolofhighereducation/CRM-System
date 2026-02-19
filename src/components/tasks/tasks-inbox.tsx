@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { isTaskReadOnly } from '@/lib/task-constants'
+import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
 interface FollowUpTask {
   id: string
@@ -88,12 +89,17 @@ export function TasksInbox() {
 
   useEffect(() => {
     fetchTasks()
+    consumeTasksPendingRefresh()
   }, [])
 
   useEffect(() => {
     const onTasksCreated = () => fetchTasks()
     window.addEventListener('tasks-created', onTasksCreated)
     return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
+  useEffect(() => {
+    return onTasksRefreshNeeded(fetchTasks)
   }, [])
 
   const fetchTasks = async () => {

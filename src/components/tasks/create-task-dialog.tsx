@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
+import { markTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
 interface User {
   id: string
@@ -88,6 +89,7 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
         // Notify other task views (Follow-ups, Inbox) to refetch so new task appears everywhere
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('tasks-created'))
+          markTasksPendingRefresh()
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))

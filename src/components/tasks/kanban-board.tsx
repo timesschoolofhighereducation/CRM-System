@@ -48,6 +48,7 @@ import {
   normalizeStatusHelper,
   isTaskReadOnly 
 } from '@/lib/task-constants'
+import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -482,6 +483,7 @@ export function KanbanBoard() {
 
   useEffect(() => {
     fetchTasks()
+    consumeTasksPendingRefresh() // clear flag if set (e.g. user navigated here after creating inquiry)
   }, [])
 
   // Refetch when follow-up or regular tasks are created elsewhere (e.g. new inquiry, Create Task dialog)
@@ -489,6 +491,11 @@ export function KanbanBoard() {
     const onTasksCreated = () => fetchTasks()
     window.addEventListener('tasks-created', onTasksCreated)
     return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
+  // Cross-tab and visibility: refetch when tasks created in another tab or user returns to this tab
+  useEffect(() => {
+    return onTasksRefreshNeeded(fetchTasks)
   }, [])
 
   const fetchTasks = async () => {

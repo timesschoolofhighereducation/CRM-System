@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { markTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
 const interactionSchema = z.object({
   channel: z.enum(['CALL', 'WHATSAPP', 'EMAIL', 'WALK_IN']),
@@ -60,6 +61,7 @@ export function LogInteractionDialog({ inquiry, open, onOpenChange, onSuccess }:
       // NO_ANSWER etc. may create a follow-up task; notify Kanban to refetch
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('tasks-created'))
+        markTasksPendingRefresh()
       }
     } catch (error) {
       toast.error('Failed to log interaction')

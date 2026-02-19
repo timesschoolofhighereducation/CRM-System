@@ -52,6 +52,7 @@ import {
   isTaskReadOnly,
   normalizeStatusHelper
 } from '@/lib/task-constants'
+import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -161,6 +162,7 @@ export function FollowUpsView() {
 
   useEffect(() => {
     fetchTasks()
+    consumeTasksPendingRefresh() // clear flag if set (e.g. user navigated here after creating inquiry)
   }, [])
 
   // Refetch when a task is created from Kanban so new task appears in Follow-ups too
@@ -168,6 +170,11 @@ export function FollowUpsView() {
     const onTasksCreated = () => fetchTasks()
     window.addEventListener('tasks-created', onTasksCreated)
     return () => window.removeEventListener('tasks-created', onTasksCreated)
+  }, [])
+
+  // Cross-tab and visibility: refetch when tasks created in another tab or user returns to this tab
+  useEffect(() => {
+    return onTasksRefreshNeeded(fetchTasks)
   }, [])
 
   useEffect(() => {
@@ -233,16 +240,17 @@ export function FollowUpsView() {
       filtered = filtered.filter(task => task.status === statusFilter)
     }
 
-    // Type filter (automatic vs manual)
+    // Type filter (automatic vs manual) - inquiry-created tasks use "Automatic follow-up #1/#2" in notes
     if (typeFilter !== 'all') {
+      const isAutomaticTask = (notes?: string | null) =>
+        !!(notes && (
+          notes.includes('Automatic follow-up') ||
+          /^Automatic\s+follow[- ]?up/i.test(notes.trim())
+        ))
       if (typeFilter === 'automatic') {
-        filtered = filtered.filter(task => 
-          task.notes?.includes('Automatic follow-up') || false
-        )
+        filtered = filtered.filter(task => isAutomaticTask(task.notes))
       } else if (typeFilter === 'manual') {
-        filtered = filtered.filter(task => 
-          !task.notes?.includes('Automatic follow-up')
-        )
+        filtered = filtered.filter(task => !isAutomaticTask(task.notes))
       }
     }
 
@@ -257,7 +265,8 @@ export function FollowUpsView() {
   }
 
   const isAutomatic = (task: FollowUpTask) => {
-    return task.notes?.includes('Automatic follow-up') || false
+    const n = task.notes?.trim()
+    return !!(n && (n.includes('Automatic follow-up') || /^Automatic\s+follow[- ]?up/i.test(n)))
   }
 
   const getFollowUpNumber = (task: FollowUpTask) => {

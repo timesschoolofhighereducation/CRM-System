@@ -19,6 +19,7 @@ import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation'
 import { QAQuickViewDialog } from './qa-quick-view-dialog'
 import { ProgramDetailsQuickViewDialog } from './program-details-quick-view-dialog'
 import { PromotionCodeClaim } from '@/components/promotion-codes/promotion-code-claim'
+import { markTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
 const inquirySchema = z.object({
   fullName: z.string()
@@ -822,6 +823,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         // Notify Tasks/Kanban to refetch so newly created follow-up tasks appear
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('tasks-created'))
+          markTasksPendingRefresh()
         }
       } else {
         // Single inquiry (0 or 1 program) - original behavior
@@ -873,6 +875,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
         // Notify Tasks/Kanban to refetch so newly created follow-up tasks appear
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('tasks-created'))
+          markTasksPendingRefresh()
         }
       }
       
