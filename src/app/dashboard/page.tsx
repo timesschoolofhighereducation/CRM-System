@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { ClientOnly } from '@/components/ui/client-only'
 import { useTheme } from '@/lib/theme-provider'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
@@ -27,10 +26,6 @@ const DashboardStats = dynamic(
 const UserInquiryAnalytics = dynamic(
   () => import('@/components/dashboard/user-inquiry-analytics').then((m) => ({ default: m.UserInquiryAnalytics })),
   { loading: () => <div className="h-64 rounded-lg bg-muted animate-pulse" /> }
-)
-const NotificationDemo = dynamic(
-  () => import('@/components/notifications/notification-demo').then((m) => ({ default: m.NotificationDemo })),
-  { loading: () => <div className="h-48 rounded-lg bg-muted animate-pulse" /> }
 )
 
 const DEFAULT_FILTERS: DashboardFilterState = {
@@ -186,22 +181,13 @@ function DashboardPageContent() {
           error={dashboardError}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className={cn('space-y-6', compactMode ? 'space-y-4' : 'space-y-6', 'lg:col-span-2')}>
-            {isAdmin && (
-              <UserInquiryAnalytics
-                userInquiryStats={dashboardData?.userInquiryStats ?? null}
-                loading={dashboardLoading}
-                error={dashboardError}
-              />
-            )}
-          </div>
-          <div>
-            <ClientOnly>
-              <NotificationDemo />
-            </ClientOnly>
-          </div>
-        </div>
+        {isAdmin && (
+          <UserInquiryAnalytics
+            userInquiryStats={dashboardData?.userInquiryStats ?? null}
+            loading={dashboardLoading}
+            error={dashboardError}
+          />
+        )}
       </div>
     </DashboardLayout>
   )
