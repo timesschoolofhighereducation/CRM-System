@@ -185,6 +185,8 @@ function DashboardPageContent() {
           error={dashboardError}
         />
 
+        <DashboardReportCharts />
+
         {isAdmin && (
           <UserInquiryAnalytics
             userInquiryStats={dashboardData?.userInquiryStats ?? null}
@@ -192,8 +194,6 @@ function DashboardPageContent() {
             error={dashboardError}
           />
         )}
-
-        <DashboardReportCharts />
       </div>
     </DashboardLayout>
   )
