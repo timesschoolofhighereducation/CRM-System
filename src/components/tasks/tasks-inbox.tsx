@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TaskSearchFilter } from './task-search-filter'
-import { CheckCircle, Clock, AlertCircle, User, Phone, Calendar, Trash2 } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, User, Phone, Calendar, Trash2, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { isTaskReadOnly } from '@/lib/task-constants'
 
 interface FollowUpTask {
   id: string
@@ -116,6 +117,30 @@ export function TasksInbox() {
 
   const handleFilteredTasks = (tasks: TaskItem[]) => {
     setFilteredTasks(tasks)
+  }
+
+  const handleClothingStationAction = async (task: FollowUpTask, action: 'register_clothing_station' | 'not_interested_clothing_station') => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      if (response.ok) {
+        const label = action === 'register_clothing_station' ? 'Registered' : 'Not interested'
+        toast.success(`${label} by clothing station queue`, {
+          description: `${task.seeker.fullName} - task(s) completed`,
+          duration: 3000,
+        })
+        fetchTasks()
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error(err.error || 'Failed to update task')
+      }
+    } catch (error) {
+      console.error('Clothing station action error:', error)
+      toast.error('Error updating task')
+    }
   }
 
   const updateTaskStatus = async (taskId: string, status: string) => {
@@ -264,6 +289,8 @@ export function TasksInbox() {
           tasks={todayTasks} 
           title="Today's Tasks"
           onUpdateStatus={updateTaskStatus}
+          onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+          onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
           onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
@@ -275,6 +302,8 @@ export function TasksInbox() {
           tasks={overdueTasks} 
           title="Overdue Tasks"
           onUpdateStatus={updateTaskStatus}
+          onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+          onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
           onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
@@ -286,6 +315,8 @@ export function TasksInbox() {
           tasks={upcomingTasks} 
           title="Upcoming Tasks"
           onUpdateStatus={updateTaskStatus}
+          onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+          onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
           onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
@@ -297,6 +328,8 @@ export function TasksInbox() {
           tasks={followUpFilteredTasks} 
           title="All Tasks"
           onUpdateStatus={updateTaskStatus}
+          onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+          onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
           onDelete={handleDeleteClick}
           getStatusColor={getStatusColor}
           getStatusIcon={getStatusIcon}
@@ -338,12 +371,14 @@ interface TaskTableProps {
   tasks: FollowUpTask[]
   title: string
   onUpdateStatus: (taskId: string, status: string) => void
+  onClothingStationRegister: (task: FollowUpTask) => void
+  onClothingStationNotInterested: (task: FollowUpTask) => void
   onDelete: (task: FollowUpTask) => void
   getStatusColor: (status: string) => string
   getStatusIcon: (status: string) => React.ReactNode
 }
 
-function TaskTable({ tasks, title, onUpdateStatus, onDelete, getStatusColor, getStatusIcon }: TaskTableProps) {
+function TaskTable({ tasks, title, onUpdateStatus, onClothingStationRegister, onClothingStationNotInterested, onDelete, getStatusColor, getStatusIcon }: TaskTableProps) {
   return (
     <Card>
       <CardHeader>
@@ -397,7 +432,31 @@ function TaskTable({ tasks, title, onUpdateStatus, onDelete, getStatusColor, get
                     {task.notes || '-'}
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {task.status !== 'COMPLETED' && !isTaskReadOnly(task.seeker.stage) && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-green-700 hover:text-green-800 hover:bg-green-50 border-green-300"
+                            onClick={() => onClothingStationRegister(task)}
+                            title="Registered by clothing station queue"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Registration
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-300"
+                            onClick={() => onClothingStationNotInterested(task)}
+                            title="Not interested - clothing station queue"
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Not Interested
+                          </Button>
+                        </>
+                      )}
                       {task.status === 'OPEN' && (
                         <Button
                           variant="outline"

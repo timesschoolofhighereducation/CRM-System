@@ -23,7 +23,8 @@ import {
   MoreHorizontal,
   Eye,
   CheckCircle2,
-  Trash2
+  Trash2,
+  XCircle
 } from 'lucide-react'
 import {
   DndContext,
@@ -121,6 +122,8 @@ function DroppableColumn({
   onViewDetails, 
   onViewHistory,
   onToggleRegister,
+  onClothingStationRegister,
+  onClothingStationNotInterested,
   onDelete
 }: { 
   column: { id: string; title: string; color: string; icon: any; headerColor: string }
@@ -128,6 +131,8 @@ function DroppableColumn({
   onViewDetails: (task: TaskItem) => void
   onViewHistory: (task: TaskItem) => void
   onToggleRegister: (task: TaskItem, registerNow: boolean) => void
+  onClothingStationRegister: (task: TaskItem) => void
+  onClothingStationNotInterested: (task: TaskItem) => void
   onDelete: (task: TaskItem) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -168,6 +173,8 @@ function DroppableColumn({
               onViewDetails={onViewDetails}
               onViewHistory={onViewHistory}
               onToggleRegister={onToggleRegister}
+              onClothingStationRegister={onClothingStationRegister}
+              onClothingStationNotInterested={onClothingStationNotInterested}
               onDelete={onDelete}
             />
           ))}
@@ -187,11 +194,13 @@ function DroppableColumn({
 }
 
 // Sortable Task Card Component
-function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister, onDelete }: { 
+function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister, onClothingStationRegister, onClothingStationNotInterested, onDelete }: { 
   task: TaskItem
   onViewDetails: (task: TaskItem) => void
   onViewHistory: (task: TaskItem) => void
   onToggleRegister: (task: TaskItem, registerNow: boolean) => void
+  onClothingStationRegister: (task: TaskItem) => void
+  onClothingStationNotInterested: (task: TaskItem) => void
   onDelete: (task: TaskItem) => void
 }) {
   // Check if task is read-only (seeker has final status)
@@ -403,6 +412,38 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
                     />
                     <span className="font-medium text-green-700">Register</span>
                   </div>
+                )}
+                {!isReadOnly && task.type === 'followup' && 'seeker' in task && task.status !== 'COMPLETED' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-1.5 text-xs shrink-0 text-green-700 hover:text-green-800 hover:bg-green-50 border-green-300"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        onClothingStationRegister(task)
+                      }}
+                      title="Registered by clothing station queue"
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                      Registration
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-1.5 text-xs shrink-0 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-300"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        onClothingStationNotInterested(task)
+                      }}
+                      title="Not interested - clothing station queue"
+                    >
+                      <XCircle className="h-3 w-3 mr-0.5" />
+                      Not Interested
+                    </Button>
+                  </>
                 )}
               </div>
               <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
@@ -656,6 +697,33 @@ export function KanbanBoard() {
     setSelectedTask(task)
   }
 
+  const handleClothingStationAction = async (task: TaskItem, action: 'register_clothing_station' | 'not_interested_clothing_station') => {
+    if (task.type !== 'followup' || !('seeker' in task)) return
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      if (response.ok) {
+        const label = action === 'register_clothing_station' ? 'Registered' : 'Not interested'
+        toast.success(`${label} by clothing station queue`, {
+          description: `${task.seeker.fullName} - task(s) completed`,
+          duration: 3000,
+        })
+        await fetchTasks()
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error(err.error || 'Failed to update task')
+        await fetchTasks()
+      }
+    } catch (error) {
+      console.error('Clothing station action error:', error)
+      toast.error('Error updating task')
+      await fetchTasks()
+    }
+  }
+
   const handleToggleRegister = async (task: TaskItem, registerNow: boolean) => {
     if (task.type !== 'followup' || !('seeker' in task)) {
       return
@@ -851,6 +919,8 @@ export function KanbanBoard() {
                 onViewDetails={handleViewDetails}
                 onViewHistory={handleViewHistory}
                 onToggleRegister={handleToggleRegister}
+                onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+                onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
                 onDelete={handleDeleteClick}
               />
             )

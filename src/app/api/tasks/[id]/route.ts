@@ -77,14 +77,15 @@ export async function PATCH(
   try {
     const _user = await requireAuth(request)
     const body = await request.json()
-    const { status, notes, registerNow } = body
+    const { status, notes, registerNow, action } = body
     const { id } = await params
 
-    // Get the current task to track the status change
+    // Get the current task to track the status change (include notes for clothing station logic)
     const currentTask = await prisma.followUpTask.findUnique({
       where: { id },
       select: { 
         status: true,
+        notes: true,
         assignedTo: true,
         seekerId: true,
         seeker: {
@@ -115,7 +116,91 @@ export async function PATCH(
       }
     }
 
-    // Update the task status
+    // Handle clothing station queue actions (Registration / Not Interested)
+    if (action === 'register_clothing_station' || action === 'not_interested_clothing_station') {
+      const isRegistration = action === 'register_clothing_station'
+      const note = isRegistration
+        ? 'Registered by clothing station queue'
+        : 'Not interested - clothing station queue'
+
+      // Extract follow-up number from notes (e.g. "Automatic follow-up #1" -> 1)
+      const followUpMatch = (currentTask.notes || '').match(/#(\d+)/)
+      const currentFollowUpNum = followUpMatch ? parseInt(followUpMatch[1], 10) : null
+
+      // Tasks to complete: current + next (#2) if current is #1
+      const taskIdsToComplete: string[] = [id]
+      if (currentFollowUpNum === 1) {
+        const task2 = await prisma.followUpTask.findFirst({
+          where: {
+            seekerId: currentTask.seekerId,
+            id: { not: id },
+            status: { not: 'COMPLETED' },
+            notes: { contains: '#2' }
+          },
+          select: { id: true }
+        })
+        if (task2) taskIdsToComplete.push(task2.id)
+      }
+
+      // Update seeker
+      if (isRegistration) {
+        await prisma.seeker.update({
+          where: { id: currentTask.seekerId },
+          data: { registerNow: true }
+        })
+      } else {
+        await prisma.seeker.update({
+          where: { id: currentTask.seekerId },
+          data: { stage: 'LOST' }
+        })
+      }
+
+      // Complete all target tasks with note
+      for (const taskId of taskIdsToComplete) {
+        const t = await prisma.followUpTask.findUnique({ where: { id: taskId }, select: { status: true, notes: true } })
+        if (!t) continue
+        const appendedNote = t.status !== 'COMPLETED' ? (t.notes ? `${t.notes}\n${note}` : note) : undefined
+        await prisma.followUpTask.update({
+          where: { id: taskId },
+          data: {
+            status: 'COMPLETED',
+            ...(appendedNote && { notes: appendedNote })
+          }
+        })
+        await prisma.taskActionHistory.create({
+          data: {
+            taskId,
+            fromStatus: t.status,
+            toStatus: 'COMPLETED',
+            actionBy: _user.id,
+            notes: note
+          }
+        })
+      }
+
+      const updatedTask = await prisma.followUpTask.findUnique({
+        where: { id },
+        include: {
+          seeker: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              createdById: true,
+              registerNow: true
+            }
+          },
+          user: { select: { name: true } },
+          actionHistory: {
+            include: { user: { select: { name: true } } },
+            orderBy: { actionAt: 'desc' }
+          }
+        }
+      })
+      return NextResponse.json(updatedTask)
+    }
+
+    // Update the task status (standard flow)
     const updatedTask = await prisma.followUpTask.update({
       where: { id },
       data: { status },

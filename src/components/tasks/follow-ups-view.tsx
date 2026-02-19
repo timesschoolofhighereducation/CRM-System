@@ -20,7 +20,9 @@ import {
   Filter,
   Eye,
   History,
-  GripVertical
+  GripVertical,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -484,6 +486,33 @@ export function FollowUpsView() {
     }
   }
 
+  const handleClothingStationAction = async (task: FollowUpTask, action: 'register_clothing_station' | 'not_interested_clothing_station') => {
+    if (task.taskType === 'regular') return
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      if (response.ok) {
+        const label = action === 'register_clothing_station' ? 'Registered' : 'Not interested'
+        toast.success(`${label} by clothing station queue`, {
+          description: `${task.seeker.fullName} - task(s) completed`,
+          duration: 3000,
+        })
+        await fetchTasks()
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+        toast.error(err.error || 'Failed to update task')
+        await fetchTasks()
+      }
+    } catch (error) {
+      console.error('Clothing station action error:', error)
+      toast.error('Error updating task')
+      await fetchTasks()
+    }
+  }
+
   const getTasksByStatus = (status: string) => {
     return filteredTasks.filter(task => task.status === status)
   }
@@ -513,6 +542,8 @@ export function FollowUpsView() {
     onViewHistory,
     onViewTask,
     onToggleRegister,
+    onClothingStationRegister,
+    onClothingStationNotInterested,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -527,6 +558,8 @@ export function FollowUpsView() {
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
     onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
+    onClothingStationRegister: (task: FollowUpTask) => void
+    onClothingStationNotInterested: (task: FollowUpTask) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -573,6 +606,8 @@ export function FollowUpsView() {
                 onViewHistory={onViewHistory}
                 onViewTask={onViewTask}
                 onToggleRegister={onToggleRegister}
+                onClothingStationRegister={onClothingStationRegister}
+                onClothingStationNotInterested={onClothingStationNotInterested}
                 getStatusInfo={getStatusInfo}
                 isAutomatic={isAutomatic}
                 getFollowUpNumber={getFollowUpNumber}
@@ -604,6 +639,8 @@ export function FollowUpsView() {
     onViewHistory, 
     onViewTask,
     onToggleRegister,
+    onClothingStationRegister,
+    onClothingStationNotInterested,
     getStatusInfo,
     isAutomatic,
     getFollowUpNumber,
@@ -617,6 +654,8 @@ export function FollowUpsView() {
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
     onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
+    onClothingStationRegister: (task: FollowUpTask) => void
+    onClothingStationNotInterested: (task: FollowUpTask) => void
     getStatusInfo: (status: string) => any
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
@@ -744,6 +783,38 @@ export function FollowUpsView() {
                   e.preventDefault()
                 }}
               >
+                {task.taskType !== 'regular' && !isTaskReadOnly(task.seeker.stage) && task.status !== 'COMPLETED' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs shrink-0 whitespace-nowrap text-green-700 hover:text-green-800 hover:bg-green-50 border-green-300"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        onClothingStationRegister(task)
+                      }}
+                      title="Registered by clothing station queue"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                      Registration
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs shrink-0 whitespace-nowrap text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-300"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        onClothingStationNotInterested(task)
+                      }}
+                      title="Not interested - clothing station queue"
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-1" />
+                      Not Interested
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -951,6 +1022,8 @@ export function FollowUpsView() {
                     onViewHistory={handleViewHistory}
                     onViewTask={handleViewTask}
                     onToggleRegister={handleToggleRegister}
+                    onClothingStationRegister={(t) => handleClothingStationAction(t, 'register_clothing_station')}
+                    onClothingStationNotInterested={(t) => handleClothingStationAction(t, 'not_interested_clothing_station')}
                     getStatusInfo={getStatusInfo}
                     isAutomatic={isAutomatic}
                     getFollowUpNumber={getFollowUpNumber}
