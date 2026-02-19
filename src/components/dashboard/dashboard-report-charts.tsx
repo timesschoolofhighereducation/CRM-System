@@ -146,8 +146,8 @@ export function DashboardReportCharts() {
                 labelLine={false}
                 outerRadius={100}
                 dataKey="count"
-                label={(props: { payload?: { source?: string }; percent?: number }) => {
-                  const source = props?.payload?.source ?? ''
+                label={(props: { payload?: { source?: string }; name?: string; percent?: number } & Record<string, unknown>) => {
+                  const source = props?.payload?.source ?? props?.name ?? ''
                   const percent = typeof props?.percent === 'number' ? props.percent : 0
                   return `${source}: ${(percent * 100).toFixed(0)}%`
                 }}
