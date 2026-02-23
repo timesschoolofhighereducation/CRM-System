@@ -117,8 +117,8 @@ function normalizeRegularTask(raw: {
 }
 
 export function TasksInbox() {
-  const [allTasks, setAllTasks] = useState<TaskItem[]>([])
-  const [filteredTasks, setFilteredTasks] = useState<TaskItem[]>([])
+  const [allTasks, setAllTasks] = useState<FollowUpTask[]>([])
+  const [filteredTasks, setFilteredTasks] = useState<FollowUpTask[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<FollowUpTask | null>(null)
@@ -181,7 +181,7 @@ export function TasksInbox() {
   }
 
   const handleFilteredTasks = (tasks: TaskItem[]) => {
-    setFilteredTasks(tasks)
+    setFilteredTasks(tasks as FollowUpTask[])
   }
 
   const handleClothingStationAction = async (task: FollowUpTask, action: 'register_clothing_station' | 'not_interested_clothing_station') => {
