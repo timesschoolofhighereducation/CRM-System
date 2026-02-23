@@ -22,6 +22,7 @@ import {
 import { isTaskReadOnly } from '@/lib/task-constants'
 import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
+/** Unified task shape for display (follow-ups + normalized regular tasks from Create Task) */
 interface FollowUpTask {
   id: string
   purpose: string
@@ -50,6 +51,8 @@ interface FollowUpTask {
       name: string
     }
   }[]
+  /** 'regular' = from Create Task (enhanced API); undefined/'followup' = seeker follow-up */
+  taskType?: 'followup' | 'regular'
 }
 
 interface RegularTask {
@@ -75,9 +78,42 @@ interface RegularTask {
 
 type TaskItem = FollowUpTask | RegularTask
 
-// Type guard to check if task is FollowUpTask
+// Type guard to check if task is FollowUpTask (or normalized regular with same shape)
 function isFollowUpTask(task: TaskItem): task is FollowUpTask {
   return 'purpose' in task && 'dueAt' in task && 'seeker' in task
+}
+
+/** Normalize enhanced task to same shape as follow-up for display in Task section */
+function normalizeRegularTask(raw: {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  dueDate?: string | null
+  createdAt: string
+  assignedTo?: { name: string } | null
+  createdBy?: { name: string } | null
+}): FollowUpTask {
+  return {
+    id: raw.id,
+    purpose: 'Task',
+    status: raw.status,
+    dueAt: raw.dueDate || raw.createdAt,
+    notes: raw.description || undefined,
+    createdAt: raw.createdAt,
+    seeker: {
+      id: '',
+      fullName: raw.title,
+      phone: '',
+      registerNow: false,
+      stage: '',
+    },
+    user: {
+      name: raw.assignedTo?.name || raw.createdBy?.name || 'Unassigned',
+    },
+    actionHistory: [],
+    taskType: 'regular',
+  }
 }
 
 export function TasksInbox() {
@@ -104,14 +140,37 @@ export function TasksInbox() {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch('/api/tasks')
-      if (response.ok) {
-        const data = await response.json()
-        // Handle array format (API returns array by default)
-        const tasks = Array.isArray(data) ? data : []
-        setAllTasks(tasks)
-        setFilteredTasks(tasks)
-      }
+      setLoading(true)
+      // Fetch both follow-up tasks and enhanced tasks so newly created tasks appear here
+      const [followUpRes, enhancedRes] = await Promise.all([
+        fetch('/api/tasks', { cache: 'no-store' }),
+        fetch('/api/tasks/enhanced', { cache: 'no-store' }),
+      ])
+
+      const followUpData = followUpRes.ok ? await followUpRes.json() : []
+      const enhancedData = enhancedRes.ok ? await enhancedRes.json() : []
+
+      const followUpList: FollowUpTask[] = Array.isArray(followUpData)
+        ? followUpData
+        : (followUpData?.tasks ?? [])
+      const rawRegular = Array.isArray(enhancedData)
+        ? enhancedData
+        : (enhancedData?.tasks ?? [])
+
+      const followUpWithType: FollowUpTask[] = followUpList
+        .filter((t: FollowUpTask) => t?.id && t?.status)
+        .map((t: FollowUpTask) => ({ ...t, taskType: 'followup' as const }))
+      const regularNormalized: FollowUpTask[] = rawRegular
+        .filter((r: { id?: string; status?: string }) => r?.id && r?.status)
+        .map((r: { id: string; title: string; description?: string | null; status: string; dueDate?: string | null; createdAt: string; assignedTo?: { name: string } | null; createdBy?: { name: string } | null }) =>
+          normalizeRegularTask(r)
+        )
+
+      const merged: FollowUpTask[] = [...followUpWithType, ...regularNormalized].sort(
+        (a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()
+      )
+      setAllTasks(merged)
+      setFilteredTasks(merged)
     } catch (error) {
       console.error('Error fetching tasks:', error)
       setAllTasks([])
@@ -149,9 +208,10 @@ export function TasksInbox() {
     }
   }
 
-  const updateTaskStatus = async (taskId: string, status: string) => {
+  const updateTaskStatus = async (taskId: string, status: string, taskType?: 'followup' | 'regular') => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const url = taskType === 'regular' ? `/api/tasks/enhanced/${taskId}` : `/api/tasks/${taskId}`
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -160,13 +220,13 @@ export function TasksInbox() {
       })
 
       if (response.ok) {
-        setAllTasks(prev => 
-          prev.map(task => 
+        setAllTasks(prev =>
+          prev.map(task =>
             task.id === taskId ? { ...task, status } : task
           )
         )
-        setFilteredTasks(prev => 
-          prev.map(task => 
+        setFilteredTasks(prev =>
+          prev.map(task =>
             task.id === taskId ? { ...task, status } : task
           )
         )
@@ -184,17 +244,19 @@ export function TasksInbox() {
     if (!taskToDelete) return
 
     try {
-      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+      const url = taskToDelete.taskType === 'regular'
+        ? `/api/tasks/enhanced/${taskToDelete.id}`
+        : `/api/tasks/${taskToDelete.id}`
+      const response = await fetch(url, {
         method: 'DELETE',
       })
 
       if (response.ok) {
         toast.success('Task deleted successfully')
-        
-        // Remove task from local state
+
         setAllTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
         setFilteredTasks(prev => prev.filter(t => t.id !== taskToDelete.id))
-        
+
         setDeleteDialogOpen(false)
         setTaskToDelete(null)
       } else {
@@ -239,18 +301,17 @@ export function TasksInbox() {
   }
 
   const today = new Date().toDateString()
+  // All merged tasks have dueAt (follow-ups and normalized regular tasks)
   const todayTasks = filteredTasks.filter((task): task is FollowUpTask => 
-    isFollowUpTask(task) && new Date(task.dueAt).toDateString() === today && task.status === 'OPEN'
+    'dueAt' in task && new Date(task.dueAt).toDateString() === today && task.status === 'OPEN'
   )
   const overdueTasks = filteredTasks.filter((task): task is FollowUpTask => 
-    isFollowUpTask(task) && isOverdue(task.dueAt) && task.status === 'OPEN'
+    'dueAt' in task && isOverdue(task.dueAt) && task.status === 'OPEN'
   )
   const upcomingTasks = filteredTasks.filter((task): task is FollowUpTask => 
-    isFollowUpTask(task) && new Date(task.dueAt) > new Date() && task.status === 'OPEN'
+    'dueAt' in task && new Date(task.dueAt) > new Date() && task.status === 'OPEN'
   )
-  
-  // Filter all tasks to only show follow-up tasks
-  const followUpFilteredTasks = filteredTasks.filter((task): task is FollowUpTask => isFollowUpTask(task))
+  const followUpFilteredTasks = filteredTasks
 
   if (loading) {
     return (
@@ -376,7 +437,7 @@ export function TasksInbox() {
 interface TaskTableProps {
   tasks: FollowUpTask[]
   title: string
-  onUpdateStatus: (taskId: string, status: string) => void
+  onUpdateStatus: (taskId: string, status: string, taskType?: 'followup' | 'regular') => void
   onClothingStationRegister: (task: FollowUpTask) => void
   onClothingStationNotInterested: (task: FollowUpTask) => void
   onDelete: (task: FollowUpTask) => void
@@ -439,7 +500,7 @@ function TaskTable({ tasks, title, onUpdateStatus, onClothingStationRegister, on
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2 items-center">
-                      {task.status !== 'COMPLETED' && !isTaskReadOnly(task.seeker.stage) && (
+                      {task.taskType !== 'regular' && task.status !== 'COMPLETED' && !isTaskReadOnly(task.seeker.stage) && (
                         <>
                           <Button
                             variant="outline"
@@ -467,19 +528,21 @@ function TaskTable({ tasks, title, onUpdateStatus, onClothingStationRegister, on
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onUpdateStatus(task.id, 'DONE')}
+                          onClick={() => onUpdateStatus(task.id, 'DONE', task.taskType)}
                         >
                           Mark Done
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => window.location.href = `tel:${task.seeker.phone}`}
-                        title={`Call ${task.seeker.fullName}`}
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
+                      {task.seeker.phone && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.location.href = `tel:${task.seeker.phone}`}
+                          title={`Call ${task.seeker.fullName}`}
+                        >
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="sm"
