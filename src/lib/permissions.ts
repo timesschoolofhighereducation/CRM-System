@@ -1,18 +1,19 @@
 import { Permission } from '@prisma/client'
 
-// Permission categories for easier management
+// Permission categories aligned with Prisma Permission enum
 export const PERMISSION_CATEGORIES = {
   USER_MANAGEMENT: [
     'CREATE_USER',
-    'READ_USER', 
+    'READ_USER',
     'UPDATE_USER',
     'DELETE_USER',
+    'ASSIGN_ROLE',
     'MANAGE_USER_ROLES'
   ],
   ROLE_MANAGEMENT: [
     'CREATE_ROLE',
     'READ_ROLE',
-    'UPDATE_ROLE', 
+    'UPDATE_ROLE',
     'DELETE_ROLE',
     'MANAGE_ROLE_PERMISSIONS'
   ],
@@ -20,38 +21,42 @@ export const PERMISSION_CATEGORIES = {
     'CREATE_PROGRAM',
     'READ_PROGRAM',
     'UPDATE_PROGRAM',
-    'DELETE_PROGRAM',
-    'MANAGE_PROGRAM_LEVELS'
+    'DELETE_PROGRAM'
   ],
   SEEKER_MANAGEMENT: [
     'CREATE_SEEKER',
     'READ_SEEKER',
     'UPDATE_SEEKER',
-    'DELETE_SEEKER',
-    'MANAGE_SEEKER_INTERACTIONS'
+    'DELETE_SEEKER'
   ],
   TASK_MANAGEMENT: [
     'CREATE_TASK',
     'READ_TASK',
     'UPDATE_TASK',
     'DELETE_TASK',
-    'ASSIGN_TASK'
+    'ASSIGN_TASK',
+    'MANAGE_TASK_CHECKLISTS',
+    'MANAGE_TASK_ATTACHMENTS',
+    'MANAGE_TASK_COMMENTS',
+    'MANAGE_TASK_TIME_ENTRIES',
+    'CREATE_SUBTASKS'
   ],
   CAMPAIGN_MANAGEMENT: [
     'CREATE_CAMPAIGN',
     'READ_CAMPAIGN',
     'UPDATE_CAMPAIGN',
     'DELETE_CAMPAIGN',
-    'MANAGE_CAMPAIGN_SEEKERS'
+    'MANAGE_CAMPAIGN_ANALYTICS'
   ],
   REPORTS: [
-    'VIEW_REPORTS',
+    'READ_REPORTS',
     'EXPORT_REPORTS',
     'VIEW_ANALYTICS'
   ],
   SYSTEM: [
-    'VIEW_SYSTEM_SETTINGS',
-    'MANAGE_SYSTEM_SETTINGS'
+    'READ_SETTINGS',
+    'UPDATE_SETTINGS',
+    'MANAGE_SYSTEM_CONFIG'
   ]
 } as const
 
@@ -108,8 +113,21 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
   VIEWER: [
     // Read-only access
-    'READ_USER', 'READ_SEEKER', 'READ_TASK', 'READ_PROGRAM', 'READ_CAMPAIGN', 
+    'READ_USER', 'READ_SEEKER', 'READ_TASK', 'READ_PROGRAM', 'READ_CAMPAIGN',
     'READ_INQUIRY', 'READ_REPORTS', 'VIEW_ANALYTICS'
+  ],
+  SYSTEM: [
+    // System/technical role; same as ADMINISTRATOR for operational parity
+    'CREATE_USER', 'READ_USER', 'UPDATE_USER', 'DELETE_USER', 'ASSIGN_ROLE', 'MANAGE_USER_ROLES',
+    'CREATE_ROLE', 'READ_ROLE', 'UPDATE_ROLE', 'DELETE_ROLE', 'MANAGE_ROLE_PERMISSIONS',
+    'CREATE_SEEKER', 'READ_SEEKER', 'UPDATE_SEEKER', 'DELETE_SEEKER',
+    'CREATE_TASK', 'READ_TASK', 'UPDATE_TASK', 'DELETE_TASK', 'ASSIGN_TASK',
+    'CREATE_PROGRAM', 'READ_PROGRAM', 'UPDATE_PROGRAM', 'DELETE_PROGRAM',
+    'CREATE_CAMPAIGN', 'READ_CAMPAIGN', 'UPDATE_CAMPAIGN', 'DELETE_CAMPAIGN', 'MANAGE_CAMPAIGN_ANALYTICS',
+    'CREATE_INQUIRY', 'READ_INQUIRY', 'UPDATE_INQUIRY', 'DELETE_INQUIRY', 'MANAGE_INQUIRY_INTERACTIONS',
+    'READ_REPORTS', 'EXPORT_REPORTS', 'VIEW_ANALYTICS',
+    'READ_SETTINGS', 'UPDATE_SETTINGS', 'MANAGE_SYSTEM_CONFIG',
+    'DELETE_ADMINISTRATOR', 'MANAGE_ALL_USERS', 'SYSTEM_ADMINISTRATION'
   ]
 } as const
 
@@ -130,7 +148,7 @@ export function hasCategoryPermission(userPermissions: string[], category: keyof
   return hasAnyPermission(userPermissions, [...PERMISSION_CATEGORIES[category]])
 }
 
-// Check if user can access a specific feature
+// Check if user can access a specific feature (permission names match Prisma enum)
 export function canAccessFeature(userPermissions: string[], feature: string): boolean {
   const featurePermissions: Record<string, string[]> = {
     'user-management': ['READ_USER', 'READ_ROLE'],
@@ -138,8 +156,8 @@ export function canAccessFeature(userPermissions: string[], feature: string): bo
     'seekers': ['READ_SEEKER'],
     'tasks': ['READ_TASK'],
     'campaigns': ['READ_CAMPAIGN'],
-    'reports': ['VIEW_REPORTS'],
-    'settings': ['VIEW_SYSTEM_SETTINGS']
+    'reports': ['READ_REPORTS'],
+    'settings': ['READ_SETTINGS']
   }
 
   const requiredPermissions = featurePermissions[feature] || []
@@ -198,7 +216,7 @@ export function canManageTasks(userPermissions: string[]): boolean {
 
 // Check if user can view reports
 export function canViewReports(userPermissions: string[]): boolean {
-  return hasPermission(userPermissions, 'VIEW_REPORTS')
+  return hasPermission(userPermissions, 'READ_REPORTS')
 }
 
 // Check if user can export reports

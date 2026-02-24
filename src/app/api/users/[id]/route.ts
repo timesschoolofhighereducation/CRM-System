@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { isAdminRole, requireRole, hashPassword } from '@/lib/auth'
+import { isAdminRole, hashPassword } from '@/lib/auth'
+import { requirePermission, ForbiddenError } from '@/lib/authorization'
+import { AuthenticationError } from '@/lib/auth'
 import { UserRole } from '@prisma/client'
 import { getSafeErrorMessage } from '@/lib/safe-api-error'
+import { logRoleAssignmentChange } from '@/lib/activity-logger'
+
+const USER_ROLE_NAMES = new Set<string>(Object.values(UserRole))
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN', request)
+    await requirePermission('READ_USER', request)
     const { id } = await params
     
     const user = await prisma.user.findUnique({
@@ -34,6 +39,12 @@ export async function GET(
     const { password: _, ...userWithoutPassword } = user
     return NextResponse.json(userWithoutPassword)
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error fetching user:', error)
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to fetch user') },
@@ -47,11 +58,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN', request)
+    const _user = await requirePermission('UPDATE_USER', request)
     const { id } = await params
-    
+
     const body = await request.json()
     const { name, email, password, role, isActive, selectedRoles } = body
+
+    if (selectedRoles !== undefined) {
+      await requirePermission(['ASSIGN_ROLE', 'MANAGE_USER_ROLES'], request, { any: true })
+    }
     
     // Hash the password if provided
     const hashedPassword = password ? await hashPassword(password) : undefined
@@ -87,22 +102,44 @@ export async function PUT(
       },
     })
 
-    // Update user roles if provided
     if (selectedRoles !== undefined) {
-      // Delete existing role assignments
-      await prisma.userRoleAssignment.deleteMany({
-        where: { userId: id }
+      const previousAssignments = await prisma.userRoleAssignment.findMany({
+        where: { userId: id },
+        include: { role: true },
       })
-      
-      // Create new role assignments
+      const previousRoleIds = previousAssignments.map((a) => a.roleId)
+      const previousRoleNames = previousAssignments.map((a) => a.role.name)
+
+      await prisma.userRoleAssignment.deleteMany({
+        where: { userId: id },
+      })
+
       if (selectedRoles.length > 0) {
         await prisma.userRoleAssignment.createMany({
           data: selectedRoles.map((roleId: string) => ({
             userId: id,
             roleId,
             assignedBy: _user.id,
-          }))
+          })),
         })
+        const assignedRoles = await prisma.role.findMany({
+          where: { id: { in: selectedRoles } },
+        })
+        const firstRoleName = assignedRoles[0]?.name
+        if (firstRoleName && USER_ROLE_NAMES.has(firstRoleName)) {
+          await prisma.user.update({
+            where: { id },
+            data: { role: firstRoleName as UserRole },
+          })
+        }
+        logRoleAssignmentChange(_user.id, request, {
+          targetUserId: id,
+          targetEmail: updatedUser.email,
+          assignedRoleIds: selectedRoles,
+          assignedRoleNames: assignedRoles.map((r) => r.name),
+          previousRoleIds,
+          previousRoleNames,
+        }).catch(() => {})
       }
     }
 
@@ -122,16 +159,19 @@ export async function PUT(
     const { password: _, ...userWithoutPassword } = finalUser!
     return NextResponse.json(userWithoutPassword)
   } catch (error) {
-    console.error('Error updating user:', error)
-    
-    // Handle unique constraint violation for email
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     if (error instanceof Error && error.message.includes('Unique constraint')) {
       return NextResponse.json(
         { error: 'A user with this email already exists' },
         { status: 400 }
       )
     }
-    
+    console.error('Error updating user:', error)
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to update user') },
       { status: 500 }
@@ -144,10 +184,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const _user = await requireRole('ADMIN', request)
+    const _user = await requirePermission('DELETE_USER', request)
     const { id } = await params
 
-    // Prevent deleting yourself
     if (_user.id === id) {
       return NextResponse.json(
         { error: 'You cannot delete your own account' },
@@ -155,7 +194,6 @@ export async function DELETE(
       )
     }
 
-    // Check if user exists
     const userToDelete = await prisma.user.findUnique({
       where: { id }
     })
@@ -167,15 +205,14 @@ export async function DELETE(
       )
     }
 
-    // Prevent deleting the last admin role user
     if (isAdminRole(userToDelete.role)) {
+      await requirePermission('DELETE_ADMINISTRATOR', request)
       const adminCount = await prisma.user.count({
         where: {
           role: { in: ['ADMIN', 'ADMINISTRATOR', 'DEVELOPER'] },
           isActive: true
         }
       })
-
       if (adminCount <= 1) {
         return NextResponse.json(
           { error: 'Cannot delete the last admin user' },
@@ -190,6 +227,12 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'User deleted successfully' })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error deleting user:', error)
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to delete user') },

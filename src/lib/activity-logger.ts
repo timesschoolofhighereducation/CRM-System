@@ -116,7 +116,7 @@ export async function logFailedLogin(email: string, request: NextRequest, reason
         where: { email }
       })
       systemUserId = user?.id
-    } catch (error) {
+    } catch {
       // If user doesn't exist, we'll use a system user
     }
 
@@ -200,6 +200,75 @@ export async function logProfileUpdate(userId: string, request: NextRequest, cha
     metadata: {
       updateTime: new Date().toISOString(),
       changes
+    }
+  })
+}
+
+/** Audit: role assignments changed for a user (who did it, target user, role ids/names) */
+export async function logRoleAssignmentChange(
+  actorUserId: string,
+  request: NextRequest,
+  payload: {
+    targetUserId: string
+    targetEmail?: string
+    assignedRoleIds: string[]
+    assignedRoleNames?: string[]
+    previousRoleIds?: string[]
+    previousRoleNames?: string[]
+  }
+) {
+  return logUserActivity({
+    userId: actorUserId,
+    activityType: 'PROFILE_UPDATE',
+    request,
+    isSuccessful: true,
+    metadata: {
+      action: 'role_assignment_change',
+      time: new Date().toISOString(),
+      ...payload
+    }
+  })
+}
+
+/** Audit: role permissions updated (who did it, role id/name, permission names) */
+export async function logRolePermissionChange(
+  actorUserId: string,
+  request: NextRequest,
+  payload: {
+    roleId: string
+    roleName: string
+    permissionNames: string[]
+    previousPermissionNames?: string[]
+  }
+) {
+  return logUserActivity({
+    userId: actorUserId,
+    activityType: 'PROFILE_UPDATE',
+    request,
+    isSuccessful: true,
+    metadata: {
+      action: 'role_permission_change',
+      time: new Date().toISOString(),
+      ...payload
+    }
+  })
+}
+
+/** Audit: new permission created (who did it, permission name) */
+export async function logPermissionCreation(
+  actorUserId: string,
+  request: NextRequest,
+  payload: { permissionName: string; description?: string }
+) {
+  return logUserActivity({
+    userId: actorUserId,
+    activityType: 'PROFILE_UPDATE',
+    request,
+    isSuccessful: true,
+    metadata: {
+      action: 'permission_creation',
+      time: new Date().toISOString(),
+      ...payload
     }
   })
 }

@@ -1,35 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { isAdminRole, requireAuth, requireRole } from '@/lib/auth'
+import { requirePermission, ForbiddenError } from '@/lib/authorization'
+import { AuthenticationError } from '@/lib/auth'
 
 // GET /api/roles - Get all roles with permissions and user counts
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    
-    // Check if user has READ_ROLE permission
-    const hasPermission = await prisma.rolePermission.findFirst({
-      where: {
-        role: {
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        permission: {
-          name: 'READ_ROLE'
-        }
-      }
-    })
+    await requirePermission('READ_ROLE', request)
 
-    if (!hasPermission && !isAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to read roles' },
-        { status: 403 }
-      )
-    }
-    
     const roles = await prisma.role.findMany({
       include: {
         permissions: {
@@ -78,6 +56,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(transformedRoles)
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error fetching roles:', error)
     return NextResponse.json(
       { error: 'Failed to fetch roles' },
@@ -89,31 +73,8 @@ export async function GET(request: NextRequest) {
 // POST /api/roles - Create a new role
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    
-    // Check if user has CREATE_ROLE permission
-    const hasPermission = await prisma.rolePermission.findFirst({
-      where: {
-        role: {
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        permission: {
-          name: 'CREATE_ROLE'
-        }
-      }
-    })
+    await requirePermission('CREATE_ROLE', request)
 
-    if (!hasPermission && !isAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to create roles' },
-        { status: 403 }
-      )
-    }
-    
     const { name, description, permissions } = await request.json()
 
     if (!name) {
@@ -208,6 +169,12 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error creating role:', error)
     return NextResponse.json(
       { error: 'Failed to create role' },

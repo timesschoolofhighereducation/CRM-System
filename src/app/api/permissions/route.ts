@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { Permission } from '@prisma/client'
+import { requirePermission, ForbiddenError } from '@/lib/authorization'
+import { AuthenticationError } from '@/lib/auth'
+import { logPermissionCreation } from '@/lib/activity-logger'
 
-// GET /api/permissions - Get all permissions
+const VALID_PERMISSION_NAMES = new Set(Object.values(Permission))
+
+// GET /api/permissions - Get all permissions (requires READ_ROLE or MANAGE_ROLE_PERMISSIONS)
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    
+    await requirePermission(['READ_ROLE', 'MANAGE_ROLE_PERMISSIONS'], request, { any: true })
+
     const permissions = await prisma.permissionModel.findMany({
       include: {
         _count: {
@@ -22,6 +27,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(permissions)
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error fetching permissions:', error)
     return NextResponse.json(
       { error: 'Failed to fetch permissions' },
@@ -30,23 +41,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/permissions - Create a new permission
+// POST /api/permissions - Create a new permission (requires MANAGE_ROLE_PERMISSIONS; name must be in Permission enum)
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request)
-    
+    const _user = await requirePermission('MANAGE_ROLE_PERMISSIONS', request)
+
     const { name, description } = await request.json()
 
-    if (!name) {
+    if (!name || typeof name !== 'string') {
       return NextResponse.json(
         { error: 'Permission name is required' },
         { status: 400 }
       )
     }
 
-    // Check if permission already exists
+    if (!VALID_PERMISSION_NAMES.has(name as Permission)) {
+      return NextResponse.json(
+        { error: 'Permission name must be a valid system permission' },
+        { status: 400 }
+      )
+    }
+
     const existingPermission = await prisma.permissionModel.findFirst({
-      where: { name }
+      where: { name: name as Permission }
     })
 
     if (existingPermission) {
@@ -58,13 +75,24 @@ export async function POST(request: NextRequest) {
 
     const permission = await prisma.permissionModel.create({
       data: {
-        name,
-        description
-      }
+        name: name as Permission,
+        description: description ?? undefined,
+      },
     })
+
+    logPermissionCreation(_user.id, request, {
+      permissionName: name,
+      description: description ?? undefined,
+    }).catch(() => {})
 
     return NextResponse.json(permission)
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error creating permission:', error)
     return NextResponse.json(
       { error: 'Failed to create permission' },

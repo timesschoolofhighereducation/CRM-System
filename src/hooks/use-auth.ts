@@ -4,12 +4,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { safeJsonParse } from '@/lib/utils'
 
-interface User {
+export interface User {
   id: string
   name: string
   email: string
   role: string
   isActive: boolean
+  permissions?: string[]
+  roles?: { id: string; name: string }[]
 }
 
 // Helper to get cookie value

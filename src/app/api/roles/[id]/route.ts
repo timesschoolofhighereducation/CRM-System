@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { isAdminRole, requireAuth } from '@/lib/auth'
+import { requirePermission, ForbiddenError } from '@/lib/authorization'
+import { AuthenticationError } from '@/lib/auth'
+import { logRolePermissionChange } from '@/lib/activity-logger'
 
 // GET /api/roles/[id] - Get a specific role
 export async function GET(
@@ -8,32 +10,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireAuth(request)
+    await requirePermission('READ_ROLE', request)
     const { id } = await params
-    
-    // Check if user has READ_ROLE permission
-    const hasPermission = await prisma.rolePermission.findFirst({
-      where: {
-        role: {
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        permission: {
-          name: 'READ_ROLE'
-        }
-      }
-    })
 
-    if (!hasPermission && !isAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to read role details' },
-        { status: 403 }
-      )
-    }
-    
     const role = await prisma.role.findUnique({
       where: { id },
       include: {
@@ -84,6 +63,12 @@ export async function GET(
       }
     })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error fetching role:', error)
     return NextResponse.json(
       { error: 'Failed to fetch role' },
@@ -98,32 +83,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireAuth(request)
+    const _user = await requirePermission('UPDATE_ROLE', request)
     const { id } = await params
-    
-    // Check if user has UPDATE_ROLE permission
-    const hasPermission = await prisma.rolePermission.findFirst({
-      where: {
-        role: {
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        permission: {
-          name: 'UPDATE_ROLE'
-        }
-      }
-    })
 
-    if (!hasPermission && !isAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to update roles' },
-        { status: 403 }
-      )
-    }
-    
     const { name, description, permissions } = await request.json()
 
     // Check if role exists
@@ -165,41 +127,49 @@ export async function PUT(
       }
     })
 
-    // Update permissions if provided
     if (permissions !== undefined) {
-      // Remove existing permissions
+      const previousPermissions = existingRole
+        ? (await prisma.rolePermission.findMany({
+            where: { roleId: id },
+            include: { permission: true },
+          })).map((rp) => rp.permission.name)
+        : []
+
       await prisma.rolePermission.deleteMany({
-        where: { roleId: id }
+        where: { roleId: id },
       })
 
-      // Add new permissions
       if (permissions.length > 0) {
         const permissionRecords = await Promise.all(
           permissions.map(async (permissionName: string) => {
             let permission = await prisma.permissionModel.findFirst({
-              where: { name: permissionName as any }
+              where: { name: permissionName as any },
             })
-
             if (!permission) {
               permission = await prisma.permissionModel.create({
                 data: {
                   name: permissionName as any,
-                  description: `Permission for ${permissionName}`
-                }
+                  description: `Permission for ${permissionName}`,
+                },
               })
             }
-
             return permission
           })
         )
-
         await prisma.rolePermission.createMany({
-          data: permissionRecords.map(permission => ({
+          data: permissionRecords.map((p) => ({
             roleId: id,
-            permissionId: permission.id
-          }))
+            permissionId: p.id,
+          })),
         })
       }
+
+      logRolePermissionChange(_user.id, request, {
+        roleId: id,
+        roleName: existingRole.name,
+        permissionNames: permissions,
+        previousPermissionNames: previousPermissions,
+      }).catch(() => {})
     }
 
     // Fetch the updated role with permissions
@@ -235,6 +205,12 @@ export async function PUT(
       }
     })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error updating role:', error)
     return NextResponse.json(
       { error: 'Failed to update role' },
@@ -249,32 +225,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireAuth(request)
+    await requirePermission('DELETE_ROLE', request)
     const { id } = await params
-    
-    // Check if user has DELETE_ROLE permission
-    const hasPermission = await prisma.rolePermission.findFirst({
-      where: {
-        role: {
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
-        },
-        permission: {
-          name: 'DELETE_ROLE'
-        }
-      }
-    })
 
-    if (!hasPermission && !isAdminRole(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to delete roles' },
-        { status: 403 }
-      )
-    }
-    
     // Check if role exists
     const existingRole = await prisma.role.findUnique({
       where: { id },
@@ -310,6 +263,12 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Role deleted successfully' })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Error deleting role:', error)
     return NextResponse.json(
       { error: 'Failed to delete role' },

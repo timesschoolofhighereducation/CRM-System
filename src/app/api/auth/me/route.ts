@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
+import { getEffectivePermissionsAndRolesForUser } from '@/lib/authorization'
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth-token')?.value || 
+    const token = request.cookies.get('auth-token')?.value ||
                   request.headers.get('authorization')?.replace('Bearer ', '')
 
     // Check session activity
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const { permissions, roles } = await getEffectivePermissionsAndRolesForUser(user.id)
+
     // Update session activity on successful auth check
     const sessionExpiry = Date.now() + (60 * 60 * 1000) // 1 hour
     const response = NextResponse.json({
@@ -44,7 +47,9 @@ export async function GET(request: NextRequest) {
         name: user.name,
         email: user.email,
         role: user.role,
-        isActive: user.isActive
+        isActive: user.isActive,
+        permissions,
+        roles
       }
     })
     
