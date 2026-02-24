@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
+import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions'
 
 interface Permission {
   id: string
@@ -38,6 +39,8 @@ interface EditRoleDialogProps {
   onRoleUpdated?: () => void
 }
 
+const BUILT_IN_ROLE_NAMES = ['ADMINISTRATOR', 'ADMIN', 'DEVELOPER', 'COORDINATOR', 'VIEWER', 'SYSTEM'] as const
+
 export function EditRoleDialog({ role, open, onOpenChange, onRoleUpdated }: EditRoleDialogProps) {
   const [loading, setLoading] = useState(false)
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -45,9 +48,20 @@ export function EditRoleDialog({ role, open, onOpenChange, onRoleUpdated }: Edit
     name: role.name,
     description: role.description || '',
     isActive: role.isActive,
-    // Handle both flattened API response and nested database structure
     selectedPermissions: role.permissions.map(p => p.permission?.id || p.id),
   })
+
+  // Reset form when dialog opens or role changes (by id)
+  useEffect(() => {
+    if (open && role) {
+      setFormData({
+        name: role.name,
+        description: role.description || '',
+        isActive: role.isActive,
+        selectedPermissions: role.permissions.map(p => p.permission?.id || p.id),
+      })
+    }
+  }, [open, role?.id])
 
   useEffect(() => {
     if (open) {
@@ -68,6 +82,28 @@ export function EditRoleDialog({ role, open, onOpenChange, onRoleUpdated }: Edit
       console.error('Error fetching permissions:', error)
     }
   }
+
+  // When role has no permissions in DB but is a built-in role, pre-fill with default permissions
+  const defaultNamesForRole = useMemo(() => {
+    if (!role || role.permissions.length > 0) return null
+    const names = BUILT_IN_ROLE_NAMES.includes(role.name as typeof BUILT_IN_ROLE_NAMES[number])
+      ? DEFAULT_ROLE_PERMISSIONS[role.name as keyof typeof DEFAULT_ROLE_PERMISSIONS]
+      : null
+    return names ?? null
+  }, [role?.name, role?.permissions?.length])
+
+  useEffect(() => {
+    if (!open || !defaultNamesForRole || permissions.length === 0) return
+    const ids = permissions
+      .filter(p => defaultNamesForRole.includes(p.name))
+      .map(p => p.id)
+    if (ids.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        selectedPermissions: ids,
+      }))
+    }
+  }, [open, defaultNamesForRole, permissions])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
