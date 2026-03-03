@@ -30,7 +30,8 @@ import {
   BookOpen,
   Sparkles,
   Gamepad2,
-  Ticket
+  Ticket,
+  ClipboardList,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -122,6 +123,12 @@ const navigation: NavigationItem[] = [
         href: '/reports', 
         icon: BarChart3,
         permissions: ['VIEW_REPORTS']
+      },
+      { 
+        name: 'Weekly Reports', 
+        href: '/weekly-reports', 
+        icon: ClipboardList,
+        permissions: [] // All authenticated users can manage their own reports
       },
       { 
         name: 'Annual Reports', 

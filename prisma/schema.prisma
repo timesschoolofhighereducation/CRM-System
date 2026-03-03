@@ -54,6 +54,9 @@ model User {
   notifications     Notification[]     @relation("UserNotifications")
   pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
 
+  // Weekly report relations
+  weeklyReports WeeklyReport[] @relation("WeeklyReportCreatedBy")
+
   // Notebook system relations
   createdNotebooks      Notebook[]      @relation("NotebookCreatedBy")
   createdNotes          Note[]          @relation("NoteCreatedBy")
@@ -1230,4 +1233,52 @@ model PromotionCode {
   seekers            Seeker[] // Seekers who used this promotion code
 
   @@map("promotion_codes")
+}
+
+// ========================================
+// WEEKLY REPORT SYSTEM
+// ========================================
+
+model WeeklyReport {
+  id          String             @id @default(cuid())
+  title       String
+  developer   String
+  periodStart DateTime
+  periodEnd   DateTime
+  project     String
+  purpose     String?
+  activeDays  Int?
+  status      WeeklyReportStatus @default(DRAFT)
+
+  // At-a-glance / executive summary
+  summary String?
+
+  // JSON arrays for rich structured content
+  metrics        Json? // [{id, label, value, unit?}]
+  plannedItems   Json? // [{id, description, achieved, notes?}]
+  dailyTasks     Json? // [{id, date, no, area, description}]
+  areasUpdated   Json? // [{id, area, changes}]
+  risks          Json? // [{id, title, impact, mitigation, status}]
+  blockers       Json? // [{id, description, dependency?, status}]
+  nextWeekPlan   Json? // [{id, priority, description}]
+  timeAllocation Json? // [{id, category, percentage}]
+  references     Json? // [{id, label, url}]
+  notes          String?
+
+  createdById String
+  createdBy   User   @relation("WeeklyReportCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([periodStart, periodEnd])
+  @@map("weekly_reports")
+}
+
+enum WeeklyReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REVIEWED
 }
