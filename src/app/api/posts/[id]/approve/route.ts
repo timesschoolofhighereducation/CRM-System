@@ -6,11 +6,11 @@ import { notifyNextApprover, notifyPostApproved, notifyPostFullyApproved } from 
 // POST /api/posts/[id]/approve - Approve a post
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { comment } = body
 
