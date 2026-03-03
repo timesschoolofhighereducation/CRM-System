@@ -95,7 +95,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onRoleUpdated }: Edit
   useEffect(() => {
     if (!open || !defaultNamesForRole || permissions.length === 0) return
     const ids = permissions
-      .filter(p => defaultNamesForRole.includes(p.name))
+      .filter(p => (defaultNamesForRole as unknown as string[]).includes(p.name))
       .map(p => p.id)
     if (ids.length > 0) {
       setFormData(prev => ({

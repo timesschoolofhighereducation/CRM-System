@@ -5,11 +5,11 @@ import { requireAuth, isAdminRole } from '@/lib/auth'
 // GET /api/posts/[id] - Get a specific post
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
 
     const post = await prisma.socialMediaPost.findUnique({
       where: { id },
@@ -82,11 +82,11 @@ export async function GET(
 // PUT /api/posts/[id] - Update a post
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     // Check if post exists and user has permission
@@ -167,11 +167,11 @@ export async function PUT(
 // DELETE /api/posts/[id] - Delete a post
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
     const isAdminUser = isAdminRole(user.role)
 
     // Check if post exists
@@ -212,4 +212,3 @@ export async function DELETE(
     )
   }
 }
-

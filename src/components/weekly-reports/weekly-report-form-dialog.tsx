@@ -155,19 +155,19 @@ export function WeeklyReportFormDialog({ open, onOpenChange, initialData, onSave
     setForm(prev => ({ ...prev, [field]: value }))
 
   // Generic list updater
-  function updateList<T>(field: keyof WeeklyReportData, id: string, patch: Partial<T>) {
+  function updateList<T extends { id: string }>(field: keyof WeeklyReportData, id: string, patch: Partial<T>) {
     setForm(prev => ({
       ...prev,
-      [field]: (prev[field] as any[]).map((item: any) =>
+      [field]: (prev[field] as unknown as T[]).map((item) =>
         item.id === id ? { ...item, ...patch } : item
       ),
     }))
   }
 
-  function removeFromList(field: keyof WeeklyReportData, id: string) {
+  function removeFromList<T extends { id: string }>(field: keyof WeeklyReportData, id: string) {
     setForm(prev => ({
       ...prev,
-      [field]: (prev[field] as any[]).filter((item: any) => item.id !== id),
+      [field]: (prev[field] as unknown as T[]).filter((item) => item.id !== id),
     }))
   }
 

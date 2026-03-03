@@ -4,11 +4,11 @@ import { requireAuth, isAdminRole } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
 
     const report = await prisma.weeklyReport.findUnique({
       where: { id },
@@ -38,11 +38,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     const existing = await prisma.weeklyReport.findUnique({ where: { id } })
@@ -124,11 +124,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = params
+    const { id } = await params
 
     const existing = await prisma.weeklyReport.findUnique({ where: { id } })
     if (!existing) {
