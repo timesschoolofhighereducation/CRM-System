@@ -5,11 +5,11 @@ import { requireAuth } from '@/lib/auth'
 // POST /api/posts/[id]/comments - Add a comment to a post
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = await params
+    const { id } = params
     const body = await request.json()
     const { comment } = body
 

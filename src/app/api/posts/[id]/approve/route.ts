@@ -6,11 +6,11 @@ import { notifyNextApprover, notifyPostApproved, notifyPostFullyApproved } from 
 // POST /api/posts/[id]/approve - Approve a post
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = await params
+    const { id } = params
     const body = await request.json()
     const { comment } = body
 
@@ -28,6 +28,13 @@ export async function POST(
 
     if (!post) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
+
+    if (post.status !== 'PENDING_APPROVAL') {
+      return NextResponse.json(
+        { error: 'Post is not pending approval' },
+        { status: 400 }
+      )
     }
 
     // Find current user's approval
@@ -68,16 +75,6 @@ export async function POST(
       },
     })
 
-    // Get post creator info for notifications
-    const postWithCreator = await prisma.socialMediaPost.findUnique({
-      where: { id },
-      include: {
-        createdBy: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    })
-
     // Check if this was the last approver
     const nextApproval = post.approvals.find((a) => a.order > userApproval.order)
 
@@ -91,16 +88,14 @@ export async function POST(
       })
 
       // Notify creator that post is fully approved
-      if (postWithCreator) {
-        try {
-          await notifyPostFullyApproved(
-            postWithCreator.createdById,
-            id,
-            post.caption
-          )
-        } catch (error) {
-          console.error('Error sending notification:', error)
-        }
+      try {
+        await notifyPostFullyApproved(
+          post.createdById,
+          id,
+          post.caption
+        )
+      } catch (error) {
+        console.error('Error sending notification:', error)
       }
     } else {
       // Notify next approver
@@ -116,17 +111,15 @@ export async function POST(
       }
 
       // Also notify creator of progress
-      if (postWithCreator) {
-        try {
-          await notifyPostApproved(
-            postWithCreator.createdById,
-            id,
-            post.caption,
-            user.name || user.email
-          )
-        } catch (error) {
-          console.error('Error sending notification:', error)
-        }
+      try {
+        await notifyPostApproved(
+          post.createdById,
+          id,
+          post.caption,
+          user.name || user.email
+        )
+      } catch (error) {
+        console.error('Error sending notification:', error)
       }
     }
 

@@ -6,11 +6,11 @@ import { notifyPostRejected } from '@/lib/notification-service'
 // POST /api/posts/[id]/reject - Reject a post
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await requireAuth(request)
-    const { id } = await params
+    const { id } = params
     const body = await request.json()
     const { comment } = body
 
@@ -35,6 +35,13 @@ export async function POST(
 
     if (!post) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
+
+    if (post.status !== 'PENDING_APPROVAL') {
+      return NextResponse.json(
+        { error: 'Post is not pending approval' },
+        { status: 400 }
+      )
     }
 
     // Find current user's approval
@@ -65,37 +72,49 @@ export async function POST(
       )
     }
 
-    // Update approval status
-    await prisma.postApproval.update({
-      where: { id: userApproval.id },
-      data: {
-        status: 'REJECTED',
-        comment,
-        approvedAt: new Date(),
-      },
-    })
-
-    // Update post status to REJECTED
-    const updatedPostStatus = await prisma.socialMediaPost.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-      },
-      include: {
-        createdBy: {
-          select: { id: true, name: true, email: true },
+    // Update approval status and post status in a single transaction
+    await prisma.$transaction(async (tx) => {
+      // Mark current approver as rejected
+      await tx.postApproval.update({
+        where: { id: userApproval.id },
+        data: {
+          status: 'REJECTED',
+          comment: comment.trim(),
+          approvedAt: new Date(),
         },
-      },
+      })
+
+      // Optionally mark any later pending approvals as rejected to reflect that the chain has stopped
+      await tx.postApproval.updateMany({
+        where: {
+          postId: id,
+          order: { gt: userApproval.order },
+          status: 'PENDING',
+        },
+        data: {
+          status: 'REJECTED',
+          comment: 'Automatically cancelled after earlier rejection',
+          approvedAt: new Date(),
+        },
+      })
+
+      // Update post status to REJECTED
+      await tx.socialMediaPost.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+        },
+      })
     })
 
     // Notify post creator of rejection
     try {
       await notifyPostRejected(
-        updatedPostStatus.createdById,
+        post.createdById,
         id,
         post.caption,
         user.name || user.email,
-        comment
+        comment.trim()
       )
     } catch (error) {
       console.error('Error sending notification:', error)
