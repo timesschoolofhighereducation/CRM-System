@@ -5,7 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { NewCampaignDialog } from './new-campaign-dialog'
 
-export function NewCampaignButton() {
+interface NewCampaignButtonProps {
+  onSuccess?: () => void
+}
+
+export function NewCampaignButton({ onSuccess }: NewCampaignButtonProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -14,10 +18,7 @@ export function NewCampaignButton() {
         <Plus className="h-4 w-4 mr-2" />
         New Campaign
       </Button>
-      <NewCampaignDialog open={open} onOpenChange={setOpen} />
+      <NewCampaignDialog open={open} onOpenChange={setOpen} onSuccess={onSuccess} />
     </>
   )
 }
-
-
-

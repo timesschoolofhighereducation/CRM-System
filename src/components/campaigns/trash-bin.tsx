@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Eye, RotateCcw, Trash2, Target, Users, Calendar } from 'lucide-react'
-import { SocialIcon } from '@/components/ui/social-icons'
+import { RotateCcw, Trash2, Target, Calendar } from 'lucide-react'
+import { getSocialIcon, getStatusColor } from '@/components/campaigns/campaign-utils'
 import { formatDate } from '@/lib/date-utils'
 import { toast } from 'sonner'
 
@@ -131,17 +131,6 @@ export function TrashBin() {
     return matchesSearch
   })
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'DRAFT': 'bg-gray-100 text-gray-800',
-      'ACTIVE': 'bg-green-100 text-green-800',
-      'PAUSED': 'bg-yellow-100 text-yellow-800',
-      'COMPLETED': 'bg-blue-100 text-blue-800',
-      'CANCELLED': 'bg-red-100 text-red-800',
-    }
-    return colors[status] || 'bg-gray-100 text-gray-800'
-  }
-
   if (loading) {
     return (
       <Card className="shadow-sm border-gray-200">
@@ -244,7 +233,7 @@ export function TrashBin() {
                   <TableCell className="font-medium text-gray-900">{campaign.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
-                      <SocialIcon platform="facebook" size="sm" />
+                      {getSocialIcon(campaign.type)}
                       <Badge variant="outline" className="text-xs">
                         {campaign.type.replace('_', ' ').replace(/([A-Z])/g, ' $1').trim()}
                       </Badge>
@@ -320,7 +309,7 @@ export function TrashBin() {
 
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="flex items-center space-x-1.5">
-                        <SocialIcon platform="facebook" size="sm" />
+                        {getSocialIcon(campaign.type)}
                         <Badge variant="outline" className="text-xs">
                           {campaign.type.replace('_', ' ').replace(/([A-Z])/g, ' $1').trim()}
                         </Badge>

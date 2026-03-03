@@ -12,9 +12,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AnalyticsDashboard } from './analytics-dashboard'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { safeJsonParse } from '@/lib/utils'
+import { usePermissions } from '@/hooks/use-permissions'
 
 const analyticsSchema = z.object({
   // Basic metrics
@@ -68,8 +69,10 @@ interface AnalyticsDialogProps {
 }
 
 export function AnalyticsDialog({ open, onOpenChange, campaign, onSuccess }: AnalyticsDialogProps) {
+  const { hasPermission } = usePermissions()
+  const canEditAnalytics = hasPermission('MANAGE_CAMPAIGN_ANALYTICS')
   const [isLoading, setIsLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'edit' | 'view'>('edit')
+  const [viewMode, setViewMode] = useState<'edit' | 'view'>('view')
   const [isClearing, setIsClearing] = useState(false)
   
   const form = useForm<AnalyticsFormData>({
@@ -270,24 +273,34 @@ export function AnalyticsDialog({ open, onOpenChange, campaign, onSuccess }: Ana
                 >
                   View Analytics
                 </Button>
-                <Button
-                  type="button"
-                  variant={viewMode === 'edit' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('edit')}
-                >
-                  Edit Analytics
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleClearAnalytics}
-                  disabled={isClearing}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  {isClearing ? 'Clearing...' : 'Clear Analytics'}
-                </Button>
+                {canEditAnalytics && (
+                  <>
+                    <Button
+                      type="button"
+                      variant={viewMode === 'edit' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('edit')}
+                    >
+                      Edit Analytics
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleClearAnalytics}
+                      disabled={isClearing}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {isClearing ? 'Clearing...' : 'Clear Analytics'}
+                    </Button>
+                  </>
+                )}
+                {!canEditAnalytics && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-md">
+                    <Lock className="h-3 w-3" />
+                    Read-only
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -488,9 +501,9 @@ export function AnalyticsDialog({ open, onOpenChange, campaign, onSuccess }: Ana
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isLoading}
+            <Button
+              type="submit"
+              disabled={isLoading || !canEditAnalytics}
               className="w-full sm:w-auto"
             >
               {isLoading ? 'Updating...' : 'Update Analytics'}

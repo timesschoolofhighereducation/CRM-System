@@ -15,6 +15,7 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { Plus, BarChart3, Users, Target, TrendingUp, Tag, Eye, FileSpreadsheet } from 'lucide-react'
 import { formatDate } from '@/lib/date-utils'
 import { CampaignImage } from '@/components/ui/campaign-image'
+import { toast } from 'sonner'
 
 interface Campaign {
   id: string
@@ -101,12 +102,11 @@ export function CampaignsDashboard() {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
-      
-      // Show success message
-      alert(`All campaigns exported successfully! Total: ${allCampaigns.length} campaigns`)
+
+      toast.success(`Exported ${allCampaigns.length} campaign(s) to Excel`)
     } catch (error) {
       console.error('Error exporting all campaigns:', error)
-      alert('Failed to export campaigns. Please try again.')
+      toast.error('Failed to export campaigns. Please try again.')
     } finally {
       setExportingAll(false)
     }
@@ -137,7 +137,7 @@ export function CampaignsDashboard() {
                 {exportingAll ? 'Exporting...' : 'Export All to Excel'}
               </Button>
               {hasPermission('CREATE_CAMPAIGN') && (
-                <NewCampaignButton />
+                <NewCampaignButton onSuccess={fetchCampaigns} />
               )}
             </div>
           </div>

@@ -1,11 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Eye, Users, Heart, MessageCircle, Share, Bookmark, MousePointer, TrendingUp, Clock, Target } from 'lucide-react'
 import { formatDate } from '@/lib/date-utils'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 
 interface Campaign {
   id: string
@@ -26,6 +33,61 @@ interface Campaign {
   trafficSources?: any
   audienceDemographics?: any
   createdAt: string
+}
+
+interface RetentionData {
+  retentionPoints?: number[]
+  timePoints?: number[]
+  [key: string]: unknown
+}
+
+function RetentionChart({ data }: { data: RetentionData }) {
+  const retention = data?.retentionPoints
+  const time = data?.timePoints
+
+  if (!Array.isArray(retention) || retention.length === 0) {
+    return (
+      <pre className="p-3 bg-gray-50 rounded text-xs overflow-x-auto border border-gray-200">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    )
+  }
+
+  const chartData = retention.map((pct, i) => ({
+    time: Array.isArray(time) && time[i] !== undefined ? `${time[i]}s` : `${i + 1}`,
+    retention: typeof pct === 'number' ? Math.round(pct) : 0,
+  }))
+
+  return (
+    <div className="w-full">
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+          <YAxis
+            domain={[0, 100]}
+            tickFormatter={(v) => `${v}%`}
+            tick={{ fontSize: 11 }}
+            width={42}
+          />
+          <Tooltip formatter={(value: number) => [`${value}%`, 'Retention']} />
+          <Area
+            type="monotone"
+            dataKey="retention"
+            stroke="#6366f1"
+            strokeWidth={2}
+            fill="url(#retentionGradient)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
 }
 
 interface AnalyticsDashboardProps {
@@ -273,12 +335,7 @@ export function AnalyticsDashboard({ campaign }: AnalyticsDashboardProps) {
             <CardTitle className="text-base sm:text-lg">Audience Retention</CardTitle>
           </CardHeader>
           <CardContent className="w-full overflow-hidden">
-            <div className="text-xs sm:text-sm text-gray-600">
-              <p>Retention data available</p>
-              <pre className="mt-2 p-2 sm:p-3 bg-gray-100 rounded text-xs overflow-x-auto max-w-full">
-                {JSON.stringify(campaign.audienceRetention, null, 2)}
-              </pre>
-            </div>
+            <RetentionChart data={campaign.audienceRetention} />
           </CardContent>
         </Card>
       )}

@@ -38,6 +38,7 @@ type CampaignFormData = z.infer<typeof campaignSchema>
 interface NewCampaignDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 interface CampaignType {
@@ -49,7 +50,7 @@ interface CampaignType {
   isActive: boolean
 }
 
-export function NewCampaignDialog({ open, onOpenChange }: NewCampaignDialogProps) {
+export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaignDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [campaignTypes, setCampaignTypes] = useState<CampaignType[]>([])
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -136,9 +137,9 @@ export function NewCampaignDialog({ open, onOpenChange }: NewCampaignDialogProps
 
       toast.success('Campaign created successfully')
       form.reset()
+      setImageUrl(null)
       onOpenChange(false)
-      // Refresh the campaigns list
-      window.location.reload()
+      onSuccess?.()
     } catch (error) {
       console.error('Error creating campaign:', error)
       
