@@ -404,7 +404,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 min-w-0">
 
               {/* LEFT: Caption + Image */}
-              <div className="space-y-5">
+              <div className="space-y-5 bg-background min-w-0">
 
                 {/* Caption */}
                 <div className="space-y-2">
@@ -646,11 +646,10 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
               </div>
 
               {/* RIGHT: Settings + Approval Chain */}
-              <div className="space-y-5">
-
+              <div className="space-y-5 bg-background relative z-10 min-w-0">
                 {/* Program & Campaign */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="program" className="text-sm font-medium">
                       Program
                       <span className="ml-1.5 text-xs text-muted-foreground font-normal">(optional)</span>
@@ -659,10 +658,10 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                       value={formData.programId}
                       onValueChange={value => setFormData(prev => ({ ...prev, programId: value }))}
                     >
-                      <SelectTrigger id="program">
+                      <SelectTrigger id="program" className="w-full">
                         <SelectValue placeholder="Select program" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[110]">
                         {programs.map(program => (
                           <SelectItem key={program.id} value={program.id}>
                             {program.name} — {program.campus}
@@ -672,7 +671,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="campaign" className="text-sm font-medium">
                       Campaign
                       <span className="ml-1.5 text-xs text-muted-foreground font-normal">(optional)</span>
@@ -681,10 +680,10 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                       value={formData.campaignId}
                       onValueChange={value => setFormData(prev => ({ ...prev, campaignId: value }))}
                     >
-                      <SelectTrigger id="campaign">
+                      <SelectTrigger id="campaign" className="w-full">
                         <SelectValue placeholder="Select campaign" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[110]">
                         {campaigns.map(campaign => (
                           <SelectItem key={campaign.id} value={campaign.id}>
                             {campaign.name}
@@ -813,7 +812,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                             >
                               <SelectValue placeholder={`Select approver ${index + 1}`} />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="z-[110]">
                               {users
                                 .filter(
                                   u =>
