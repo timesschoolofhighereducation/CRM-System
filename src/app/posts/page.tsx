@@ -17,6 +17,8 @@ interface Post {
   id: string
   caption: string
   imageUrl: string | null
+  videoUrl?: string | null
+  mediaType?: string | null
   budget: number | null
   startDate: string
   endDate: string
@@ -167,8 +169,44 @@ export default function PostsPage() {
     <Card key={post.id} className="overflow-hidden">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-4 p-6">
-          {/* Image */}
-          {post.imageUrl && (
+          {/* Image or Video */}
+          {(post.mediaType === 'video' && post.videoUrl) ? (
+            <div className="w-full md:w-80 flex-shrink-0 aspect-video rounded-lg overflow-hidden bg-black">
+              {(() => {
+                const url = post.videoUrl!
+                const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)?.[1]
+                const vimeoId = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1]
+                if (ytId) {
+                  return (
+                    <iframe
+                      title="Post video"
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${ytId}`}
+                      allowFullScreen
+                    />
+                  )
+                }
+                if (vimeoId) {
+                  return (
+                    <iframe
+                      title="Post video"
+                      className="w-full h-full"
+                      src={`https://player.vimeo.com/video/${vimeoId}`}
+                      allowFullScreen
+                    />
+                  )
+                }
+                return (
+                  <video
+                    src={url}
+                    controls
+                    className="w-full h-full object-contain"
+                    preload="metadata"
+                  />
+                )
+              })()}
+            </div>
+          ) : post.imageUrl ? (
             <div className="w-full md:w-48 h-48 flex-shrink-0">
               <img
                 src={post.imageUrl}
@@ -176,7 +214,7 @@ export default function PostsPage() {
                 className="w-full h-full object-cover rounded-lg"
               />
             </div>
-          )}
+          ) : null}
 
           {/* Content */}
           <div className="flex-1 space-y-3">

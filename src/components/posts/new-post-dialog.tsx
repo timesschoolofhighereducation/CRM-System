@@ -21,9 +21,31 @@ import {
   Calendar,
   Users,
   CheckCircle2,
+  Link2,
+  Video,
 } from 'lucide-react'
 import imageCompression from 'browser-image-compression'
 import { cn } from '@/lib/utils'
+
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov)(\?|$)/i
+const VIDEO_DOMAINS = /youtube\.com|youtu\.be|vimeo\.com|drive\.google\.com/i
+const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i
+function isVideoUrl(url: string): boolean {
+  try {
+    const u = url.trim()
+    return VIDEO_EXTENSIONS.test(u) || VIDEO_DOMAINS.test(u)
+  } catch {
+    return false
+  }
+}
+function isValidMediaUrl(url: string): boolean {
+  try {
+    new URL(url.trim())
+    return true
+  } catch {
+    return false
+  }
+}
 
 interface Program {
   id: string
@@ -58,11 +80,16 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [mediaLinkInput, setMediaLinkInput] = useState('')
+  const [mediaLinkError, setMediaLinkError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     caption: '',
     imageUrl: '',
+    videoUrl: '',
+    mediaType: '' as '' | 'image' | 'video',
     budget: '',
     startDate: '',
     endDate: '',
@@ -110,7 +137,9 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   }
 
   const processAndUploadImage = useCallback(async (file: File) => {
+    setUploadError(null)
     if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file (PNG, JPG, GIF, or WebP).')
       toast.error('Please select an image file')
       return
     }
@@ -131,6 +160,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         const ratio = (((file.size - processedFile.size) / file.size) * 100).toFixed(1)
         toast.success(`Image compressed — size reduced by ${ratio}%`)
       } catch {
+        setUploadError('Image compression failed. Try a smaller image.')
         toast.error('Image compression failed')
         setIsCompressingImage(false)
         return
@@ -139,7 +169,8 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
       }
     }
 
-    setImagePreview(URL.createObjectURL(processedFile))
+    const objectUrl = URL.createObjectURL(processedFile)
+    setImagePreview(objectUrl)
     setIsUploadingImage(true)
 
     try {
@@ -152,20 +183,27 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         body: formDataUpload,
       })
 
+      const data = await response.json().catch(() => ({}))
       if (response.ok) {
-        const data = await response.json()
-        setFormData(prev => ({ ...prev, imageUrl: data.url }))
+        setFormData(prev => ({ ...prev, imageUrl: data.url, videoUrl: '', mediaType: 'image' }))
+        setUploadError(null)
         toast.success('Image uploaded successfully')
       } else {
-        toast.error('Failed to upload image')
+        const message = data?.error || 'Failed to upload image.'
+        setUploadError(message)
+        toast.error(message)
+        URL.revokeObjectURL(objectUrl)
         setImagePreview(null)
-        setFormData(prev => ({ ...prev, imageUrl: '' }))
+        setFormData(prev => ({ ...prev, imageUrl: '', videoUrl: '', mediaType: '' }))
       }
     } catch (error) {
       console.error('Error uploading image:', error)
+      const message = error instanceof Error ? error.message : 'Failed to upload image. Please try again.'
+      setUploadError(message)
       toast.error('Failed to upload image')
+      URL.revokeObjectURL(objectUrl)
       setImagePreview(null)
-      setFormData(prev => ({ ...prev, imageUrl: '' }))
+      setFormData(prev => ({ ...prev, imageUrl: '', videoUrl: '', mediaType: '' }))
     } finally {
       setIsUploadingImage(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -198,9 +236,40 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   }
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, imageUrl: '' }))
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setFormData(prev => ({ ...prev, imageUrl: '', videoUrl: '', mediaType: '' }))
     setImagePreview(null)
+    setUploadError(null)
+    setMediaLinkInput('')
+    setMediaLinkError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleMediaLinkSubmit = () => {
+    setMediaLinkError(null)
+    const url = mediaLinkInput.trim()
+    if (!url) {
+      setMediaLinkError('Please enter a valid URL.')
+      return
+    }
+    if (!isValidMediaUrl(url)) {
+      setMediaLinkError('Please enter a valid URL (e.g. https://… or Google Drive share link).')
+      return
+    }
+    const isVideo = isVideoUrl(url)
+    if (isVideo) {
+      setFormData(prev => ({ ...prev, videoUrl: url, imageUrl: '', mediaType: 'video' }))
+      if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
+      setImagePreview(null)
+      toast.success('Video link added. It will play in the CRM.')
+    } else {
+      setFormData(prev => ({ ...prev, imageUrl: url, videoUrl: '', mediaType: 'image' }))
+      setImagePreview(url)
+      toast.success('Image link added.')
+    }
+    setMediaLinkInput('')
   }
 
   const handleApproverChange = (index: number, userId: string) => {
@@ -219,9 +288,14 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   }
 
   const resetForm = () => {
+    if (imagePreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview)
+    }
     setFormData({
       caption: '',
       imageUrl: '',
+      videoUrl: '',
+      mediaType: '',
       budget: '',
       startDate: '',
       endDate: '',
@@ -230,6 +304,9 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
       approvers: [],
     })
     setImagePreview(null)
+    setUploadError(null)
+    setMediaLinkInput('')
+    setMediaLinkError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -268,7 +345,9 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           caption: formData.caption,
-          imageUrl: formData.imageUrl,
+          imageUrl: formData.imageUrl || null,
+          videoUrl: formData.videoUrl || null,
+          mediaType: formData.mediaType || null,
           budget: formData.budget ? parseFloat(formData.budget) : null,
           startDate: formData.startDate,
           endDate: formData.endDate,
@@ -297,12 +376,16 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
 
   const isImageBusy = isUploadingImage || isCompressingImage
 
+  const hasMedia = !!(formData.imageUrl || formData.videoUrl)
+  const showVideoPreview = formData.mediaType === 'video' && formData.videoUrl
+  const showImagePreview = formData.mediaType === 'image' && (imagePreview || formData.imageUrl)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
           'w-full max-w-[calc(100%-2rem)] sm:max-w-2xl lg:max-w-4xl',
-          'max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden'
+          'max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden z-[100]'
         )}
       >
         {/* ── Header ─────────────────────────────────────────── */}
@@ -317,8 +400,8 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
 
         {/* ── Body ──────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 py-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 min-w-0">
 
               {/* LEFT: Caption + Image */}
               <div className="space-y-5">
@@ -345,11 +428,11 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                   </p>
                 </div>
 
-                {/* Image Upload */}
+                {/* Image / Video — Upload or link */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <Label className="font-medium leading-none">Post Image</Label>
+                    <Label className="font-medium leading-none">Post Image or Video</Label>
                     <Badge variant="secondary" className="text-xs font-normal ml-1">
                       Optional
                     </Badge>
@@ -366,16 +449,74 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                     tabIndex={-1}
                   />
 
-                  {imagePreview ? (
-                    /* Preview state */
+                  {showVideoPreview ? (
+                    /* Video preview — playable in CRM */
+                    <div className="relative rounded-xl overflow-hidden border bg-muted">
+                      <div className="w-full aspect-video bg-black flex items-center justify-center max-h-52">
+                        {formData.videoUrl && (() => {
+                          const url = formData.videoUrl
+                          const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)?.[1]
+                          const vimeoId = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1]
+                          if (ytId) {
+                            return (
+                              <iframe
+                                title="Video preview"
+                                className="w-full h-full min-h-0"
+                                src={`https://www.youtube.com/embed/${ytId}`}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                            )
+                          }
+                          if (vimeoId) {
+                            return (
+                              <iframe
+                                title="Video preview"
+                                className="w-full h-full min-h-0"
+                                src={`https://player.vimeo.com/video/${vimeoId}`}
+                                allowFullScreen
+                              />
+                            )
+                          }
+                          return (
+                            <video
+                              src={url}
+                              controls
+                              className="w-full h-full object-contain"
+                              preload="metadata"
+                            />
+                          )
+                        })()}
+                      </div>
+                      {!isImageBusy && (
+                        <>
+                          <div className="absolute top-2 left-2">
+                            <Badge className="bg-emerald-500/90 text-white border-0 gap-1 text-xs">
+                              <Video className="w-3 h-3" />
+                              Video link
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            aria-label="Remove video"
+                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-full transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : showImagePreview ? (
+                    /* Image preview state */
                     <div className="relative rounded-xl overflow-hidden border bg-muted">
                       <img
-                        src={imagePreview}
+                        src={imagePreview || formData.imageUrl || ''}
                         alt="Post preview"
                         className="w-full h-52 object-cover"
+                        onError={() => setUploadError('Could not load image from link. Check the URL is public.')}
                       />
 
-                      {/* Processing overlay */}
                       {isImageBusy && (
                         <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-2 backdrop-blur-[2px]">
                           {isCompressingImage ? (
@@ -392,17 +533,15 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                         </div>
                       )}
 
-                      {/* Uploaded badge */}
                       {!isImageBusy && formData.imageUrl && (
                         <div className="absolute top-2 left-2">
                           <Badge className="bg-emerald-500/90 text-white border-0 gap-1 text-xs">
                             <CheckCircle2 className="w-3 h-3" />
-                            Uploaded
+                            {formData.imageUrl.startsWith('http') ? 'Image link' : 'Uploaded'}
                           </Badge>
                         </div>
                       )}
 
-                      {/* Remove button */}
                       {!isImageBusy && (
                         <button
                           type="button"
@@ -414,8 +553,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                         </button>
                       )}
 
-                      {/* Hover-to-replace strip */}
-                      {!isImageBusy && (
+                      {!isImageBusy && !formData.imageUrl?.startsWith('http') && (
                         <label
                           htmlFor="image-upload"
                           className="absolute inset-x-0 bottom-0 flex justify-center pb-3 pt-8 opacity-0 hover:opacity-100 transition-opacity cursor-pointer bg-gradient-to-t from-black/50 to-transparent"
@@ -428,48 +566,81 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                     </div>
                   ) : (
                     /* Dropzone state */
-                    <div
-                      onDrop={handleDrop}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      className={cn(
-                        'relative rounded-xl border-2 border-dashed h-52 flex flex-col items-center justify-center',
-                        'transition-all duration-150',
-                        isDragOver
-                          ? 'border-primary bg-primary/5 scale-[1.01]'
-                          : 'border-border hover:border-primary/50 hover:bg-muted/40'
-                      )}
-                    >
-                      {/* Full-area clickable label */}
-                      <label
-                        htmlFor="image-upload"
-                        className="absolute inset-0 cursor-pointer rounded-xl"
-                        aria-label="Upload image"
-                      />
-
-                      <div className="flex flex-col items-center gap-3 pointer-events-none select-none">
-                        <div
-                          className={cn(
-                            'w-12 h-12 rounded-full flex items-center justify-center transition-colors',
-                            isDragOver ? 'bg-primary/10' : 'bg-muted'
-                          )}
-                        >
-                          <Upload
+                    <>
+                      <div
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        className={cn(
+                          'relative rounded-xl border-2 border-dashed h-52 flex flex-col items-center justify-center',
+                          'transition-all duration-150',
+                          isDragOver
+                            ? 'border-primary bg-primary/5 scale-[1.01]'
+                            : 'border-border hover:border-primary/50 hover:bg-muted/40'
+                        )}
+                      >
+                        <label
+                          htmlFor="image-upload"
+                          className="absolute inset-0 cursor-pointer rounded-xl"
+                          aria-label="Upload image"
+                        />
+                        <div className="flex flex-col items-center gap-3 pointer-events-none select-none">
+                          <div
                             className={cn(
-                              'w-5 h-5 transition-colors',
-                              isDragOver ? 'text-primary' : 'text-muted-foreground'
+                              'w-12 h-12 rounded-full flex items-center justify-center transition-colors',
+                              isDragOver ? 'bg-primary/10' : 'bg-muted'
                             )}
-                          />
-                        </div>
-                        <div className="text-center space-y-0.5">
-                          <p className="text-sm font-medium">
-                            {isDragOver ? 'Drop image here' : 'Upload a post image'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Drag & drop or click to browse</p>
-                          <p className="text-xs text-muted-foreground">PNG, JPG, GIF · Auto-compressed if &gt;5 MB</p>
+                          >
+                            <Upload
+                              className={cn(
+                                'w-5 h-5 transition-colors',
+                                isDragOver ? 'text-primary' : 'text-muted-foreground'
+                              )}
+                            />
+                          </div>
+                          <div className="text-center space-y-0.5">
+                            <p className="text-sm font-medium">
+                              {isDragOver ? 'Drop image here' : 'Upload image or add link below'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, GIF · Auto-compressed if &gt;5 MB</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      {uploadError && (
+                        <p className="text-sm text-destructive mt-1.5" role="alert">
+                          {uploadError}
+                        </p>
+                      )}
+                      {/* Paste image or video URL (e.g. Google Drive) */}
+                      <div className="space-y-1.5 pt-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Link2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                              type="url"
+                              placeholder="Paste image or video URL (e.g. Google Drive share link)"
+                              value={mediaLinkInput}
+                              onChange={e => {
+                                setMediaLinkInput(e.target.value)
+                                setMediaLinkError(null)
+                              }}
+                              className="pl-8"
+                            />
+                          </div>
+                          <Button type="button" variant="secondary" onClick={handleMediaLinkSubmit}>
+                            Add link
+                          </Button>
+                        </div>
+                        {mediaLinkError && (
+                          <p className="text-sm text-destructive" role="alert">
+                            {mediaLinkError}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Supports image links and video links (YouTube, Vimeo, or direct .mp4/.webm). Video plays in CRM.
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

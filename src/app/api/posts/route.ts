@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
     const {
       caption,
       imageUrl,
+      videoUrl,
+      mediaType,
       budget,
       startDate,
       endDate,
@@ -156,7 +158,9 @@ export async function POST(request: NextRequest) {
     const post = await prisma.socialMediaPost.create({
       data: {
         caption,
-        imageUrl,
+        imageUrl: imageUrl || null,
+        videoUrl: videoUrl || null,
+        mediaType: mediaType || null,
         budget: budget ? parseFloat(budget) : null,
         startDate: new Date(startDate),
         endDate: new Date(endDate),

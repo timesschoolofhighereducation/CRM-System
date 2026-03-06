@@ -1006,7 +1006,9 @@ model Client {
 model SocialMediaPost {
   id        String     @id @default(cuid())
   caption   String
-  imageUrl  String?
+  imageUrl  String?    // Image URL (uploaded or link e.g. Google Drive)
+  videoUrl  String?    // Video URL (link e.g. Google Drive, YouTube; playable in CRM)
+  mediaType String?    // 'image' | 'video' — which media to show
   budget    Float?
   startDate DateTime
   endDate   DateTime

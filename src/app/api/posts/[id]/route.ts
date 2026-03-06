@@ -113,7 +113,7 @@ export async function PUT(
       )
     }
 
-    const { caption, imageUrl, budget, startDate, endDate, programId, campaignId } = body
+    const { caption, imageUrl, videoUrl, mediaType, budget, startDate, endDate, programId, campaignId } = body
 
     // Update post
     const updatedPost = await prisma.socialMediaPost.update({
@@ -121,6 +121,8 @@ export async function PUT(
       data: {
         ...(caption && { caption }),
         ...(imageUrl !== undefined && { imageUrl }),
+        ...(videoUrl !== undefined && { videoUrl }),
+        ...(mediaType !== undefined && { mediaType }),
         ...(budget !== undefined && { budget: budget ? parseFloat(budget) : null }),
         ...(startDate && { startDate: new Date(startDate) }),
         ...(endDate && { endDate: new Date(endDate) }),
