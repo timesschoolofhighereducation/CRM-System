@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
-import { notifyPostRejected } from '@/lib/notification-service'
+import { notifyPostRejected, notifyPostRejectedAssignedToYou } from '@/lib/notification-service'
 
 // POST /api/posts/[id]/reject - Reject a post
 export async function POST(
@@ -12,7 +12,7 @@ export async function POST(
     const user = await requireAuth(request)
     const { id } = await params
     const body = await request.json()
-    const { comment } = body
+    const { comment, assignedToId } = body
 
     if (!comment || comment.trim() === '') {
       return NextResponse.json(
@@ -98,14 +98,18 @@ export async function POST(
         },
       })
 
-      // Update post status to REJECTED
+      // Update post status to REJECTED and optional assignee (for reverse process / resubmit)
       await tx.socialMediaPost.update({
         where: { id },
         data: {
           status: 'REJECTED',
+          assignedToId: assignedToId && typeof assignedToId === 'string' ? assignedToId : null,
         },
       })
     })
+
+    const approverName = user.name || user.email
+    const reason = comment.trim()
 
     // Notify post creator of rejection
     try {
@@ -113,11 +117,26 @@ export async function POST(
         post.createdById,
         id,
         post.caption,
-        user.name || user.email,
-        comment.trim()
+        approverName,
+        reason
       )
     } catch (error) {
       console.error('Error sending notification:', error)
+    }
+
+    // If assigned to someone (e.g. to revise), notify that user too
+    if (assignedToId && typeof assignedToId === 'string') {
+      try {
+        await notifyPostRejectedAssignedToYou(
+          assignedToId,
+          id,
+          post.caption,
+          approverName,
+          reason
+        )
+      } catch (error) {
+        console.error('Error sending assignment notification:', error)
+      }
     }
 
     // Get updated post
@@ -127,6 +146,13 @@ export async function POST(
         program: true,
         campaign: true,
         createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        assignedTo: {
           select: {
             id: true,
             name: true,

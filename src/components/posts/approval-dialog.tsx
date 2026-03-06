@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,13 +12,20 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CheckCircle, XCircle, User } from 'lucide-react'
+
+interface UserOption {
+  id: string
+  name: string
+  email: string
+}
 
 interface ApprovalDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   type: 'approve' | 'reject'
-  onConfirm: (comment: string) => void
+  onConfirm: (comment: string, assignedToId?: string) => void
   loading?: boolean
 }
 
@@ -30,17 +37,30 @@ export function ApprovalDialog({
   loading = false,
 }: ApprovalDialogProps) {
   const [comment, setComment] = useState('')
+  const [assignedToId, setAssignedToId] = useState<string>('')
+  const [users, setUsers] = useState<UserOption[]>([])
+
+  useEffect(() => {
+    if (open && type === 'reject') {
+      fetch('/api/users')
+        .then((res) => res.ok ? res.json() : [])
+        .then((data) => setUsers(Array.isArray(data) ? data : []))
+        .catch(() => setUsers([]))
+    }
+  }, [open, type])
 
   const handleSubmit = () => {
     if (type === 'reject' && !comment.trim()) {
-      return // Don't submit if reject requires comment
+      return
     }
-    onConfirm(comment.trim())
-    setComment('') // Reset on submit
+    onConfirm(comment.trim(), type === 'reject' && assignedToId ? assignedToId : undefined)
+    setComment('')
+    setAssignedToId('')
   }
 
   const handleCancel = () => {
     setComment('')
+    setAssignedToId('')
     onOpenChange(false)
   }
 
@@ -91,6 +111,30 @@ export function ApprovalDialog({
               </p>
             )}
           </div>
+          {type === 'reject' && users.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <User className="w-4 h-4" />
+                Assign to (optional)
+              </Label>
+              <Select value={assignedToId || 'none'} onValueChange={(v) => setAssignedToId(v === 'none' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select who should revise and resubmit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No assignment</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} — {u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Assign this post to someone to revise and resubmit. They can use the Rejected tab to resubmit.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

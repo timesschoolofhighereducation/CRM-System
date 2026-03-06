@@ -48,9 +48,10 @@ model User {
   createdClients     Client[]         @relation("ClientCreatedBy")
 
   // Post approval system relations
-  createdPosts  SocialMediaPost[] @relation("PostCreatedBy")
-  postApprovals PostApproval[]    @relation("PostApprover")
-  postComments  PostComment[]     @relation("PostCommenter")
+  createdPosts    SocialMediaPost[] @relation("PostCreatedBy")
+  postsAssignedTo SocialMediaPost[] @relation("PostAssignedTo")
+  postApprovals   PostApproval[]    @relation("PostApprover")
+  postComments    PostComment[]     @relation("PostCommenter")
   notifications Notification[]    @relation("UserNotifications")
 
   // Notebook system relations
@@ -1016,6 +1017,9 @@ model SocialMediaPost {
 
   createdById String
   createdBy   User   @relation("PostCreatedBy", fields: [createdById], references: [id])
+
+  assignedToId String?
+  assignedTo   User?  @relation("PostAssignedTo", fields: [assignedToId], references: [id])
 
   // Approval workflow
   approvals     PostApproval[]

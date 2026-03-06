@@ -172,6 +172,25 @@ export async function notifyPostRejected(
 }
 
 /**
+ * Notify user that a rejected post was assigned to them to revise and resubmit
+ */
+export async function notifyPostRejectedAssignedToYou(
+  assignedToUserId: string,
+  postId: string,
+  postCaption: string,
+  approverName: string,
+  reason: string
+) {
+  return createNotification({
+    userId: assignedToUserId,
+    type: 'POST_REJECTED',
+    title: 'Post assigned to you to revise',
+    message: `${approverName} rejected a post and assigned it to you. Reason: ${reason}. Open the Rejected tab to resubmit.`,
+    postId,
+  })
+}
+
+/**
  * Mark notification as read
  */
 export async function markNotificationAsRead(notificationId: string) {

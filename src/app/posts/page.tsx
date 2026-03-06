@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { NewPostDialog } from '@/components/posts/new-post-dialog'
 import { ApprovalDialog } from '@/components/posts/approval-dialog'
-import { Plus, CheckCircle, XCircle, Clock, Eye, MessageSquare, Calendar } from 'lucide-react'
+import { Plus, CheckCircle, XCircle, Clock, Eye, MessageSquare, Calendar, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
@@ -27,6 +27,7 @@ interface Post {
   program?: { id: string; name: string; campus: string }
   campaign?: { id: string; name: string; type: string }
   createdBy: { id: string; name: string; email: string }
+  assignedTo?: { id: string; name: string; email: string } | null
   approvals?: Array<{
     id: string
     order: number
@@ -61,6 +62,7 @@ export default function PostsPage() {
     postId: null,
     loading: false,
   })
+  const [resubmittingId, setResubmittingId] = useState<string | null>(null)
 
   const fetchPosts = async () => {
     setLoading(true)
@@ -106,7 +108,26 @@ export default function PostsPage() {
     })
   }
 
-  const handleApprovalConfirm = async (comment: string) => {
+  const handleResubmit = async (postId: string) => {
+    setResubmittingId(postId)
+    try {
+      const response = await fetch(`/api/posts/${postId}/resubmit`, { method: 'POST' })
+      if (response.ok) {
+        toast.success('Post resubmitted for approval')
+        fetchPosts()
+        fetchPendingApprovals()
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Failed to resubmit')
+      }
+    } catch {
+      toast.error('Failed to resubmit post')
+    } finally {
+      setResubmittingId(null)
+    }
+  }
+
+  const handleApprovalConfirm = async (comment: string, assignedToId?: string) => {
     if (!approvalDialog.postId) return
 
     setApprovalDialog((prev) => ({ ...prev, loading: true }))
@@ -117,10 +138,14 @@ export default function PostsPage() {
           ? `/api/posts/${approvalDialog.postId}/approve`
           : `/api/posts/${approvalDialog.postId}/reject`
 
+      const body =
+        approvalDialog.type === 'reject'
+          ? { comment, ...(assignedToId && { assignedToId }) }
+          : { comment }
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment }),
+        body: JSON.stringify(body),
       })
 
       if (response.ok) {
@@ -295,6 +320,38 @@ export default function PostsPage() {
               </div>
             )}
 
+            {/* Rejected: Assigned to & Resubmit (reverse process) */}
+            {post.status === 'REJECTED' && (
+              <div className="space-y-2 pt-2 border-t">
+                {post.assignedTo && (
+                  <p className="text-xs text-muted-foreground">
+                    Assigned to: <span className="font-medium text-foreground">{post.assignedTo.name}</span>
+                  </p>
+                )}
+                {user &&
+                  (post.assignedTo?.id === user.id || post.createdBy.id === user.id) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResubmit(post.id)}
+                      disabled={resubmittingId === post.id}
+                    >
+                      {resubmittingId === post.id ? (
+                        <>
+                          <span className="animate-spin mr-2 inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
+                          Resubmitting…
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Resubmit for approval
+                        </>
+                      )}
+                    </Button>
+                  )}
+              </div>
+            )}
+
             {/* Approval Actions */}
             {showApprovalActions && (
               <div className="flex gap-2 pt-2">
@@ -376,6 +433,9 @@ export default function PostsPage() {
           <TabsTrigger value="pending">
             Pending My Approval ({pendingPosts.length})
           </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rejected ({posts.filter(p => p.status === 'REJECTED').length})
+          </TabsTrigger>
           <TabsTrigger value="approved">
             Approved ({posts.filter(p => p.status === 'APPROVED').length})
           </TabsTrigger>
@@ -411,6 +471,21 @@ export default function PostsPage() {
             </Card>
           ) : (
             pendingPosts.map((post) => renderPost(post, true))
+          )}
+        </TabsContent>
+
+          {/* Rejected Posts */}
+          <TabsContent value="rejected" className="space-y-4">
+          {posts.filter(p => p.status === 'REJECTED').length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <XCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No rejected posts</p>
+                <p className="text-xs text-muted-foreground mt-1">Rejected posts can be assigned to someone and resubmitted for approval.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            posts.filter(p => p.status === 'REJECTED').map((post) => renderPost(post))
           )}
         </TabsContent>
 

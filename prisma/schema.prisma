@@ -49,8 +49,9 @@ model User {
 
   // Post approval system relations
   createdPosts      SocialMediaPost[]  @relation("PostCreatedBy")
+  postsAssignedTo   SocialMediaPost[]  @relation("PostAssignedTo")
   postApprovals     PostApproval[]     @relation("PostApprover")
-  postComments      PostComment[]      @relation("PostCommenter")
+  postComments      PostComment[]     @relation("PostCommenter")
   notifications     Notification[]     @relation("UserNotifications")
   pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
 
@@ -1023,6 +1024,9 @@ model SocialMediaPost {
 
   createdById String
   createdBy   User   @relation("PostCreatedBy", fields: [createdById], references: [id])
+
+  assignedToId String? // When rejected, assign to this user to revise and resubmit
+  assignedTo   User?  @relation("PostAssignedTo", fields: [assignedToId], references: [id])
 
   // Approval workflow
   approvals     PostApproval[]
