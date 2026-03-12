@@ -7,6 +7,10 @@ import { randomUUID } from 'crypto'
 import { validateImageFile } from '@/lib/file-type-validation'
 
 // Media storage configuration
+// Note: If uploads fail with no clear error, common causes are:
+// - Request body > 1MB (Next.js default). Use client-side compression or next.config serverActions.bodySizeLimit.
+// - Not signed in (401). User must be authenticated.
+// - File type: only JPEG, PNG, GIF, WebP (validated by magic bytes).
 const MEDIA_UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'campaigns')
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 

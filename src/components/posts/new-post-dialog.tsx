@@ -83,6 +83,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [mediaLinkInput, setMediaLinkInput] = useState('')
   const [mediaLinkError, setMediaLinkError] = useState<string | null>(null)
+  const [mediaPreviewLoading, setMediaPreviewLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -146,6 +147,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
 
     let processedFile = file
     const maxSize = 5 * 1024 * 1024
+    const safeForRequest = 1024 * 1024 // 1 MB — stay under typical server body limit
 
     if (file.size > maxSize) {
       setIsCompressingImage(true)
@@ -163,6 +165,23 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         setUploadError('Image compression failed. Try a smaller image.')
         toast.error('Image compression failed')
         setIsCompressingImage(false)
+        return
+      } finally {
+        setIsCompressingImage(false)
+      }
+    }
+    if (processedFile.size > safeForRequest) {
+      setIsCompressingImage(true)
+      try {
+        processedFile = await imageCompression(processedFile, {
+          maxSizeMB: 0.9,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          initialQuality: 0.75,
+        })
+      } catch {
+        setUploadError('Image too large. Use a smaller image (under 1 MB) or paste an image link instead.')
+        toast.error('Image too large to upload')
         return
       } finally {
         setIsCompressingImage(false)
@@ -189,7 +208,12 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         setUploadError(null)
         toast.success('Image uploaded successfully')
       } else {
-        const message = data?.error || 'Failed to upload image.'
+        let message = data?.error || 'Failed to upload image.'
+        if (response.status === 413) {
+          message = 'Image too large for server. Use a smaller image (under 1 MB) or paste an image link instead.'
+        } else if (response.status === 401) {
+          message = 'Please sign in to upload images.'
+        }
         setUploadError(message)
         toast.error(message)
         URL.revokeObjectURL(objectUrl)
@@ -198,7 +222,10 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
       }
     } catch (error) {
       console.error('Error uploading image:', error)
-      const message = error instanceof Error ? error.message : 'Failed to upload image. Please try again.'
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Upload failed. If the image is large, try a smaller file or use an image link instead.'
       setUploadError(message)
       toast.error('Failed to upload image')
       URL.revokeObjectURL(objectUrl)
@@ -244,11 +271,13 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
     setUploadError(null)
     setMediaLinkInput('')
     setMediaLinkError(null)
+    setMediaPreviewLoading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleMediaLinkSubmit = () => {
     setMediaLinkError(null)
+    setUploadError(null)
     const url = mediaLinkInput.trim()
     if (!url) {
       setMediaLinkError('Please enter a valid URL.')
@@ -259,17 +288,26 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
       return
     }
     const isVideo = isVideoUrl(url)
+    setMediaPreviewLoading(true)
     if (isVideo) {
       setFormData(prev => ({ ...prev, videoUrl: url, imageUrl: '', mediaType: 'video' }))
       if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview)
       setImagePreview(null)
-      toast.success('Video link added. It will play in the CRM.')
+      toast.success('Video URL added. Preview loads below (only URL is saved).')
+      setMediaLinkInput('')
+      setTimeout(() => setMediaPreviewLoading(false), 800)
     } else {
       setFormData(prev => ({ ...prev, imageUrl: url, videoUrl: '', mediaType: 'image' }))
       setImagePreview(url)
-      toast.success('Image link added.')
+      toast.success('Image URL added. Preview loads below (only URL is saved).')
+      setMediaLinkInput('')
     }
-    setMediaLinkInput('')
+  }
+
+  const handleMediaPreviewLoaded = () => setMediaPreviewLoading(false)
+  const handleMediaPreviewError = () => {
+    setMediaPreviewLoading(false)
+    setUploadError('Could not load preview from URL. Link may be private or invalid.')
   }
 
   const handleApproverChange = (index: number, userId: string) => {
@@ -307,6 +345,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
     setUploadError(null)
     setMediaLinkInput('')
     setMediaLinkError(null)
+    setMediaPreviewLoading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -450,9 +489,15 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                   />
 
                   {showVideoPreview ? (
-                    /* Video preview — playable in CRM */
+                    /* Video preview — auto-fetched from URL (preview only; only URL is saved) */
                     <div className="relative rounded-xl overflow-hidden border bg-muted">
                       <div className="w-full aspect-video bg-black flex items-center justify-center max-h-52">
+                        {mediaPreviewLoading && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 z-10">
+                            <Loader2 className="w-8 h-8 text-white animate-spin" />
+                            <p className="text-white text-sm">Loading video preview…</p>
+                          </div>
+                        )}
                         {formData.videoUrl && (() => {
                           const url = formData.videoUrl
                           const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)?.[1]
@@ -484,6 +529,8 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                               controls
                               className="w-full h-full object-contain"
                               preload="metadata"
+                              onLoadedData={handleMediaPreviewLoaded}
+                              onError={handleMediaPreviewError}
                             />
                           )
                         })()}
@@ -508,13 +555,20 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                       )}
                     </div>
                   ) : showImagePreview ? (
-                    /* Image preview state */
+                    /* Image preview — auto-fetched from URL (preview only; only URL is saved) */
                     <div className="relative rounded-xl overflow-hidden border bg-muted">
+                      {mediaPreviewLoading && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted z-10">
+                          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                          <p className="text-sm text-muted-foreground">Loading image preview…</p>
+                        </div>
+                      )}
                       <img
                         src={imagePreview || formData.imageUrl || ''}
                         alt="Post preview"
                         className="w-full h-52 object-cover"
-                        onError={() => setUploadError('Could not load image from link. Check the URL is public.')}
+                        onLoad={handleMediaPreviewLoaded}
+                        onError={handleMediaPreviewError}
                       />
 
                       {isImageBusy && (
@@ -611,24 +665,33 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                           {uploadError}
                         </p>
                       )}
-                      {/* Paste image or video URL (e.g. Google Drive) */}
+                      {/* Add image or video URL — one field for both; preview loads automatically */}
                       <div className="space-y-1.5 pt-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Or add by URL (image or video)
+                        </p>
                         <div className="flex gap-2">
                           <div className="relative flex-1">
                             <Link2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                             <Input
                               type="url"
-                              placeholder="Paste image or video URL (e.g. Google Drive share link)"
+                              placeholder="Paste image or video URL (e.g. Google Drive, YouTube, direct link)"
                               value={mediaLinkInput}
                               onChange={e => {
                                 setMediaLinkInput(e.target.value)
                                 setMediaLinkError(null)
                               }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleMediaLinkSubmit()
+                                }
+                              }}
                               className="pl-8"
                             />
                           </div>
                           <Button type="button" variant="secondary" onClick={handleMediaLinkSubmit}>
-                            Add link
+                            Add URL
                           </Button>
                         </div>
                         {mediaLinkError && (
@@ -637,7 +700,7 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          Supports image links and video links (YouTube, Vimeo, or direct .mp4/.webm). Video plays in CRM.
+                          One URL for either image or video. Preview loads automatically above; only the URL is saved (file is not uploaded).
                         </p>
                       </div>
                     </>
