@@ -200,18 +200,28 @@ export default function WhatsAppCampaignPage() {
   const fetchSeekers = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/inquiries')
-      if (response.ok) {
+      const allInquiries: Seeker[] = []
+      const limit = 100
+      let page = 1
+      let hasMore = true
+
+      while (hasMore) {
+        const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}`)
+        if (!response.ok) {
+          console.error('Failed to fetch inquiries:', response.status, response.statusText)
+          break
+        }
         const data = await safeJsonParse(response)
-        console.log('Fetched inquiries:', data)
-        // API returns { inquiries: [], pagination: {} }, so we need to extract the inquiries array
         const inquiries: Seeker[] = Array.isArray(data) ? data : (data.inquiries || [])
-        // Only show WhatsApp-enabled inquiries (otherwise bulk-send will fail / send to wrong numbers)
-        const whatsappInquiries = inquiries.filter((s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone))
-        setSeekers(whatsappInquiries)
-      } else {
-        console.error('Failed to fetch inquiries:', response.status, response.statusText)
+        allInquiries.push(...inquiries)
+        const pagination = data?.pagination
+        hasMore = pagination?.hasMore === true && inquiries.length === limit
+        page += 1
       }
+
+      // Only show WhatsApp-enabled inquiries (otherwise bulk-send will fail / send to wrong numbers)
+      const whatsappInquiries = allInquiries.filter((s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone))
+      setSeekers(whatsappInquiries)
     } catch (error) {
       console.error('Error fetching seekers:', error)
       setSeekers([]) // Ensure seekers is always an array on error

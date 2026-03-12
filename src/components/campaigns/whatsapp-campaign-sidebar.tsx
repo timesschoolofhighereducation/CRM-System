@@ -76,14 +76,25 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
   const fetchSeekers = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/inquiries')
-      if (response.ok) {
+      const allInquiries: Seeker[] = []
+      const limit = 100
+      let page = 1
+      let hasMore = true
+
+      while (hasMore) {
+        const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}`)
+        if (!response.ok) break
         const data = await response.json().catch(() => ({}))
         const inquiries: Seeker[] = Array.isArray(data) ? data : (data.inquiries || [])
-        // Only WhatsApp-enabled inquiries (must have a WhatsApp number or fallback phone)
-        const whatsappSeekers = inquiries.filter((seeker) => Boolean(seeker.whatsapp) && Boolean(seeker.whatsappNumber || seeker.phone))
-        setSeekers(whatsappSeekers)
+        allInquiries.push(...inquiries)
+        const pagination = data?.pagination
+        hasMore = pagination?.hasMore === true && inquiries.length === limit
+        page += 1
       }
+
+      // Only WhatsApp-enabled inquiries (must have a WhatsApp number or fallback phone)
+      const whatsappSeekers = allInquiries.filter((seeker) => Boolean(seeker.whatsapp) && Boolean(seeker.whatsappNumber || seeker.phone))
+      setSeekers(whatsappSeekers)
     } catch (error) {
       console.error('Error fetching seekers:', error)
       setSendStatus({
