@@ -88,7 +88,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
       console.error('Error fetching seekers:', error)
       setSendStatus({
         type: 'error',
-        message: 'Failed to fetch inquiries'
+        message: 'Could not load recipients. Please try again.'
       })
     } finally {
       setLoading(false)
@@ -136,7 +136,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
       if (file.size > 16 * 1024 * 1024) {
         setSendStatus({
           type: 'error',
-          message: 'File size must be less than 16MB'
+          message: 'File size must be 16 MB or less.'
         })
         return
       }
@@ -146,7 +146,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
       if (!allowedTypes.includes(file.type)) {
         setSendStatus({
           type: 'error',
-          message: 'File type not supported. Please use images, videos, audio, or documents.'
+          message: 'Supported formats: images, video, audio, or PDF/DOC. Please choose a supported file.'
         })
         return
       }
@@ -182,7 +182,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
     if (selectedSeekers.size === 0) {
       setSendStatus({
         type: 'error',
-        message: 'Please select at least one inquiry to send messages'
+        message: 'Please select at least one recipient.'
       })
       return
     }
@@ -190,7 +190,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
     if (!message.trim() && !mediaFile) {
       setSendStatus({
         type: 'error',
-        message: 'Please enter a message or attach a media file'
+        message: 'Please enter a message or attach a file.'
       })
       return
     }
@@ -218,7 +218,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
       if (response.ok) {
         setSendStatus({
           type: 'success',
-          message: `Successfully sent ${result.sentCount} messages. ${result.failedCount} failed.`
+          message: `Sent to ${result.sentCount} recipient(s). ${result.failedCount} delivery failed.`
         })
         setSelectedSeekers(new Set())
         setMessage('')
@@ -227,14 +227,14 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
       } else {
         setSendStatus({
           type: 'error',
-          message: result.error || 'Failed to send messages'
+          message: result.error || 'Message delivery failed. Please try again.'
         })
       }
     } catch (error) {
       console.error('Error sending messages:', error)
       setSendStatus({
         type: 'error',
-        message: 'Failed to send messages. Please try again.'
+        message: 'Message delivery failed. Please try again.'
       })
     } finally {
       setSending(false)
@@ -265,18 +265,18 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
           )}
         </div>
         <p className="text-sm text-gray-600 mt-1">
-          Send bulk WhatsApp messages to selected inquiries
+          Send bulk WhatsApp messages to selected recipients. Compose once, send to many.
         </p>
       </div>
 
       {/* Message Composition */}
       <div className="p-4 border-b border-gray-200">
         <Label htmlFor="message" className="text-sm font-medium">
-          Message Content
+          Message
         </Label>
         <Textarea
           id="message"
-          placeholder="Enter your WhatsApp message here..."
+          placeholder="Enter your message."
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           className="mt-2 min-h-[100px]"
@@ -284,7 +284,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
         
         {/* Media Upload Section */}
         <div className="mt-4">
-          <Label className="text-sm font-medium">Media Attachment (Optional)</Label>
+          <Label className="text-sm font-medium">Attachment (optional)</Label>
           <div className="mt-2 space-y-3">
             {/* File Upload Input */}
             <div className="flex items-center space-x-2">
@@ -300,7 +300,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
                 className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
               >
                 <Upload className="h-4 w-4" />
-                <span className="text-sm">Choose Media File</span>
+                <span className="text-sm">Attach file</span>
               </label>
             </div>
 
@@ -358,7 +358,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
         <div className="flex items-center space-x-2 mb-3">
           <Search className="h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search inquiries..."
+            placeholder="Search recipients"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1"
@@ -373,7 +373,7 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
               onCheckedChange={handleSelectAll}
             />
             <Label htmlFor="select-all" className="text-sm">
-              Select All ({filteredSeekers.length})
+              Select all ({filteredSeekers.length})
             </Label>
           </div>
           <Badge variant="secondary">
@@ -388,13 +388,13 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-              <p className="text-sm text-gray-500 mt-2">Loading inquiries...</p>
+              <p className="text-sm text-gray-500 mt-2">Loading…</p>
             </div>
           ) : filteredSeekers.length === 0 ? (
             <div className="text-center py-8">
               <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-500">
-                {searchTerm ? 'No inquiries found matching your search' : 'No WhatsApp inquiries available'}
+                {searchTerm ? 'No recipients match your search.' : 'No recipients with WhatsApp available.'}
               </p>
             </div>
           ) : (
@@ -479,12 +479,12 @@ export function WhatsAppCampaignSidebar({ campaignId, onClose }: WhatsAppCampaig
           {sending ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Sending...
+              Sending…
             </>
           ) : (
             <>
               <Send className="h-4 w-4 mr-2" />
-              Send to {selectedSeekers.size} inquiries
+              Send to {selectedSeekers.size} recipient(s)
             </>
           )}
         </Button>

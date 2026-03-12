@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     
     if (!seekersData) {
       return NextResponse.json(
-        { error: 'No seekers provided' },
+        { error: 'No recipients provided. Please select at least one recipient.' },
         { status: 400 }
       )
     }
@@ -74,14 +74,14 @@ export async function POST(request: NextRequest) {
 
     if (!seekers || seekers.length === 0) {
       return NextResponse.json(
-        { error: 'No seekers provided' },
+        { error: 'No recipients provided. Please select at least one recipient.' },
         { status: 400 }
       )
     }
 
     if ((!message || message.trim().length === 0) && !mediaFile) {
       return NextResponse.json(
-        { error: 'Message content or media file is required' },
+        { error: 'Message content or an attachment is required.' },
         { status: 400 }
       )
     }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         } catch (localError) {
           console.error('Both S3 and local storage failed:', { s3Error, localError })
           return NextResponse.json(
-            { error: 'Failed to save media file. Please check your storage configuration.' },
+            { error: 'Attachment could not be saved. Please try again or use a different file.' },
             { status: 500 }
           )
         }
@@ -348,7 +348,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: 'Failed to send bulk WhatsApp messages' },
+      { error: 'Message delivery failed. Please try again later.' },
       { status: 500 }
     )
   }

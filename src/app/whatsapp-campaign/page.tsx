@@ -320,11 +320,11 @@ export default function WhatsAppCampaignPage() {
       return
     }
     if (!file.type.startsWith('image/')) {
-      setTemplateError('Please select an image file')
+      setTemplateError('Please select an image file (JPEG, PNG, or GIF).')
       return
     }
     if (file.size > 16 * 1024 * 1024) {
-      setTemplateError('Image must be less than 16MB')
+      setTemplateError('Image size must be 16 MB or less.')
       return
     }
     setTemplateImageFile(file)
@@ -337,11 +337,11 @@ export default function WhatsAppCampaignPage() {
     const name = templateName.trim()
     const content = templateContent
     if (!name) {
-      setTemplateError('Template name is required')
+      setTemplateError('Please enter a template name.')
       return
     }
     if (!content.trim()) {
-      setTemplateError('Template content is required')
+      setTemplateError('Please enter message content.')
       return
     }
 
@@ -356,7 +356,7 @@ export default function WhatsAppCampaignPage() {
       const response = await fetch('/api/whatsapp/templates', { method: 'POST', body: formData })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setTemplateError(result.error || 'Failed to save template')
+        setTemplateError(result.error || 'Could not save template. Please try again.')
         return
       }
 
@@ -383,7 +383,7 @@ export default function WhatsAppCampaignPage() {
       setIsTemplateDialogOpen(false)
     } catch (error) {
       console.error('Error saving template:', error)
-      setTemplateError('Network error. Please try again.')
+      setTemplateError('Connection error. Please try again.')
     } finally {
       setTemplateSaving(false)
     }
@@ -429,7 +429,7 @@ export default function WhatsAppCampaignPage() {
       if (file.size > 16 * 1024 * 1024) {
         setSendStatus({
           type: 'error',
-          message: 'File size must be less than 16MB'
+          message: 'File size must be 16 MB or less.'
         })
         return
       }
@@ -439,7 +439,7 @@ export default function WhatsAppCampaignPage() {
       if (!allowedTypes.includes(file.type)) {
         setSendStatus({
           type: 'error',
-          message: 'File type not supported. Please use images, videos, audio, or documents.'
+          message: 'Supported formats: images, video, audio, or PDF/DOC. Please choose a supported file.'
         })
         return
       }
@@ -475,7 +475,7 @@ export default function WhatsAppCampaignPage() {
     if (selectedSeekers.size === 0) {
       setSendStatus({
         type: 'error',
-        message: 'Please select at least one inquiry to send messages'
+        message: 'Please select at least one recipient.'
       })
       return
     }
@@ -483,7 +483,7 @@ export default function WhatsAppCampaignPage() {
     if (!message.trim() && !mediaFile) {
       setSendStatus({
         type: 'error',
-        message: 'Please enter a message or attach a media file'
+        message: 'Please enter a message or attach a file.'
       })
       return
     }
@@ -510,7 +510,7 @@ export default function WhatsAppCampaignPage() {
       if (response.ok) {
         setSendStatus({
           type: 'success',
-          message: `Successfully sent ${result.sentCount} messages. ${result.failedCount} failed.`
+          message: `Sent to ${result.sentCount} recipient(s). ${result.failedCount} delivery failed.`
         })
         setSelectedSeekers(new Set())
         setMessage('')
@@ -523,13 +523,13 @@ export default function WhatsAppCampaignPage() {
       } else {
         setSendStatus({
           type: 'error',
-          message: result.error || 'Failed to send messages'
+          message: result.error || 'Message delivery failed. Please try again.'
         })
       }
     } catch (_error) {
       setSendStatus({
         type: 'error',
-        message: 'Network error. Please try again.'
+        message: 'Connection error. Please check your network and try again.'
       })
     } finally {
       setSending(false)
@@ -550,7 +550,7 @@ export default function WhatsAppCampaignPage() {
                 WhatsApp Campaign
               </h1>
               <p className="text-gray-600">
-                Send bulk WhatsApp messages to inquiries
+                Send bulk WhatsApp messages to selected recipients. Compose once, send to many.
               </p>
             </div>
           </div>
@@ -565,7 +565,7 @@ export default function WhatsAppCampaignPage() {
             className="flex items-center space-x-2"
           >
             <History className="h-4 w-4" />
-            <span>Message History</span>
+            <span>View history</span>
           </Button>
         </div>
 
@@ -577,7 +577,7 @@ export default function WhatsAppCampaignPage() {
                 {/* Templates */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Message Template</Label>
+                    <Label className="text-sm font-medium">Message template</Label>
                     <div className="flex items-center gap-2">
                       <Button
                         type="button"
@@ -585,7 +585,7 @@ export default function WhatsAppCampaignPage() {
                         size="sm"
                         onClick={handleOpenTemplateDialog}
                       >
-                        Add Template
+                        Create template
                       </Button>
                     </div>
                   </div>
@@ -601,10 +601,10 @@ export default function WhatsAppCampaignPage() {
                     >
                       <span className="truncate">
                         {templatesLoading
-                          ? 'Loading templates...'
+                          ? 'Loading templates…'
                           : selectedTemplateId === 'none'
-                            ? 'Select a template'
-                            : (templates.find((t) => t.id === selectedTemplateId)?.name || 'Select a template')}
+                            ? 'Choose a template'
+                            : (templates.find((t) => t.id === selectedTemplateId)?.name || 'Choose a template')}
                       </span>
                       <ChevronDown className="h-4 w-4 opacity-60" />
                     </Button>
@@ -625,11 +625,11 @@ export default function WhatsAppCampaignPage() {
 
                 <div>
                   <Label htmlFor="message" className="text-sm font-medium">
-                    Message Content
+                    Message content
                   </Label>
                   <Textarea
                     id="message"
-                    placeholder="Enter your WhatsApp message here..."
+                    placeholder="Enter your message. You can use a template or type below."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     className="mt-2 min-h-[120px]"
@@ -638,7 +638,7 @@ export default function WhatsAppCampaignPage() {
                 
                 {/* Media Upload Section */}
                 <div>
-                  <Label className="text-sm font-medium">Media Attachment (Optional)</Label>
+                  <Label className="text-sm font-medium">Attachment (optional)</Label>
                   <div className="mt-2 space-y-3">
                     {/* File Upload Input */}
                     <div className="flex items-center space-x-2">
@@ -654,7 +654,7 @@ export default function WhatsAppCampaignPage() {
                         className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
                       >
                         <Upload className="h-4 w-4" />
-                        <span className="text-sm">Choose Media File</span>
+                        <span className="text-sm">Attach file</span>
                       </label>
                     </div>
 
@@ -706,12 +706,12 @@ export default function WhatsAppCampaignPage() {
                   {sending ? (
                     <div className="flex items-center space-x-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Sending...</span>
+                      <span>Sending…</span>
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2">
                       <Send className="h-4 w-4" />
-                      <span>Send to {selectedSeekers.size} Selected</span>
+                      <span>Send to {selectedSeekers.size} recipient(s)</span>
                     </div>
                   )}
                 </Button>
@@ -737,7 +737,7 @@ export default function WhatsAppCampaignPage() {
                 <div className="flex items-center space-x-2">
                   <Search className="h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Search by name, phone, email, or city..."
+                    placeholder="Search by name, phone, email, or city"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="flex-1"
@@ -755,7 +755,7 @@ export default function WhatsAppCampaignPage() {
                             ? dateRange?.to
                               ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
                               : format(dateRange.from, 'MMM d, yyyy')
-                            : 'Date'}
+                            : 'Date range'}
                         </span>
                       </Button>
                     </PopoverTrigger>
@@ -792,7 +792,7 @@ export default function WhatsAppCampaignPage() {
                     className="flex items-center space-x-1"
                   >
                     <Filter className="h-4 w-4" />
-                    <span>Programs</span>
+                    <span>Filter by program</span>
                     {selectedPrograms.size > 0 && (
                       <Badge variant="secondary" className="ml-1 text-xs">
                         {selectedPrograms.size}
@@ -807,7 +807,7 @@ export default function WhatsAppCampaignPage() {
                     className="flex items-center space-x-1"
                   >
                     <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    <span>Refresh</span>
+                    <span>Refresh list</span>
                   </Button>
                 </div>
 
@@ -815,7 +815,7 @@ export default function WhatsAppCampaignPage() {
                 {showProgramFilter && (
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-900">Filter by Programs</h3>
+                      <h3 className="text-sm font-medium text-gray-900">Filter by program</h3>
                       <div className="flex items-center space-x-2">
                         {selectedPrograms.size > 0 && (
                           <Button
@@ -824,7 +824,7 @@ export default function WhatsAppCampaignPage() {
                             onClick={handleClearProgramFilters}
                             className="text-xs text-gray-500 hover:text-gray-700"
                           >
-                            Clear All
+                            Clear filters
                           </Button>
                         )}
                         <Button
@@ -879,9 +879,9 @@ export default function WhatsAppCampaignPage() {
                 
                 {/* Stats */}
                 <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>Total: {seekers.length} inquiries</span>
-                  <span>Filtered: {filteredSeekers.length} inquiries</span>
-                  <span>Selected: {selectedSeekers.size} inquiries</span>
+                  <span><strong>Total:</strong> {seekers.length}</span>
+                  <span><strong>Shown:</strong> {filteredSeekers.length}</span>
+                  <span><strong>Selected:</strong> {selectedSeekers.size}</span>
                   {selectedPrograms.size > 0 && (
                     <span className="text-blue-600">
                       {selectedPrograms.size} program{selectedPrograms.size > 1 ? 's' : ''} selected
@@ -897,7 +897,7 @@ export default function WhatsAppCampaignPage() {
                     onCheckedChange={handleSelectAll}
                   />
                   <Label htmlFor="select-all" className="text-sm font-medium">
-                    Select All ({filteredSeekers.length} inquiries)
+                    Select all ({filteredSeekers.length})
                   </Label>
                 </div>
 
@@ -905,12 +905,13 @@ export default function WhatsAppCampaignPage() {
                 <ScrollArea className="h-96">
                   <div className="space-y-2">
                     {loading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" aria-hidden />
+                        <span className="text-sm text-gray-500">Loading…</span>
                       </div>
                     ) : filteredSeekers.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        No inquiries found
+                        No recipients match your filters. Try adjusting the search or filters.
                       </div>
                     ) : (
                       filteredSeekers.map((seeker) => (
@@ -994,7 +995,7 @@ export default function WhatsAppCampaignPage() {
           <Card className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Message History</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Message history</h2>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1008,12 +1009,13 @@ export default function WhatsAppCampaignPage() {
               </div>
 
               {historyLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" aria-hidden />
+                  <span className="text-sm text-gray-500">Loading…</span>
                 </div>
               ) : messageHistory.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  No message history found
+                  No messages sent yet.
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1039,7 +1041,7 @@ export default function WhatsAppCampaignPage() {
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:text-blue-800 text-xs underline"
                                   >
-                                    View Media
+                                    Open media
                                   </a>
                                 )}
                               </div>
@@ -1056,7 +1058,7 @@ export default function WhatsAppCampaignPage() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <CheckCircle className="h-3 w-3 text-green-600" />
-                              <span>{message.sentCount} sent</span>
+                              <span>{message.sentCount} delivered</span>
                             </div>
                             {message.failedCount > 0 && (
                               <div className="flex items-center space-x-1">
@@ -1071,7 +1073,7 @@ export default function WhatsAppCampaignPage() {
                       {/* Media Preview */}
                       {message.mediaFilePath && message.mediaType && (
                         <div className="mt-3 pt-3 border-t border-gray-100">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Media</h4>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Attachment</h4>
                           <div className="flex items-center space-x-2">
                             {message.mediaType.startsWith('image/') ? (
                               <img
@@ -1086,7 +1088,7 @@ export default function WhatsAppCampaignPage() {
                               <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded border">
                                 <FileIcon className="h-4 w-4 text-gray-500" />
                                 <span className="text-sm text-gray-600">
-                                  {message.mediaFilename || 'Media file'}
+                                  {message.mediaFilename || 'Attachment'}
                                 </span>
                               </div>
                             )}
@@ -1141,9 +1143,9 @@ export default function WhatsAppCampaignPage() {
       <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add WhatsApp Message Template</DialogTitle>
+            <DialogTitle>Create message template</DialogTitle>
             <DialogDescription>
-              Save a reusable message. After saving, you can select it and send.
+              Reusable messages save time. Create once, then select from the template list when composing.
             </DialogDescription>
           </DialogHeader>
 
@@ -1152,17 +1154,17 @@ export default function WhatsAppCampaignPage() {
               <Label htmlFor="template-name">Template name</Label>
               <Input
                 id="template-name"
-                placeholder="e.g., Welcome message"
+                placeholder="e.g. Welcome message"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="template-content">Template content</Label>
+              <Label htmlFor="template-content">Message content</Label>
               <Textarea
                 id="template-content"
-                placeholder="Type template message..."
+                placeholder="Enter the message text for this template."
                 value={templateContent}
                 onChange={(e) => setTemplateContent(e.target.value)}
                 className="min-h-[140px]"
@@ -1170,7 +1172,7 @@ export default function WhatsAppCampaignPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="template-image">Template image (optional)</Label>
+              <Label htmlFor="template-image">Image (optional)</Label>
               <Input
                 id="template-image"
                 type="file"
@@ -1204,7 +1206,7 @@ export default function WhatsAppCampaignPage() {
               Cancel
             </Button>
             <Button type="button" onClick={handleSaveTemplate} disabled={templateSaving}>
-              {templateSaving ? 'Saving...' : 'Save Template'}
+              {templateSaving ? 'Saving…' : 'Save template'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1237,17 +1239,17 @@ export default function WhatsAppCampaignPage() {
                   <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
                     <div className="flex flex-col items-center justify-center text-gray-500">
                       <MessageSquare className="h-8 w-8" />
-                      <span className="text-xs mt-1">No template</span>
+                      <span className="text-xs mt-1">Start from scratch</span>
                     </div>
                   </div>
                   <div className="p-3">
                     <div className="font-medium text-sm text-gray-900 truncate">None</div>
-                    <div className="text-xs text-gray-600 mt-1">Clear template selection</div>
+                    <div className="text-xs text-gray-600 mt-1">Use empty message</div>
                   </div>
                 </button>
 
                 {templates.length === 0 ? (
-                  <div className="col-span-full text-sm text-gray-500">No templates yet.</div>
+                  <div className="col-span-full text-sm text-gray-500">No templates yet. Create one from the &quot;Create template&quot; button.</div>
                 ) : (
                   templates.map((t) => (
                     <button

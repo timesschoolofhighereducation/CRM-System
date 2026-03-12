@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ templates })
   } catch (error) {
     console.error('Error fetching WhatsApp templates:', error)
-    return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 })
+    return NextResponse.json({ error: 'Could not load templates. Please try again.' }, { status: 500 })
   }
 }
 
@@ -73,14 +73,14 @@ export async function POST(request: NextRequest) {
     const mediaFile = formData.get('media') as File | null
 
     if (!name) {
-      return NextResponse.json({ error: 'Template name is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Template name is required.' }, { status: 400 })
     }
     if (!content.trim()) {
-      return NextResponse.json({ error: 'Template content is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Template content is required.' }, { status: 400 })
     }
 
     if (mediaFile && !mediaFile.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Only image files are supported for templates' }, { status: 400 })
+      return NextResponse.json({ error: 'Only image files (e.g. JPEG, PNG, GIF) are supported for template images.' }, { status: 400 })
     }
 
     // Save media (try S3 first, fallback to local)
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ template })
   } catch (error) {
     console.error('Error creating WhatsApp template:', error)
-    return NextResponse.json({ error: 'Failed to save template' }, { status: 500 })
+    return NextResponse.json({ error: 'Could not save template. Please try again.' }, { status: 500 })
   }
 }
 

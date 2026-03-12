@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching WhatsApp message history:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch message history' },
+      { error: 'Could not load message history. Please try again.' },
       { status: 500 }
     )
   }
