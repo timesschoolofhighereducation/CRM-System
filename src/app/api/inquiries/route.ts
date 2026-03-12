@@ -47,6 +47,12 @@ export async function GET(request: NextRequest) {
               program: true,
             },
           },
+          promotionCode: {
+            select: {
+              id: true,
+              code: true,
+            },
+          },
           createdBy: {
             select: {
               id: true,

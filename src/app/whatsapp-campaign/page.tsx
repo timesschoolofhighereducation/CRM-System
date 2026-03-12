@@ -45,7 +45,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  User
+  User,
+  Gift
 } from 'lucide-react'
 
 interface Seeker {
@@ -58,6 +59,8 @@ interface Seeker {
   city?: string
   marketingSource: string
   campaignId?: string
+  promotionCodeId?: string | null
+  promotionCode?: { id: string; code: string } | null
   createdAt: string
   preferredPrograms?: Array<{
     program: {
@@ -133,6 +136,7 @@ export default function WhatsAppCampaignPage() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [selectedPrograms, setSelectedPrograms] = useState<Set<string>>(new Set())
   const [showProgramFilter, setShowProgramFilter] = useState(false)
+  const [promotionCodeHoldersOnly, setPromotionCodeHoldersOnly] = useState(false)
   const [messageHistory, setMessageHistory] = useState<WhatsAppMessageHistory[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -194,8 +198,13 @@ export default function WhatsAppCampaignPage() {
       })
     }
 
+    // Filter to promotion code holders only (inquiries that have a promotion code)
+    if (promotionCodeHoldersOnly) {
+      filtered = filtered.filter(seeker => Boolean(seeker.promotionCodeId ?? seeker.promotionCode))
+    }
+
     setFilteredSeekers(filtered)
-  }, [seekers, searchTerm, selectedPrograms, dateRange])
+  }, [seekers, searchTerm, selectedPrograms, dateRange, promotionCodeHoldersOnly])
 
   const fetchSeekers = async () => {
     try {
@@ -810,6 +819,15 @@ export default function WhatsAppCampaignPage() {
                     )}
                   </Button>
                   <Button
+                    variant={promotionCodeHoldersOnly ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPromotionCodeHoldersOnly(!promotionCodeHoldersOnly)}
+                    className="flex items-center space-x-1"
+                  >
+                    <Gift className="h-4 w-4" />
+                    <span>Promotion code holders</span>
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={fetchSeekers}
@@ -897,6 +915,9 @@ export default function WhatsAppCampaignPage() {
                       {selectedPrograms.size} program{selectedPrograms.size > 1 ? 's' : ''} selected
                     </span>
                   )}
+                  {promotionCodeHoldersOnly && (
+                    <span className="text-amber-600 font-medium">Promotion code holders only</span>
+                  )}
                 </div>
 
                 {/* Select All */}
@@ -943,6 +964,12 @@ export default function WhatsAppCampaignPage() {
                                 {seeker.whatsapp && (
                                   <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                                     WhatsApp
+                                  </Badge>
+                                )}
+                                {(seeker.promotionCodeId ?? seeker.promotionCode) && (
+                                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-xs gap-0.5">
+                                    <Gift className="h-3 w-3" />
+                                    {seeker.promotionCode?.code ?? 'Promo'}
                                   </Badge>
                                 )}
                                 {seeker.preferredPrograms && seeker.preferredPrograms.length > 0 && (

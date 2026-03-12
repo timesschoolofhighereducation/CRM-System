@@ -37,6 +37,8 @@ interface Seeker {
   city?: string
   marketingSource: string
   campaignId?: string
+  promotionCodeId?: string | null
+  promotionCode?: { id: string; code: string } | null
   createdAt: string
   preferredPrograms?: Array<{
     program: {
