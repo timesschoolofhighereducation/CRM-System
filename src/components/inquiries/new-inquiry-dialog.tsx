@@ -23,10 +23,10 @@ import { markTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 
 const inquirySchema = z.object({
   fullName: z.string()
-    .min(1, 'Full name is required')
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name must be less than 100 characters')
-    .regex(/^[a-zA-Z\s]+$/, 'Full name can only contain letters and spaces'),
+    .optional()
+    .refine((val) => !val || val.trim().length >= 2, 'Full name must be at least 2 characters if provided')
+    .refine((val) => !val || val.trim().length <= 100, 'Full name must be less than 100 characters')
+    .refine((val) => !val || /^[a-zA-Z\s]+$/.test(val), 'Full name can only contain letters and spaces'),
   
   phone: z.string()
     .min(1, 'Phone number is required')
@@ -241,17 +241,16 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
     
     // If "Not Answering" is checked, allow submission with minimal requirements
     if (values.notAnswering) {
-      // Still need at least full name and phone
-      const hasMinimalFields = values.fullName?.trim() && values.phone?.trim()
-      // Only check for errors on critical fields (fullName and phone)
+      // Still need at least phone number
+      const hasMinimalFields = values.phone?.trim()
+      // Only check for errors on phone (name is optional)
       // Ignore age, marketingSource, and other optional field errors
-      const hasCriticalErrors = errors.fullName || errors.phone
+      const hasCriticalErrors = errors.phone
       return hasMinimalFields && !hasCriticalErrors
     }
     
     // Normal validation: Check required fields
-    const hasRequiredFields = values.fullName?.trim() && 
-                             values.phone?.trim() && 
+    const hasRequiredFields = values.phone?.trim() && 
                              values.marketingSource?.trim()
     
     // Check if there are any validation errors
@@ -652,11 +651,6 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
     setIsLoading(true)
     try {
       // Additional validation before submission
-      if (!data.fullName?.trim()) {
-        toast.error('Full name is required')
-        return
-      }
-      
       if (!data.phone?.trim()) {
         toast.error('Phone number is required')
         return
@@ -725,7 +719,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
 
       // Base form data (shared across all inquiries if multiple programs)
       const baseFormData = {
-        fullName: data.fullName.trim(),
+        fullName: data.fullName?.trim() || '',
         phone: data.phone.trim(),
         email: data.email?.trim() || undefined,
         city: data.district?.trim() || undefined, // Map district to city
@@ -903,7 +897,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
           <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-2.5 sm:space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-1.5 relative">
-              <Label htmlFor="fullName" className="text-xs sm:text-sm font-medium">Full Name *</Label>
+              <Label htmlFor="fullName" className="text-xs sm:text-sm font-medium">Full Name (Optional)</Label>
               <div className="relative">
                 <Input
                   id="fullName"
@@ -913,7 +907,7 @@ export function NewInquiryDialog({ open, onOpenChange, initialData, onInquiryCre
                     form.register('fullName').onChange(e)
                     handleNameChange(e.target.value)
                   }}
-                  placeholder="Enter full name"
+                  placeholder="Enter full name (optional)"
                   onKeyDown={handleEnterAdvance}
                   className="w-full"
                 />
