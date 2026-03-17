@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied. Admin privileges required.' }, { status: 403 })
     }
 
-    const tables = (await requestInquiryPrisma.$queryRawUnsafe<{ table_name: string }[]>(
+    const tables = (await requestInquiryPrisma.$queryRawUnsafe(
       `SELECT table_name FROM information_schema.tables 
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE' 
        ORDER BY table_name`
-    )).map(r => r.table_name)
+    ) as { table_name: string }[]).map((r: { table_name: string }) => r.table_name)
 
     const lines: string[] = [
       '-- Request Inquiry DB backup (schema + data)',
@@ -71,13 +71,13 @@ export async function GET(request: NextRequest) {
     ]
 
     for (const table of tables) {
-      const cols = await requestInquiryPrisma.$queryRawUnsafe<ColumnRow[]>(
+      const cols = await requestInquiryPrisma.$queryRawUnsafe(
         `SELECT column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length
          FROM information_schema.columns 
          WHERE table_schema = 'public' AND table_name = $1
          ORDER BY ordinal_position`,
         table
-      )
+      ) as ColumnRow[]
       if (cols.length === 0) continue
 
       const colDefs = cols.map(c => {
@@ -87,18 +87,18 @@ export async function GET(request: NextRequest) {
         return `  "${c.column_name}" ${type}${nullable}${def}`
       })
 
-      const pkRows = await requestInquiryPrisma.$queryRawUnsafe<{ constraint_name: string }[]>(
+      const pkRows = await requestInquiryPrisma.$queryRawUnsafe(
         `SELECT c.constraint_name
          FROM information_schema.table_constraints c
          WHERE c.table_schema = 'public'
            AND c.table_name = $1
            AND c.constraint_type = 'PRIMARY KEY'`,
         table
-      )
+      ) as { constraint_name: string }[]
       const pkName = pkRows[0]?.constraint_name
-      let pkCols: string[] = []
+      const pkCols: string[] = []
       if (pkName) {
-        const colRows = await requestInquiryPrisma.$queryRawUnsafe<{ column_name: string }[]>(
+        const colRows = await requestInquiryPrisma.$queryRawUnsafe(
           `SELECT column_name
            FROM information_schema.key_column_usage
            WHERE constraint_name = $1
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
            ORDER BY ordinal_position`,
           pkName,
           table
-        )
+        ) as { column_name: string }[]
         const seen = new Set<string>()
         for (const r of colRows) {
           if (!seen.has(r.column_name)) {
@@ -128,9 +128,9 @@ export async function GET(request: NextRequest) {
 
       const columnNames = cols.map(c => c.column_name)
       const quotedCols = columnNames.map(c => `"${c}"`).join(', ')
-      const rows = await requestInquiryPrisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      const rows = await requestInquiryPrisma.$queryRawUnsafe(
         `SELECT * FROM "public"."${table}"`
-      )
+      ) as Record<string, unknown>[]
 
       if (rows.length > 0) {
         lines.push(`-- Data: ${table} (${rows.length} rows)`)
