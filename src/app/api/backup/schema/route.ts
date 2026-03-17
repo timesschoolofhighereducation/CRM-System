@@ -5,8 +5,8 @@ import { logBackupSchema } from '@/lib/activity-logger'
 import {
   getEnumTypes,
   generateIdempotentEnumSql,
-  getPrimaryKeyColumns,
   validateCustomTypes,
+  getPrimaryKeyInfo,
   sqlType,
   type ColumnRow,
 } from '@/lib/backup-utils'
@@ -65,12 +65,14 @@ export async function GET(request: NextRequest) {
         return `  "${c.column_name}" ${type}${nullable}${def}`
       })
 
-      const pk = await getPrimaryKeyColumns(table)
+      const pkInfo = await getPrimaryKeyInfo(table)
+      const pkName = pkInfo?.name
+      const pkCols = pkInfo?.columns.map(c => `"${c}"`) ?? []
 
       lines.push(`CREATE TABLE IF NOT EXISTS "public"."${table}" (`)
       lines.push(colDefs.join(',\n'))
-      if (pk && pk.columns.length > 0) {
-        lines.push(`, CONSTRAINT "${pk.constraintName}" PRIMARY KEY (${pk.columns.join(', ')})`)
+      if (pkCols.length) {
+        lines.push(`, CONSTRAINT "${pkName}" PRIMARY KEY (${pkCols.join(', ')})`)
       }
       lines.push(');')
       lines.push('')
