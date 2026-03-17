@@ -5,6 +5,7 @@ import { logBackupSchema } from '@/lib/activity-logger'
 import {
   getEnumTypes,
   generateIdempotentEnumSql,
+  getPrimaryKeyColumns,
   validateCustomTypes,
   sqlType,
   type ColumnRow,
@@ -64,26 +65,12 @@ export async function GET(request: NextRequest) {
         return `  "${c.column_name}" ${type}${nullable}${def}`
       })
 
-      const pks = await prisma.$queryRawUnsafe<{ constraint_name: string }[]>(
-        `SELECT c.constraint_name FROM information_schema.table_constraints c
-         WHERE c.table_schema = 'public' AND c.table_name = $1 AND c.constraint_type = 'PRIMARY KEY'`,
-        table
-      )
-      const pkName = pks[0]?.constraint_name
-      let pkCols: string[] = []
-      if (pkName) {
-        const pkColRows = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
-          `SELECT column_name FROM information_schema.key_column_usage 
-           WHERE constraint_name = $1 ORDER BY ordinal_position`,
-          pkName
-        )
-        pkCols = pkColRows.map(r => `"${r.column_name}"`)
-      }
+      const pk = await getPrimaryKeyColumns(table)
 
       lines.push(`CREATE TABLE IF NOT EXISTS "public"."${table}" (`)
       lines.push(colDefs.join(',\n'))
-      if (pkCols.length) {
-        lines.push(`, CONSTRAINT "${pkName}" PRIMARY KEY (${pkCols.join(', ')})`)
+      if (pk && pk.columns.length > 0) {
+        lines.push(`, CONSTRAINT "${pk.constraintName}" PRIMARY KEY (${pk.columns.join(', ')})`)
       }
       lines.push(');')
       lines.push('')

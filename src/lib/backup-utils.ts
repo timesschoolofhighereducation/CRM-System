@@ -2,12 +2,14 @@
  * PostgreSQL backup utilities: ENUM extraction and idempotent DDL generation.
  * Ensures backup order: TYPES → TABLES → DATA for restorable SQL.
  *
- * Best practices used:
- * - ENUMs are extracted from pg_catalog.pg_type/pg_enum and emitted before any table.
- * - CREATE TYPE is wrapped in DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL for idempotent restore.
- * - CREATE TABLE IF NOT EXISTS for idempotent table creation.
- * - Validation step (validateCustomTypes) before export to detect missing type definitions.
- * - Column types reference "public"."TypeName" for custom types so restore works with any search_path.
+ * Fixes applied (production-ready restore):
+ * - ENUMs: Extracted from pg_catalog.pg_type/pg_enum and emitted BEFORE any CREATE TABLE.
+ * - CREATE TYPE uses DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL (idempotent).
+ * - Primary keys: getPrimaryKeyColumns() scopes key_column_usage to the table and deduplicates
+ *   column names to avoid "column X appears twice in primary key constraint" (PRIMARY KEY ("id","id")).
+ * - Column types: Custom types emitted as "public"."TypeName" for correct restore.
+ *
+ * Alternative (recommended for full fidelity): use pg_dump via scripts/backup-postgres.sh.
  */
 
 import { prisma } from '@/lib/prisma'
@@ -81,6 +83,46 @@ export async function validateCustomTypes(): Promise<
     return { valid: false, missingTypes: [...missingTypeNames].sort() }
   }
   return { valid: true }
+}
+
+/**
+ * Get primary key column names for a table (deduplicated, order preserved).
+ * Prevents "column X appears twice in primary key constraint" by scoping to the table
+ * and removing duplicate column names.
+ */
+export async function getPrimaryKeyColumns(tableName: string): Promise<{ constraintName: string; columns: string[] } | null> {
+  const constraints = await prisma.$queryRawUnsafe<{ constraint_name: string }[]>(
+    `SELECT c.constraint_name
+     FROM information_schema.table_constraints c
+     WHERE c.table_schema = 'public' AND c.table_name = $1 AND c.constraint_type = 'PRIMARY KEY'
+     LIMIT 1`,
+    tableName
+  )
+  const pkName = constraints[0]?.constraint_name
+  if (!pkName) return null
+
+  const rows = await prisma.$queryRawUnsafe<{ column_name: string; ordinal_position: number }[]>(
+    `SELECT k.column_name, k.ordinal_position
+     FROM information_schema.table_constraints c
+     JOIN information_schema.key_column_usage k
+       ON c.constraint_name = k.constraint_name
+      AND c.table_schema = k.table_schema
+      AND c.table_name = k.table_name
+     WHERE c.table_schema = 'public' AND c.table_name = $1 AND c.constraint_type = 'PRIMARY KEY'
+     ORDER BY k.ordinal_position`,
+    tableName
+  )
+
+  const seen = new Set<string>()
+  const columns = rows
+    .filter(r => {
+      if (seen.has(r.column_name)) return false
+      seen.add(r.column_name)
+      return true
+    })
+    .map(r => `"${r.column_name}"`)
+
+  return { constraintName: pkName, columns }
 }
 
 /** Escape a single quote in SQL string literal (for enum labels) */
