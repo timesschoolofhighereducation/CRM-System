@@ -30,6 +30,8 @@ export function DatabaseBackupDashboard() {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [downloadingFull, setDownloadingFull] = useState(false)
   const [downloadingSchema, setDownloadingSchema] = useState(false)
+  const [downloadingRqFull, setDownloadingRqFull] = useState(false)
+  const [downloadingRqSchema, setDownloadingRqSchema] = useState(false)
 
   const fetchHistory = async () => {
     setLoadingHistory(true)
@@ -69,6 +71,34 @@ export function DatabaseBackupDashboard() {
       a.click()
       URL.revokeObjectURL(url)
       await fetchHistory()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Download failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const downloadRequestInquiryBackup = async (type: 'full' | 'schema') => {
+    const setBusy = type === 'full' ? setDownloadingRqFull : setDownloadingRqSchema
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/backup/request-inquiry/${type}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Download failed: ${res.status}`)
+      }
+      const blob = await res.blob()
+      const name =
+        res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
+        (type === 'full'
+          ? 'request-inquiry-backup-full.sql'
+          : 'request-inquiry-schema.sql')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.click()
+      URL.revokeObjectURL(url)
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Download failed')
     } finally {
@@ -135,6 +165,65 @@ export function DatabaseBackupDashboard() {
                 <Download className="h-4 w-4 mr-2" />
               )}
               {downloadingSchema ? 'Generating…' : 'Download schema only (.sql)'}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Request Inquiry DB – full backup
+            </CardTitle>
+            <CardDescription>
+              Export the separate Request Inquiry database (schema + data) as SQL.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => downloadRequestInquiryBackup('full')}
+              disabled={downloadingRqFull}
+              className="w-full"
+            >
+              {downloadingRqFull ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {downloadingRqFull
+                ? 'Generating…'
+                : 'Download Request Inquiry full backup (.sql)'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              Request Inquiry DB – schema only
+            </CardTitle>
+            <CardDescription>
+              Export only table structure (DDL) for the Request Inquiry database.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => downloadRequestInquiryBackup('schema')}
+              disabled={downloadingRqSchema}
+              className="w-full"
+            >
+              {downloadingRqSchema ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {downloadingRqSchema
+                ? 'Generating…'
+                : 'Download Request Inquiry schema only (.sql)'}
             </Button>
           </CardContent>
         </Card>
