@@ -24,7 +24,10 @@ import {
   XCircle,
   FileText,
   FileSpreadsheet,
-  RefreshCw
+  RefreshCw,
+  Database,
+  FileCode,
+  HardDrive
 } from 'lucide-react'
 import { LoginTrendsChart } from './login-trends-chart'
 
@@ -89,6 +92,8 @@ export function ActivityLogsDashboard() {
   })
 
   const [selectedTab, setSelectedTab] = useState('logs')
+  const [backupLoading, setBackupLoading] = useState<'data' | 'schema' | null>(null)
+  const [backupError, setBackupError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchActivityLogs()
@@ -188,7 +193,61 @@ export function ActivityLogsDashboard() {
       case 'SESSION_TIMEOUT': return <Clock className="h-4 w-4 text-yellow-500" />
       case 'PASSWORD_CHANGE': return <Shield className="h-4 w-4 text-blue-500" />
       case 'PROFILE_UPDATE': return <User className="h-4 w-4 text-purple-500" />
+      case 'DATA_BACKUP': return <HardDrive className="h-4 w-4 text-emerald-500" />
+      case 'SCHEMA_EXPORT': return <FileCode className="h-4 w-4 text-cyan-500" />
       default: return <Activity className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  const downloadDataBackup = async () => {
+    setBackupError(null)
+    setBackupLoading('data')
+    try {
+      const res = await fetch('/api/backup/data')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Download failed')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `data-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      fetchActivityLogs()
+    } catch (e) {
+      setBackupError(e instanceof Error ? e.message : 'Failed to download data backup')
+    } finally {
+      setBackupLoading(null)
+    }
+  }
+
+  const downloadSchemaExport = async () => {
+    setBackupError(null)
+    setBackupLoading('schema')
+    try {
+      const res = await fetch('/api/backup/schema')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Download failed')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `schema-export-${new Date().toISOString().slice(0, 10)}.sql`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      fetchActivityLogs()
+    } catch (e) {
+      setBackupError(e instanceof Error ? e.message : 'Failed to download schema export')
+    } finally {
+      setBackupLoading(null)
     }
   }
 
@@ -238,8 +297,9 @@ export function ActivityLogsDashboard() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+        <TabsList className="grid w-full grid-cols-4 sm:w-auto">
           <TabsTrigger value="logs" className="text-xs sm:text-sm">Activity Logs</TabsTrigger>
+          <TabsTrigger value="backup" className="text-xs sm:text-sm">Backup</TabsTrigger>
           <TabsTrigger value="trends" className="text-xs sm:text-sm">Trends</TabsTrigger>
           <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
         </TabsList>
@@ -280,6 +340,8 @@ export function ActivityLogsDashboard() {
                       <SelectItem value="SESSION_TIMEOUT">Session Timeout</SelectItem>
                       <SelectItem value="PASSWORD_CHANGE">Password Change</SelectItem>
                       <SelectItem value="PROFILE_UPDATE">Profile Update</SelectItem>
+                      <SelectItem value="DATA_BACKUP">Data Backup</SelectItem>
+                      <SelectItem value="SCHEMA_EXPORT">Schema Export</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -371,6 +433,11 @@ export function ActivityLogsDashboard() {
                                     {log.failureReason && (
                                       <div className="text-xs text-red-600 dark:text-red-400 truncate max-w-[120px]" title={log.failureReason}>
                                         {log.failureReason}
+                                      </div>
+                                    )}
+                                    {(log.activityType === 'DATA_BACKUP' || log.activityType === 'SCHEMA_EXPORT') && log.metadata?.tables && (
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]" title={Array.isArray(log.metadata.tables) ? log.metadata.tables.join(', ') : ''}>
+                                        Tables: {Array.isArray(log.metadata.tables) ? log.metadata.tables.length : 0} exported
                                       </div>
                                     )}
                                   </div>
@@ -471,6 +538,51 @@ export function ActivityLogsDashboard() {
                   )}
                 </>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="backup" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Database backup &amp; schema export
+              </CardTitle>
+              <CardDescription>
+                Download a full data backup (JSON) or table structure as PostgreSQL/SQL. Each action is recorded in Activity Logs with the tables included.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {backupError && (
+                <div className="flex items-center gap-2 rounded-md bg-destructive/10 text-destructive px-3 py-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {backupError}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={downloadDataBackup}
+                  disabled={backupLoading !== null}
+                  variant="default"
+                  className="flex items-center gap-2"
+                >
+                  <HardDrive className="h-4 w-4" />
+                  {backupLoading === 'data' ? 'Generating...' : 'Download data backup (JSON)'}
+                </Button>
+                <Button
+                  onClick={downloadSchemaExport}
+                  disabled={backupLoading !== null}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <FileCode className="h-4 w-4" />
+                  {backupLoading === 'schema' ? 'Generating...' : 'Download table structure (SQL / PostgreSQL)'}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Data backup: all tables and rows as JSON. Schema export: CREATE TABLE statements only (no data). Check Activity Logs after each download to see which tables were included.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
