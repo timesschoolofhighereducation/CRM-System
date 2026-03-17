@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     const filename = `schema-export-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.sql`
 
     try {
-      await logBackupSchema(user.id, request, { tables, filename, enumCount: enums.length })
+      await logBackupSchema(user.id, request, { tables, filename })
     } catch {
       // Don't fail the download if logging fails
     }
