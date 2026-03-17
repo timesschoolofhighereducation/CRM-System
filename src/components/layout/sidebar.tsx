@@ -32,6 +32,7 @@ import {
   Gamepad2,
   Ticket,
   ClipboardList,
+  Database,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -140,6 +141,12 @@ const navigation: NavigationItem[] = [
         name: 'Activity Logs & Backup', 
         href: '/activity-logs', 
         icon: Activity,
+        permissions: ['READ_USER'] // Only admin and administrator can view
+      },
+      { 
+        name: 'Database Backup', 
+        href: '/database-backup', 
+        icon: Database,
         permissions: ['READ_USER'] // Only admin and administrator can view
       },
     ]

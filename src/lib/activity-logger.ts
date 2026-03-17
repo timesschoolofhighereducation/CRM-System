@@ -272,3 +272,41 @@ export async function logPermissionCreation(
     }
   })
 }
+
+/** Audit: full database backup (schema + data) generated */
+export async function logBackupFull(
+  userId: string,
+  request: NextRequest,
+  payload: { tables: string[]; filename: string }
+) {
+  return logUserActivity({
+    userId,
+    activityType: 'DATA_BACKUP',
+    request,
+    isSuccessful: true,
+    metadata: {
+      action: 'backup_full',
+      time: new Date().toISOString(),
+      ...payload
+    }
+  })
+}
+
+/** Audit: schema-only (DDL) export generated */
+export async function logBackupSchema(
+  userId: string,
+  request: NextRequest,
+  payload: { tables: string[]; filename: string }
+) {
+  return logUserActivity({
+    userId,
+    activityType: 'SCHEMA_EXPORT',
+    request,
+    isSuccessful: true,
+    metadata: {
+      action: 'backup_schema',
+      time: new Date().toISOString(),
+      ...payload
+    }
+  })
+}

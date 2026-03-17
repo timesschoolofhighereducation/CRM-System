@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "ActivityType" ADD VALUE 'DATA_BACKUP';
+ALTER TYPE "ActivityType" ADD VALUE 'SCHEMA_EXPORT';
