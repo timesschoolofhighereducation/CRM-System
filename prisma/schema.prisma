@@ -499,8 +499,6 @@ enum ActivityType {
   CREATE_INQUIRY
   UPDATE_INQUIRY
   DELETE_INQUIRY
-  DATA_BACKUP
-  SCHEMA_EXPORT
 }
 
 model UserActivityLog {

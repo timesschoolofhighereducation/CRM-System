@@ -137,7 +137,7 @@ const navigation: NavigationItem[] = [
         permissions: ['READ_USER'] // Only admin and administrator can view
       },
       { 
-        name: 'Activity Logs', 
+        name: 'Activity Logs & Backup', 
         href: '/activity-logs', 
         icon: Activity,
         permissions: ['READ_USER'] // Only admin and administrator can view
