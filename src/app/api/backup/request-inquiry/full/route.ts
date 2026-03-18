@@ -91,8 +91,25 @@ function escapeString(s: string): string {
   return s.replace(/'/g, "''")
 }
 
-function escapeSqlLiteral(val: unknown): string {
+/** Format value for PostgreSQL TIME column: time-only string, not full timestamp */
+function formatTimeOnly(val: unknown): string {
   if (val === null || val === undefined) return 'NULL'
+  if (val instanceof Date) return `'${val.toISOString().slice(11, 23)}'`
+  if (typeof val === 'string') {
+    const match = val.match(/T(\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)/)
+    if (match) return `'${match[1]}'`
+    if (/^\d{2}:\d{2}/.test(val)) return `'${escapeString(val)}'`
+  }
+  return `'${escapeString(String(val))}'`
+}
+
+function escapeSqlLiteral(val: unknown, dataType?: string, udtName?: string): string {
+  if (val === null || val === undefined) return 'NULL'
+  const dt = (dataType || '').toLowerCase()
+  const ut = (udtName || '').toLowerCase()
+  if (dt === 'time without time zone' || dt === 'time with time zone' || ut === 'time' || ut === 'timetz') {
+    return formatTimeOnly(val)
+  }
   if (typeof val === 'boolean') return val ? 'true' : 'false'
   if (typeof val === 'number' && !Number.isNaN(val)) return String(val)
   if (val instanceof Date) return `'${val.toISOString()}'`
@@ -195,7 +212,7 @@ export async function GET(request: NextRequest) {
         for (let i = 0; i < rows.length; i += batchSize) {
           const batch = rows.slice(i, i + batchSize)
           const values = batch.map(row => {
-            const vals = columnNames.map(col => escapeSqlLiteral(row[col]))
+            const vals = cols.map(c => escapeSqlLiteral(row[c.column_name], c.data_type, c.udt_name))
             return `(${vals.join(', ')})`
           })
           lines.push(`INSERT INTO "public"."${table}" (${quotedCols}) VALUES`)

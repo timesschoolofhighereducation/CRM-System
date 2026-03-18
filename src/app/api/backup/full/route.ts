@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         for (let i = 0; i < rows.length; i += batchSize) {
           const batch = rows.slice(i, i + batchSize)
           const values = batch.map(row => {
-            const vals = columnNames.map(col => escapeSqlLiteral(row[col]))
+            const vals = cols.map(c => escapeSqlLiteral(row[c.column_name], c.data_type, c.udt_name))
             return `(${vals.join(', ')})`
           })
           lines.push(`INSERT INTO "public"."${table}" (${quotedCols}) VALUES`)

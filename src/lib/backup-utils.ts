@@ -191,8 +191,38 @@ function escapeString(s: string): string {
   return s.replace(/'/g, "''")
 }
 
-export function escapeSqlLiteral(val: unknown): string {
+/** Format value for PostgreSQL TIME column: time-only, not full timestamp */
+function formatTimeOnly(val: unknown): string {
   if (val === null || val === undefined) return 'NULL'
+  if (val instanceof Date) return `'${val.toISOString().slice(11, 23)}'`
+  if (typeof val === 'string') {
+    const match = val.match(/T(\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)/)
+    if (match) return `'${match[1]}'`
+    if (/^\d{2}:\d{2}/.test(val)) return `'${escapeString(val)}'`
+  }
+  return `'${escapeString(String(val))}'`
+}
+
+/**
+ * Escape value for SQL literal in INSERT. For TIME columns pass dataType/udtName
+ * so we output time-only (e.g. '10:16:08.000') instead of full timestamp.
+ */
+export function escapeSqlLiteral(
+  val: unknown,
+  dataType?: string,
+  udtName?: string
+): string {
+  if (val === null || val === undefined) return 'NULL'
+  const dt = (dataType ?? '').toLowerCase()
+  const ut = (udtName ?? '').toLowerCase()
+  if (
+    dt === 'time without time zone' ||
+    dt === 'time with time zone' ||
+    ut === 'time' ||
+    ut === 'timetz'
+  ) {
+    return formatTimeOnly(val)
+  }
   if (typeof val === 'boolean') return val ? 'true' : 'false'
   if (typeof val === 'number' && !Number.isNaN(val)) return String(val)
   if (val instanceof Date) return `'${val.toISOString()}'`
