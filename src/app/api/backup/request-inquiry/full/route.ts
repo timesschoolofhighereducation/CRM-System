@@ -39,18 +39,26 @@ async function getSequences(): Promise<SequenceInfo[]> {
   return rows
 }
 
-function generateSequenceSql(sequences: SequenceInfo[]): string[] {
+function generateSequenceCreateSql(sequences: SequenceInfo[]): string[] {
   const lines: string[] = ['-- Sequences', '']
   for (const s of sequences) {
     const seqName = `"${s.schemaname}"."${s.sequencename}"`
     lines.push(`CREATE SEQUENCE IF NOT EXISTS ${seqName};`)
-    if (s.tablename && s.columnname) {
-      lines.push(
-        `ALTER SEQUENCE ${seqName} OWNED BY "${s.schemaname}"."${s.tablename}"."${s.columnname}";`
-      )
-    }
-    lines.push('')
   }
+  lines.push('')
+  return lines
+}
+
+function generateSequenceOwnedBySql(sequences: SequenceInfo[]): string[] {
+  const lines: string[] = ['-- Sequence ownership', '']
+  for (const s of sequences) {
+    if (!s.tablename || !s.columnname) continue
+    const seqName = `"${s.schemaname}"."${s.sequencename}"`
+    lines.push(
+      `ALTER SEQUENCE ${seqName} OWNED BY "${s.schemaname}"."${s.tablename}"."${s.columnname}";`
+    )
+  }
+  lines.push('')
   return lines
 }
 
@@ -110,13 +118,13 @@ export async function GET(request: NextRequest) {
     const lines: string[] = [
       '-- Request Inquiry DB backup (schema + data)',
       `-- Generated at ${new Date().toISOString()}`,
-      '-- Order: SEQUENCES → TABLES → DATA (no custom ENUM types in this schema).',
+      '-- Order: SEQUENCES → TABLES → SEQUENCE OWNERSHIP → DATA (no custom ENUM types in this schema).',
       '-- PostgreSQL',
       ''
     ]
 
     if (sequences.length > 0) {
-      lines.push(...generateSequenceSql(sequences))
+      lines.push(...generateSequenceCreateSql(sequences))
     }
 
     for (const table of tables) {
@@ -196,6 +204,11 @@ export async function GET(request: NextRequest) {
           lines.push('')
         }
       }
+    }
+
+    // After all tables exist, safely attach sequences to columns
+    if (sequences.length > 0) {
+      lines.push(...generateSequenceOwnedBySql(sequences))
     }
 
     const sql = lines.join('\n')

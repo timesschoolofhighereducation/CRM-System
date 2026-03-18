@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Database, Download, FileCode, History, RefreshCw, Loader2 } from 'lucide-react'
+import { Database, Download, FileCode, History, RefreshCw, Loader2, FileSpreadsheet } from 'lucide-react'
 
 interface BackupLogEntry {
   id: string
@@ -32,6 +32,7 @@ export function DatabaseBackupDashboard() {
   const [downloadingSchema, setDownloadingSchema] = useState(false)
   const [downloadingRqFull, setDownloadingRqFull] = useState(false)
   const [downloadingRqSchema, setDownloadingRqSchema] = useState(false)
+  const [downloadingRqSpreadsheet, setDownloadingRqSpreadsheet] = useState(false)
 
   const fetchHistory = async () => {
     setLoadingHistory(true)
@@ -106,6 +107,31 @@ export function DatabaseBackupDashboard() {
     }
   }
 
+  const downloadRequestInquirySpreadsheet = async () => {
+    setDownloadingRqSpreadsheet(true)
+    try {
+      const res = await fetch('/api/backup/request-inquiry/export')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Download failed: ${res.status}`)
+      }
+      const blob = await res.blob()
+      const name =
+        res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
+        `request-inquiry-migration-${new Date().toISOString().slice(0, 10)}.xlsx`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Download failed')
+    } finally {
+      setDownloadingRqSpreadsheet(false)
+    }
+  }
+
   return (
     <div className="space-y-6 p-4">
       <div>
@@ -170,15 +196,16 @@ export function DatabaseBackupDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Request Inquiry DB – full backup
+              Request Inquiry DB – full backup (migrations + data)
             </CardTitle>
             <CardDescription>
-              Export the separate Request Inquiry database (schema + data) as SQL.
+              Download a complete backup as SQL: table definitions and all row data
+              for the Request Inquiry database. Use for migrations or full restore.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -224,6 +251,35 @@ export function DatabaseBackupDashboard() {
               {downloadingRqSchema
                 ? 'Generating…'
                 : 'Download Request Inquiry schema only (.sql)'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Request Inquiry – spreadsheet for migration
+            </CardTitle>
+            <CardDescription>
+              Download all Request Inquiry data as Excel (.xlsx): Exhibition Visitors, Programs, Visitor Programs, and Visitor Metadata. Use to migrate or audit data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={downloadRequestInquirySpreadsheet}
+              disabled={downloadingRqSpreadsheet}
+              className="w-full"
+            >
+              {downloadingRqSpreadsheet ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+              )}
+              {downloadingRqSpreadsheet
+                ? 'Generating…'
+                : 'Download spreadsheet (.xlsx)'}
             </Button>
           </CardContent>
         </Card>
