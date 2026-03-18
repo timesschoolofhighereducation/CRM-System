@@ -3,6 +3,43 @@ import { requireAuth, isAdminRole } from '@/lib/auth'
 import { requestInquiryPrisma } from '@/lib/request-inquiry-prisma'
 import * as XLSX from 'xlsx'
 
+type ExhibitionVisitorRow = {
+  id: string
+  name: string
+  workPhone: string
+  isConverted: boolean
+  convertedAt: Date | null
+  createdAt: Date
+}
+type ProgramRow = {
+  id: number
+  programName: string
+  category: string | null
+  isActive: boolean
+  createdAt: Date
+}
+type VisitorProgramRow = {
+  id: string
+  visitorId: string
+  programId: number
+  createdAt: Date
+}
+type VisitorMetadataRow = {
+  id: string
+  visitorId: string
+  ipAddress: string | null
+  country: string | null
+  city: string | null
+  region: string | null
+  timezone: string | null
+  userAgent: string | null
+  browser: string | null
+  device: string | null
+  submissionDate: Date | null
+  submissionTime: Date | null
+  createdAt: Date
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request)
@@ -10,7 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied. Admin privileges required.' }, { status: 403 })
     }
 
-    const [visitors, programs, visitorPrograms, visitorMetadata] = await Promise.all([
+    const [visitors, programs, visitorPrograms, visitorMetadata] = (await Promise.all([
       requestInquiryPrisma.exhibitionVisitor.findMany({
         orderBy: { createdAt: 'asc' },
       }),
@@ -23,7 +60,7 @@ export async function GET(request: NextRequest) {
       requestInquiryPrisma.visitorMetadata.findMany({
         orderBy: { createdAt: 'asc' },
       }),
-    ])
+    ])) as [ExhibitionVisitorRow[], ProgramRow[], VisitorProgramRow[], VisitorMetadataRow[]]
 
     const workbook = XLSX.utils.book_new()
 
