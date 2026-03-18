@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, isAdminRole } from '@/lib/auth'
 import { requestInquiryPrisma } from '@/lib/request-inquiry-prisma'
 
+type SequenceInfo = {
+  schemaname: string
+  sequencename: string
+  tablename: string | null
+  columnname: string | null
+}
+
 type ColumnRow = {
   column_name: string
   data_type: string
@@ -9,6 +16,42 @@ type ColumnRow = {
   is_nullable: string
   column_default: string | null
   character_maximum_length: number | null
+}
+
+async function getSequences(): Promise<SequenceInfo[]> {
+  const rows = await requestInquiryPrisma.$queryRawUnsafe(
+    `
+    SELECT
+      n.nspname        AS schemaname,
+      c.relname        AS sequencename,
+      t.relname        AS tablename,
+      a.attname        AS columnname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN pg_depend d ON d.objid = c.oid AND d.deptype = 'a'
+    LEFT JOIN pg_class t ON t.oid = d.refobjid
+    LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+    WHERE c.relkind = 'S'
+      AND n.nspname = 'public'
+    ORDER BY n.nspname, c.relname;
+    `
+  ) as SequenceInfo[]
+  return rows
+}
+
+function generateSequenceSql(sequences: SequenceInfo[]): string[] {
+  const lines: string[] = ['-- Sequences', '']
+  for (const s of sequences) {
+    const seqName = `"${s.schemaname}"."${s.sequencename}"`
+    lines.push(`CREATE SEQUENCE IF NOT EXISTS ${seqName};`)
+    if (s.tablename && s.columnname) {
+      lines.push(
+        `ALTER SEQUENCE ${seqName} OWNED BY "${s.schemaname}"."${s.tablename}"."${s.columnname}";`
+      )
+    }
+    lines.push('')
+  }
+  return lines
 }
 
 function sqlType(
@@ -62,13 +105,19 @@ export async function GET(request: NextRequest) {
        ORDER BY table_name`
     ) as { table_name: string }[]).map((r: { table_name: string }) => r.table_name)
 
+    const sequences = await getSequences()
+
     const lines: string[] = [
       '-- Request Inquiry DB backup (schema + data)',
       `-- Generated at ${new Date().toISOString()}`,
-      '-- Order: TABLES → DATA (no custom ENUM types in this schema).',
+      '-- Order: SEQUENCES → TABLES → DATA (no custom ENUM types in this schema).',
       '-- PostgreSQL',
       ''
     ]
+
+    if (sequences.length > 0) {
+      lines.push(...generateSequenceSql(sequences))
+    }
 
     for (const table of tables) {
       const cols = await requestInquiryPrisma.$queryRawUnsafe(
