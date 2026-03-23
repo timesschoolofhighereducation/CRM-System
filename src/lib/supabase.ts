@@ -20,11 +20,12 @@ export const createServerSupabaseClient = () => {
   return createClient(supabaseUrl, supabaseAnonKey)
 }
 
-export type RealtimePayload = {
+export interface RealtimePayload {
   commit_timestamp: string
   eventType: 'INSERT' | 'UPDATE' | 'DELETE'
-  new: any
-  old: any
+  new?: any // Will be properly typed per entity
+  old?: any
   schema: string
   table: string
+  errors?: any[]
 }

@@ -294,7 +294,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     console.log('Setting up realtime subscriptions for user:', user.id)
 
     // Subscribe to new inquiries
-    realtimeService.subscribeToInquiries(user.id, (newInquiry) => {
+        realtimeService.subscribeToInquiries(user.id, (newInquiry: any) => {
       addNotification({
         title: 'New Inquiry',
         message: `New inquiry from ${newInquiry.fullName || 'a lead'}`,
@@ -307,7 +307,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     })
 
     // Subscribe to task updates
-    realtimeService.subscribeToTasks(user.id, (task) => {
+    realtimeService.subscribeToTasks(user.id, (task: any) => {
       if (task) {
         addNotification({
           title: task.status === 'COMPLETED' ? 'Task Completed' : 'Task Updated',

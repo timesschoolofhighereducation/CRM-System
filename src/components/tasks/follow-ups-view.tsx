@@ -51,7 +51,8 @@ import {
   FOLLOW_UP_STATUS_COLUMNS,
   getTaskStatusInfo,
   isTaskReadOnly,
-  normalizeStatusHelper
+  normalizeStatusHelper,
+  type TaskStatusColumn
 } from '@/lib/task-constants'
 import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 import {
@@ -563,14 +564,14 @@ export function FollowUpsView() {
     onDeleteClick,
     onPhoneCall
   }: { 
-    column: { id: string; title: string; color: string; icon: any; headerColor: string }
+    column: TaskStatusColumn
     tasks: FollowUpTask[]
     onViewHistory: (task: FollowUpTask) => void
     onViewTask: (task: FollowUpTask) => void
     onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     onClothingStationRegister: (task: FollowUpTask) => void
     onClothingStationNotInterested: (task: FollowUpTask) => void
-    getStatusInfo: (status: string) => any
+    getStatusInfo: (status: string) => { color: string; label: string; icon: any }
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
     isOverdue: (dueAt: string) => boolean
@@ -666,7 +667,7 @@ export function FollowUpsView() {
     onToggleRegister: (task: FollowUpTask, registerNow: boolean) => void
     onClothingStationRegister: (task: FollowUpTask) => void
     onClothingStationNotInterested: (task: FollowUpTask) => void
-    getStatusInfo: (status: string) => any
+    getStatusInfo: (status: string) => { color: string; label: string; icon: any }
     isAutomatic: (task: FollowUpTask) => boolean
     getFollowUpNumber: (task: FollowUpTask) => string
     isOverdue: (dueAt: string) => boolean

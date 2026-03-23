@@ -1,20 +1,13 @@
 import { supabase } from './supabase'
 import { toast } from 'sonner'
-
-interface RealtimePayload {
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE'
-  new?: any
-  old?: any
-  schema: string
-  table: string
-}
+import type { RealtimePayload } from './supabase'
 
 export class RealtimeService {
-  private channels: any[] = []
-  private callbacks: Map<string, (payload: any) => void> = new Map()
+  private channels: any[] = [] // TODO: Type as SupabaseChannel when available
+  private callbacks: Map<string, (payload: RealtimePayload) => void> = new Map()
 
   // Subscribe to new inquiries
-  subscribeToInquiries(userId: string, onNewInquiry: (inquiry: any) => void) {
+  subscribeToInquiries(userId: string, onNewInquiry: (inquiry: any) => void) { // TODO: Type Inquiry properly
     if (!supabase) {
       console.warn('Supabase not configured - realtime features disabled')
       return
@@ -31,7 +24,7 @@ export class RealtimeService {
           filter: `createdById=eq.${userId}`,
         },
         (payload: RealtimePayload) => {
-          console.log('New inquiry received:', payload)
+          console.debug('New inquiry received:', payload)
           onNewInquiry(payload.new)
           toast.success('New inquiry received!', {
             description: 'Check the inquiries list',
@@ -49,7 +42,7 @@ export class RealtimeService {
   }
 
   // Subscribe to task updates
-  subscribeToTasks(userId: string, onTaskUpdate: (task: any) => void) {
+  subscribeToTasks(userId: string, onTaskUpdate: (task: any) => void) { // TODO: Type Task properly
     if (!supabase) {
       console.warn('Supabase not configured - realtime features disabled')
       return
@@ -66,7 +59,7 @@ export class RealtimeService {
           filter: `assignedToId=eq.${userId}`,
         },
         (payload: RealtimePayload) => {
-          console.log('Task update received:', payload)
+          console.debug('Task update received:', payload)
           onTaskUpdate(payload.new || payload.old)
 
           if (payload.eventType === 'INSERT') {
@@ -83,7 +76,7 @@ export class RealtimeService {
   }
 
   // Subscribe to notifications
-  subscribeToNotifications(userId: string, onNotification: (notification: any) => void) {
+  subscribeToNotifications(userId: string, onNotification: (notification: any) => void) { // TODO: Type Notification properly
     if (!supabase) {
       console.warn('Supabase not configured - realtime features disabled')
       return
@@ -100,7 +93,7 @@ export class RealtimeService {
           filter: `userId=eq.${userId}`,
         },
         (payload: RealtimePayload) => {
-          console.log('New notification received:', payload)
+          console.debug('New notification received:', payload)
           onNotification(payload.new)
         }
       )

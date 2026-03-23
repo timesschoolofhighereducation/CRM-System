@@ -61,9 +61,27 @@ function DashboardPageContent() {
 
   const [filters, setFilters] = useState<DashboardFilterState>(DEFAULT_FILTERS)
   const [dashboardData, setDashboardData] = useState<{
-    stats: any
-    activities: any[]
-    userInquiryStats: any[] | null
+    stats: {
+      totalInquiries: number
+      totalCampaigns: number
+      totalUsers: number
+      activeUsers: number
+      [key: string]: any
+    }
+    activities: Array<{
+      id: string
+      type: string
+      title: string
+      description: string
+      timestamp: string
+      userName?: string
+    }>
+    userInquiryStats: Array<{
+      userId: string
+      userName: string
+      totalInquiries: number
+      completedInquiries: number
+    }> | null
     users: { id: string; name: string }[]
     campaigns: { id: string; name: string }[]
     isAdmin: boolean

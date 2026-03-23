@@ -46,7 +46,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { 
   TASK_STATUS_COLUMNS, 
   normalizeStatusHelper,
-  isTaskReadOnly 
+  isTaskReadOnly,
+  type TaskStatusColumn
 } from '@/lib/task-constants'
 import { onTasksRefreshNeeded, consumeTasksPendingRefresh } from '@/lib/tasks-refresh-sync'
 import {
@@ -127,7 +128,7 @@ function DroppableColumn({
   onClothingStationNotInterested,
   onDelete
 }: { 
-  column: { id: string; title: string; color: string; icon: any; headerColor: string }
+  column: TaskStatusColumn
   tasks: TaskItem[]
   onViewDetails: (task: TaskItem) => void
   onViewHistory: (task: TaskItem) => void

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     // Other users can only see inquiries they created
     // Treat legacy rows where isDeleted might be NULL as "not deleted"
     // (Some older DB rows may have NULL even if Prisma schema is non-nullable)
-    const where: any = {
+    const where: Record<string, any> = {
       NOT: { isDeleted: true },
     }
     
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
     })
     
     // Build data object - temporarily exclude registerNow until Prisma client is regenerated
-    const seekerData: any = {
+    const seekerData: Record<string, any> = {
       fullName: body.fullName,
       phone: body.phone,
       whatsapp: body.whatsapp || false,
@@ -216,12 +216,12 @@ export async function POST(request: NextRequest) {
     if (body.registerNow !== undefined) {
       try {
         // Use Prisma's update with type assertion as workaround
-        await (prisma.seeker.update as any)({
+        await prisma.seeker.update({
           where: { id: seeker.id },
           data: { registerNow: body.registerNow || false },
         })
         // Update the seeker object to include registerNow in response
-        ;(seeker as any).registerNow = body.registerNow || false
+        ;(seeker as any).registerNow = body.registerNow || false // TODO: Remove type assertion after Prisma regeneration
       } catch (updateError) {
         console.warn('Could not update registerNow field (Prisma client may need regeneration):', updateError)
         // Continue without failing the request
