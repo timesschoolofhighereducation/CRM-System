@@ -29,6 +29,8 @@ const RequestInquiriesTable = dynamic(
 export default function InquiriesPage() {
   const { user, loading: authLoading } = useAuth()
   const { hasPermission } = usePermissions()
+  const canReadInquiries = hasPermission('READ_SEEKER')
+  const canCreateInquiry = hasPermission('CREATE_SEEKER')
 
   if (authLoading) {
     return (
@@ -52,17 +54,6 @@ export default function InquiriesPage() {
     )
   }
 
-  if (!hasPermission('READ_SEEKER')) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You don't have permission to view inquiries.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -72,26 +63,45 @@ export default function InquiriesPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Inquiries</h1>
             <p className="text-sm text-gray-600">
               Manage all student inquiries and leads
-              {hasPermission('CREATE_SEEKER') && (
+              {canCreateInquiry && (
                 <span className="ml-2 text-xs text-gray-500">
                   • Press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">⌘↵</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Ctrl↵</kbd> to create new inquiry
                 </span>
               )}
             </p>
           </div>
-          {hasPermission('CREATE_SEEKER') && <NewInquiryButton />}
+          {canCreateInquiry && <NewInquiryButton />}
         </div>
-        
+
+        {!canReadInquiries ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            You are logged in, but your role does not have `READ_SEEKER` permission.
+            Ask an administrator to enable inquiry access.
+          </div>
+        ) : null}
+
         <Tabs defaultValue="inquiries" className="w-full">
           <TabsList>
-            <TabsTrigger value="inquiries">All Inquiries</TabsTrigger>
-            <TabsTrigger value="requests">Request Inquiries</TabsTrigger>
+            <TabsTrigger value="inquiries" disabled={!canReadInquiries}>All Inquiries</TabsTrigger>
+            <TabsTrigger value="requests" disabled={!canReadInquiries}>Request Inquiries</TabsTrigger>
           </TabsList>
           <TabsContent value="inquiries" className="mt-4">
-            <InquiriesTable />
+            {canReadInquiries ? (
+              <InquiriesTable />
+            ) : (
+              <div className="rounded-lg border p-8 text-sm text-muted-foreground">
+                Inquiry list is disabled for your current role.
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="requests" className="mt-4">
-            <RequestInquiriesTable />
+            {canReadInquiries ? (
+              <RequestInquiriesTable />
+            ) : (
+              <div className="rounded-lg border p-8 text-sm text-muted-foreground">
+                Request inquiry list is disabled for your current role.
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

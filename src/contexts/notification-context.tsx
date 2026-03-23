@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { SafeNotification } from '@/lib/notification-utils'
 import { PushNotificationClient } from '@/lib/push-notification-client'
+import { realtimeService } from '@/lib/realtime'
+import { useAuth } from '@/hooks/use-auth'
 
 export interface Notification {
   id: string
@@ -13,7 +15,7 @@ export interface Notification {
   read: boolean
   actionUrl?: string
   actionText?: string
-  entityType?: 'task' | 'project' | 'deal' | 'meeting' | 'comment' | 'mention'
+  entityType?: 'task' | 'project' | 'deal' | 'meeting' | 'comment' | 'mention' | 'inquiry'
   entityId?: string
   fromUser?: {
     id: string
@@ -41,6 +43,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isNotificationSupported, setIsNotificationSupported] = useState(false)
   const [isPushSupported, setIsPushSupported] = useState(false)
@@ -87,6 +90,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       localStorage.setItem('notifications', JSON.stringify(notifications))
     }
   }, [notifications])
+
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -282,6 +286,45 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       return false
     }
   }, [isClient])
+
+  // Realtime subscriptions with Supabase
+  useEffect(() => {
+    if (!user?.id || typeof window === 'undefined') return
+
+    console.log('Setting up realtime subscriptions for user:', user.id)
+
+    // Subscribe to new inquiries
+    realtimeService.subscribeToInquiries(user.id, (newInquiry) => {
+      addNotification({
+        title: 'New Inquiry',
+        message: `New inquiry from ${newInquiry.fullName || 'a lead'}`,
+        type: 'info',
+        entityType: 'inquiry',
+        entityId: newInquiry.id,
+        actionUrl: `/inquiries`,
+        actionText: 'View Inquiry'
+      })
+    })
+
+    // Subscribe to task updates
+    realtimeService.subscribeToTasks(user.id, (task) => {
+      if (task) {
+        addNotification({
+          title: task.status === 'COMPLETED' ? 'Task Completed' : 'Task Updated',
+          message: task.title || 'A task has been updated',
+          type: task.status === 'COMPLETED' ? 'success' : 'info',
+          entityType: 'task',
+          entityId: task.id,
+          actionUrl: `/tasks`,
+          actionText: 'View Tasks'
+        })
+      }
+    })
+
+    return () => {
+      realtimeService.unsubscribeAll()
+    }
+  }, [user?.id, addNotification])
 
   const value: NotificationContextType = {
     notifications,

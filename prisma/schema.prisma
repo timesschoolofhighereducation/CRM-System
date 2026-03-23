@@ -63,6 +63,9 @@ model User {
   createdNotes          Note[]          @relation("NoteCreatedBy")
   createdPromotionCodes PromotionCode[] @relation("PromotionCodeCreatedBy")
 
+  // Saved filters
+  savedFilters SavedFilter[] @relation("UserSavedFilters")
+
   @@map("users")
 }
 
@@ -189,6 +192,15 @@ model Seeker {
   emailRecipients      EmailRecipient[]
   promotionCodeId      String?
   promotionCode        PromotionCode?      @relation(fields: [promotionCodeId], references: [id])
+
+  // Performance indexes for common queries
+  @@index([createdAt])
+  @@index([stage])
+  @@index([marketingSource])
+  @@index([isDeleted, createdAt])
+  @@index([createdById, createdAt])
+  @@index([followUpAgain, followUpDate])
+  @@index([notAnswering, registerNow])
 
   @@map("seekers")
 }
@@ -1114,6 +1126,7 @@ model Notification {
 
   @@index([userId, read])
   @@index([createdAt])
+  @@index([userId, createdAt]) // For realtime queries
   @@map("notifications")
 }
 
@@ -1289,4 +1302,29 @@ enum WeeklyReportStatus {
   SUBMITTED
   APPROVED
   REVIEWED
+}
+
+// ========================================
+// SAVED FILTERS (for Inquiries and other views)
+// ========================================
+
+model SavedFilter {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  entityType  String   @default("inquiry") // "inquiry", "task", "campaign", etc.
+  filterData  Json     // Serialized filter state (searchQuery, stages, dateRange, etc.)
+  isDefault   Boolean  @default(false)
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation("UserSavedFilters", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, entityType])
+  @@index([isDefault])
+  @@map("saved_filters")
 }

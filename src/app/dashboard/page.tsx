@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { DashboardFilterBar } from '@/components/dashboard/dashboard-filter-bar'
 import type { DashboardFilterState, DashboardPreset } from '@/components/dashboard/dashboard-types'
 import { safeJsonParse } from '@/lib/utils'
+import { RoleBasedDashboard } from '@/components/dashboard/role-based-dashboard'
 
 const DashboardStats = dynamic(
   () => import('@/components/dashboard/dashboard-stats').then((m) => ({ default: m.DashboardStats })),
@@ -179,21 +180,25 @@ function DashboardPageContent() {
           campaigns={dashboardData?.campaigns ?? []}
         />
 
-        <DashboardStats
-          stats={dashboardData?.stats ?? null}
-          loading={dashboardLoading}
-          error={dashboardError}
-        />
+        {/* Role-based Personalized Dashboard */}
+        <RoleBasedDashboard />
 
-        <DashboardReportCharts />
-
-        {isAdmin && (
-          <UserInquiryAnalytics
-            userInquiryStats={dashboardData?.userInquiryStats ?? null}
+        {/* Legacy components for backward compatibility */}
+        <div className="hidden">
+          <DashboardStats
+            stats={dashboardData?.stats ?? null}
             loading={dashboardLoading}
             error={dashboardError}
           />
-        )}
+          <DashboardReportCharts />
+          {isAdmin && (
+            <UserInquiryAnalytics
+              userInquiryStats={dashboardData?.userInquiryStats ?? null}
+              loading={dashboardLoading}
+              error={dashboardError}
+            />
+          )}
+        </div>
       </div>
     </DashboardLayout>
   )
