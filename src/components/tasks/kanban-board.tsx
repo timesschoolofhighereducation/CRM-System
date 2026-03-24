@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useQuery } from '@tanstack/react-query'
 
 interface FollowUpTask {
   id: string
@@ -466,7 +467,6 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
 export function KanbanBoard() {
   const [allTasks, setAllTasks] = useState<TaskItem[]>([])
   const [filteredTasks, setFilteredTasks] = useState<TaskItem[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyTask, setHistoryTask] = useState<TaskItem | null>(null)
@@ -482,71 +482,81 @@ export function KanbanBoard() {
     })
   )
 
+  const fetchTasks = useCallback(async (): Promise<TaskItem[]> => {
+    // Fetch both FollowUpTasks and regular Tasks (no-store so new tasks show after create)
+    const [followUpTasksResponse, regularTasksResponse] = await Promise.all([
+      fetch('/api/tasks', { cache: 'no-store' }),
+      fetch('/api/tasks/enhanced', { cache: 'no-store' }),
+    ])
+
+    const followUpData = followUpTasksResponse.ok ? await followUpTasksResponse.json() : []
+    const regularData = regularTasksResponse.ok ? await regularTasksResponse.json() : []
+
+    // Handle both array and { tasks, pagination } response formats
+    const followUpTasks: FollowUpTask[] = Array.isArray(followUpData)
+      ? followUpData
+      : (followUpData?.tasks ?? [])
+    const regularTasks: RegularTask[] = Array.isArray(regularData)
+      ? regularData
+      : (regularData?.tasks ?? [])
+
+    // Mark task types and normalize - ensure status is valid
+    const markedFollowUpTasks: TaskItem[] = followUpTasks
+      .filter(task => task && task.id && task.status)
+      .map(task => ({ ...task, type: 'followup' as const }))
+
+    const markedRegularTasks: TaskItem[] = regularTasks
+      .filter(task => task && task.id && task.status)
+      .map(task => ({ ...task, type: 'regular' as const }))
+
+    return [...markedFollowUpTasks, ...markedRegularTasks]
+  }, [])
+
+  const {
+    data: tasksData,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ['kanban-tasks'],
+    queryFn: fetchTasks,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const refreshTasks = useCallback(async () => {
+    try {
+      await refetch()
+    } catch (error) {
+      console.error('Error refreshing tasks:', error)
+      toast.error('Could not refresh tasks')
+    }
+  }, [refetch])
+
   useEffect(() => {
-    fetchTasks()
-    consumeTasksPendingRefresh() // clear flag if set (e.g. user navigated here after creating inquiry)
+    const nextTasks = tasksData ?? []
+    setAllTasks(nextTasks)
+    setFilteredTasks(nextTasks)
+  }, [tasksData])
+
+  useEffect(() => {
+    consumeTasksPendingRefresh()
   }, [])
 
   // Refetch when follow-up or regular tasks are created elsewhere (e.g. new inquiry, Create Task dialog)
   useEffect(() => {
-    const onTasksCreated = () => fetchTasks()
+    const onTasksCreated = () => {
+      void refreshTasks()
+    }
     window.addEventListener('tasks-created', onTasksCreated)
     return () => window.removeEventListener('tasks-created', onTasksCreated)
-  }, [])
+  }, [refreshTasks])
 
   // Cross-tab and visibility: refetch when tasks created in another tab or user returns to this tab
   useEffect(() => {
-    return onTasksRefreshNeeded(fetchTasks)
-  }, [])
-
-  const fetchTasks = async () => {
-    try {
-      setLoading(true)
-      // Fetch both FollowUpTasks and regular Tasks (no-store so new tasks show after create)
-      const [followUpTasksResponse, regularTasksResponse] = await Promise.all([
-        fetch('/api/tasks', { cache: 'no-store' }).catch(err => {
-          console.error('Error fetching followup tasks:', err)
-          return { ok: false, json: async () => [] }
-        }),
-        fetch('/api/tasks/enhanced', { cache: 'no-store' }).catch(err => {
-          console.error('Error fetching regular tasks:', err)
-          return { ok: false, json: async () => [] }
-        })
-      ])
-
-      const followUpData = followUpTasksResponse.ok ? await followUpTasksResponse.json() : []
-      const regularData = regularTasksResponse.ok ? await regularTasksResponse.json() : []
-      
-      // Handle both array and { tasks, pagination } response formats
-      const followUpTasks: FollowUpTask[] = Array.isArray(followUpData)
-        ? followUpData
-        : (followUpData?.tasks ?? [])
-      const regularTasks: RegularTask[] = Array.isArray(regularData)
-        ? regularData
-        : (regularData?.tasks ?? [])
-
-      // Mark task types and normalize - ensure status is valid
-      const markedFollowUpTasks: TaskItem[] = followUpTasks
-        .filter(task => task && task.id && task.status) // Filter out invalid tasks
-        .map(task => ({ ...task, type: 'followup' as const }))
-      
-      const markedRegularTasks: TaskItem[] = regularTasks
-        .filter(task => task && task.id && task.status) // Filter out invalid tasks
-        .map(task => ({ ...task, type: 'regular' as const }))
-
-      // Combine both types
-      const allTasksData = [...markedFollowUpTasks, ...markedRegularTasks]
-      setAllTasks(allTasksData)
-      setFilteredTasks(allTasksData)
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-      // Set empty arrays on error to prevent UI issues
-      setAllTasks([])
-      setFilteredTasks([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    return onTasksRefreshNeeded(() => {
+      void refreshTasks()
+    })
+  }, [refreshTasks])
 
   const handleFilteredTasks = (tasks: TaskItem[]) => {
     setFilteredTasks(tasks)
@@ -601,7 +611,7 @@ export function KanbanBoard() {
         })
         
         // Refresh all tasks to get updated data including history
-        await fetchTasks()
+        await refreshTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Failed to update task status:', errorData)
@@ -613,7 +623,7 @@ export function KanbanBoard() {
         })
         
         // Revert optimistic update by refreshing
-        await fetchTasks()
+        await refreshTasks()
       }
     } catch (error) {
       console.error('Error updating task status:', error)
@@ -625,7 +635,7 @@ export function KanbanBoard() {
       })
       
       // Revert optimistic update by refreshing
-      await fetchTasks()
+      await refreshTasks()
     }
   }
 
@@ -719,16 +729,16 @@ export function KanbanBoard() {
           description: `${task.seeker.fullName} - task(s) completed`,
           duration: 3000,
         })
-        await fetchTasks()
+        await refreshTasks()
       } else {
         const err = await response.json().catch(() => ({ error: 'Unknown error' }))
         toast.error(err.error || 'Failed to update task')
-        await fetchTasks()
+        await refreshTasks()
       }
     } catch (error) {
       console.error('Clothing station action error:', error)
       toast.error('Error updating task')
-      await fetchTasks()
+      await refreshTasks()
     }
   }
 
@@ -765,14 +775,14 @@ export function KanbanBoard() {
         }
         
         // Refresh to get latest data (tasks will be auto-completed by service layer)
-        await fetchTasks()
+        await refreshTasks()
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         toast.error('Failed to update registration', {
           description: errorData.error || 'Could not update registration status',
           duration: 4000,
         })
-        await fetchTasks()
+        await refreshTasks()
       }
     } catch (error) {
       console.error('Error updating registration:', error)
@@ -780,7 +790,7 @@ export function KanbanBoard() {
         description: 'An error occurred while updating the registration status',
         duration: 4000,
       })
-      await fetchTasks()
+      await refreshTasks()
     }
   }
 
@@ -874,18 +884,31 @@ export function KanbanBoard() {
     }
   }
 
-  const getTasksByStatus = (status: string) => {
-    return filteredTasks.filter(task => {
-      // Ensure status matches exactly (case-sensitive)
-      return task.status === status
-    })
-  }
+  const tasksByStatus = useMemo(() => {
+    const grouped = new Map<string, TaskItem[]>()
+    for (const column of statusColumns) grouped.set(column.id, [])
+    for (const task of filteredTasks) {
+      const existing = grouped.get(task.status)
+      if (existing) {
+        existing.push(task)
+      }
+    }
+    return grouped
+  }, [filteredTasks])
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center">Loading tasks...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="rounded-lg border p-4 space-y-3">
+                <div className="h-5 w-24 bg-gray-200 animate-pulse rounded" />
+                <div className="h-20 w-full bg-gray-100 animate-pulse rounded" />
+                <div className="h-20 w-full bg-gray-100 animate-pulse rounded" />
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     )
@@ -906,7 +929,7 @@ export function KanbanBoard() {
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Task Kanban Board</h2>
             <p className="text-sm text-gray-600">Manage your tasks with drag-and-drop workflow</p>
           </div>
-          <CreateTaskDialog onTaskCreated={fetchTasks} />
+          <CreateTaskDialog onTaskCreated={refreshTasks} />
         </div>
 
         {/* Search and Filter Component */}
@@ -915,9 +938,18 @@ export function KanbanBoard() {
           onFilteredTasks={handleFilteredTasks}
         />
 
+        {filteredTasks.length === 0 && (
+          <Card className="border-dashed border-gray-300">
+            <CardContent className="py-10 text-center">
+              <p className="text-sm font-medium text-gray-900">No tasks match your filters</p>
+              <p className="text-xs text-gray-500 mt-1">Try adjusting filters or create a new task.</p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex gap-4 sm:gap-5 overflow-x-auto pb-6 px-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
           {statusColumns.map((column) => {
-            const columnTasks = getTasksByStatus(column.id)
+            const columnTasks = tasksByStatus.get(column.id) ?? []
             
             return (
               <DroppableColumn
