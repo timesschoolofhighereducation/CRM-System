@@ -15,7 +15,6 @@ import {
   Clock, 
   User, 
   Phone, 
-  Calendar,
   Play,
   Pause,
   CheckSquare,
@@ -61,6 +60,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useQuery } from '@tanstack/react-query'
+import { formatTaskDate, getCalendarIcon, getTaskStatusIcon } from './task-board-utils'
+import { TaskBoardColumn } from './task-board-column'
 
 interface FollowUpTask {
   id: string
@@ -138,61 +139,23 @@ function DroppableColumn({
   onClothingStationNotInterested: (task: TaskItem) => void
   onDelete: (task: TaskItem) => void
 }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: column.id,
-  })
-
-  const IconComponent = column.icon
-
   return (
-    <div className="w-full min-w-[280px] max-w-[320px] flex-shrink-0">
-      {/* Professional Column Header */}
-      <div className={`flex items-center justify-between mb-3 px-3 py-2.5 rounded-t-lg border-b-2 ${column.headerColor} shadow-sm`}>
-        <div className="flex items-center gap-2">
-          <IconComponent className="h-4 w-4 text-gray-600" />
-          <h3 className="font-semibold text-gray-900 text-sm">{column.title}</h3>
-        </div>
-        <Badge className={`${column.color} text-xs font-medium px-2 py-0.5 shadow-sm`}>
-          {tasks.length > 999 ? '999+' : tasks.length}
-        </Badge>
-      </div>
-      
-      <SortableContext 
-        items={tasks.map(task => task.id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div 
-          ref={setNodeRef}
-          className={`space-y-2.5 min-h-[400px] max-h-[calc(100vh-280px)] overflow-y-auto p-3 rounded-b-lg bg-gray-50/50 transition-all duration-200 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent ${
-            isOver 
-              ? 'ring-2 ring-blue-400 ring-offset-2 bg-blue-50/80 shadow-lg' 
-              : 'border border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          {tasks.map((task) => (
-            <SortableTaskCard
-              key={task.id}
-              task={task}
-              onViewDetails={onViewDetails}
-              onViewHistory={onViewHistory}
-              onToggleRegister={onToggleRegister}
-              onClothingStationRegister={onClothingStationRegister}
-              onClothingStationNotInterested={onClothingStationNotInterested}
-              onDelete={onDelete}
-            />
-          ))}
-          {tasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                <Clock className="h-6 w-6 text-gray-400" />
-              </div>
-              <p className="text-xs font-medium text-gray-500">No tasks</p>
-              <p className="text-xs text-gray-400 mt-1">Drop tasks here</p>
-            </div>
-          )}
-        </div>
-      </SortableContext>
-    </div>
+    <TaskBoardColumn
+      column={column}
+      tasks={tasks}
+      renderTask={(task) => (
+        <SortableTaskCard
+          key={task.id}
+          task={task}
+          onViewDetails={onViewDetails}
+          onViewHistory={onViewHistory}
+          onToggleRegister={onToggleRegister}
+          onClothingStationRegister={onClothingStationRegister}
+          onClothingStationNotInterested={onClothingStationNotInterested}
+          onDelete={onDelete}
+        />
+      )}
+    />
   )
 }
 
@@ -368,8 +331,8 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
               </div>
               {task.dueDate && (
                 <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
-                  <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
-                  <span className="truncate font-medium">{new Date(task.dueDate).toLocaleDateString()}</span>
+                {getCalendarIcon()}
+                <span className="truncate font-medium">{formatTaskDate(task.dueDate)}</span>
                 </div>
               )}
               {task.description && (
@@ -450,8 +413,8 @@ function SortableTaskCard({ task, onViewDetails, onViewHistory, onToggleRegister
                 )}
               </div>
               <div className="flex items-center space-x-1.5 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-md">
-                <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
-                <span className="truncate font-medium">{new Date('dueAt' in task ? task.dueAt : task.dueDate || new Date()).toLocaleDateString()}</span>
+                {getCalendarIcon()}
+                <span className="truncate font-medium">{formatTaskDate('dueAt' in task ? task.dueAt : task.dueDate)}</span>
               </div>
               {'notes' in task && task.notes && (
                 <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{task.notes}</p>
@@ -869,21 +832,6 @@ export function KanbanBoard() {
     setDeleteDialogOpen(true)
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return <CheckCircle className="h-4 w-4" />
-      case 'DONE':
-        return <CheckSquare className="h-4 w-4" />
-      case 'IN_PROGRESS':
-        return <Play className="h-4 w-4" />
-      case 'ON_HOLD':
-        return <Pause className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
-    }
-  }
-
   const tasksByStatus = useMemo(() => {
     const grouped = new Map<string, TaskItem[]>()
     for (const column of statusColumns) grouped.set(column.id, [])
@@ -1257,7 +1205,7 @@ export function KanbanBoard() {
                               <TableRow key={action.id} className="hover:bg-gray-50/50 transition-colors">
                                 <TableCell>
                                   <div className="flex items-center space-x-2">
-                                    {getStatusIcon(action.toStatus)}
+                                    {getTaskStatusIcon(action.toStatus)}
                                     <span className="text-sm font-medium">
                                       {action.fromStatus ? 'Moved' : 'Created'}
                                     </span>
@@ -1313,7 +1261,7 @@ export function KanbanBoard() {
                             {/* Header */}
                             <div className="flex items-start justify-between gap-3 pb-2 border-b border-gray-100">
                               <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                {getStatusIcon(action.toStatus)}
+                                {getTaskStatusIcon(action.toStatus)}
                                 <span className="text-sm font-semibold text-gray-900">
                                   {action.fromStatus ? 'Moved' : 'Created'}
                                 </span>
