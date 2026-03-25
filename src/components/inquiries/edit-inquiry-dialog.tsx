@@ -312,13 +312,20 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
   const fetchCampaignsByType = async (campaignType: string) => {
     setCampaignsLoading(true)
     try {
-      // Use forInquiry=true to allow all users to see all ACTIVE campaigns
-      const response = await fetch(`/api/campaigns?type=${encodeURIComponent(campaignType)}&limit=500&forInquiry=true`)
+      // Fetch active campaigns for inquiry, then match source case-insensitively.
+      // This prevents mismatches like "Facebook" vs "FACEBOOK".
+      const response = await fetch('/api/campaigns?limit=500&forInquiry=true')
       if (response.ok) {
         const data = await response.json()
         const campaigns = data.campaigns || (Array.isArray(data) ? data : [])
-        // Filter to only show ACTIVE campaigns (API already filters, but double-check)
-        setCampaigns(campaigns.filter((campaign: Campaign) => campaign.status === 'ACTIVE'))
+        const normalizedType = String(campaignType || '').trim().toLowerCase()
+        const filtered = campaigns.filter((campaign: any) => {
+          if (campaign.status !== 'ACTIVE') return false
+          const campaignTypeName = String(campaign.type || '').trim().toLowerCase()
+          const linkedTypeName = String(campaign.campaignType?.name || '').trim().toLowerCase()
+          return campaignTypeName === normalizedType || linkedTypeName === normalizedType
+        })
+        setCampaigns(filtered)
       }
     } catch (error) {
       console.error('Error fetching campaigns:', error)
