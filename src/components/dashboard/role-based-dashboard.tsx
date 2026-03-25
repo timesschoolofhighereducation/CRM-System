@@ -16,12 +16,24 @@ import {
 } from 'lucide-react'
 import { DashboardStats } from './dashboard-stats'
 import { UserInquiryAnalytics } from './user-inquiry-analytics'
+import type { DashboardStatsData } from './dashboard-stats'
+import type { UserInquiryStat } from './user-inquiry-analytics'
 
 interface RoleBasedDashboardProps {
   className?: string
+  stats?: DashboardStatsData | null
+  userInquiryStats?: UserInquiryStat[] | null
+  loading?: boolean
+  error?: string | null
 }
 
-export function RoleBasedDashboard({ className }: RoleBasedDashboardProps) {
+export function RoleBasedDashboard({
+  className,
+  stats,
+  userInquiryStats,
+  loading,
+  error,
+}: RoleBasedDashboardProps) {
   const { user } = useAuth()
   const { isAdmin, canManageUsers, canManageSeekers, canViewReports } = usePermissions()
 
@@ -69,7 +81,7 @@ export function RoleBasedDashboard({ className }: RoleBasedDashboardProps) {
       {/* Role-specific Dashboard Content */}
       <div className="space-y-8">
         {/* Core Stats - Available to all roles */}
-        <DashboardStats />
+        <DashboardStats stats={stats} loading={loading} error={error} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main Analytics - Role dependent */}
@@ -84,7 +96,11 @@ export function RoleBasedDashboard({ className }: RoleBasedDashboardProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <UserInquiryAnalytics />
+                  <UserInquiryAnalytics
+                    userInquiryStats={userInquiryStats}
+                    loading={loading}
+                    error={error}
+                  />
                 </CardContent>
               </Card>
             )}

@@ -190,7 +190,12 @@ function DashboardPageContent() {
         />
 
         {/* Role-based Personalized Dashboard */}
-        <RoleBasedDashboard />
+        <RoleBasedDashboard
+          stats={dashboardData?.stats ?? null}
+          userInquiryStats={dashboardData?.userInquiryStats ?? null}
+          loading={dashboardLoading}
+          error={dashboardError}
+        />
 
         {/* Charts (legacy components). Stats cards are already shown by RoleBasedDashboard. */}
         <DashboardReportCharts />
