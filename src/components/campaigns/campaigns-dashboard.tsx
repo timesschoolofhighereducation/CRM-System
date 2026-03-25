@@ -16,6 +16,7 @@ import { Plus, BarChart3, Users, Target, TrendingUp, Tag, Eye, FileSpreadsheet }
 import { formatDate } from '@/lib/date-utils'
 import { CampaignImage } from '@/components/ui/campaign-image'
 import { toast } from 'sonner'
+import { InquiryAttributionStats } from '@/components/campaigns/inquiry-attribution-stats'
 
 interface Campaign {
   id: string
@@ -204,6 +205,8 @@ export function CampaignsDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <InquiryAttributionStats />
 
       {/* Recent Campaigns with Thumbnails */}
       {recentCampaigns.length > 0 && (

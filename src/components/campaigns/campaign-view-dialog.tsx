@@ -57,6 +57,10 @@ interface Campaign {
   _count: {
     seekers: number
   }
+  inquiryAttribution?: {
+    inquiryCount: number
+    registeredCount: number
+  }
 }
 
 interface CampaignViewDialogProps {
@@ -280,16 +284,27 @@ export function CampaignViewDialog({ open, onOpenChange, campaignId }: CampaignV
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="text-center p-3 bg-blue-50 rounded-lg">
                       <div className="text-2xl font-bold text-blue-600">{campaign.views?.toLocaleString() || 0}</div>
                       <div className="text-sm text-blue-600">Total Views</div>
                     </div>
                     <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{campaign._count?.seekers || 0}</div>
-                      <div className="text-sm text-green-600">Leads Generated</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {campaign.inquiryAttribution?.inquiryCount ?? campaign._count?.seekers ?? 0}
+                      </div>
+                      <div className="text-sm text-green-600">Inquiries (linked)</div>
+                    </div>
+                    <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <div className="text-2xl font-bold text-emerald-700">
+                        {campaign.inquiryAttribution?.registeredCount ?? 0}
+                      </div>
+                      <div className="text-sm text-emerald-800">Registered (register now)</div>
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Inquiry and registered counts exclude deleted records; registered uses the register now flag on each inquiry.
+                  </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-3 bg-purple-50 rounded-lg">
                       <div className="text-2xl font-bold text-purple-600">

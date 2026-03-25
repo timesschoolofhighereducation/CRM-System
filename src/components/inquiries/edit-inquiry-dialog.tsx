@@ -214,8 +214,10 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     mode: 'onChange',
   })
 
-  // Load initial data
+  // Load programs and marketing sources (aligned with active campaigns + default types)
   useEffect(() => {
+    if (!open) return
+
     const fetchPrograms = async () => {
       setProgramsLoading(true)
       try {
@@ -230,22 +232,37 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         setProgramsLoading(false)
       }
     }
-    
+
     const fetchCampaignTypes = async () => {
       try {
-        const res = await fetch('/api/campaign-types')
-        if (res.ok) {
-          const data = await res.json()
-          setCampaignTypes(data.filter((type: CampaignType) => type.isActive))
+        const res = await fetch('/api/campaign-types?forInquiry=true')
+        if (!res.ok) return
+        let data = await res.json()
+        if (!Array.isArray(data)) data = []
+        const currentSource = inquiry?.marketingSource
+        if (
+          currentSource &&
+          !data.some((type: CampaignType) => type.name === currentSource)
+        ) {
+          data = [
+            ...data,
+            {
+              id: `legacy-${currentSource}`,
+              name: currentSource,
+              isActive: true,
+              isDefault: false,
+            },
+          ]
         }
+        setCampaignTypes(data)
       } catch (e) {
         console.error('Failed to load campaign types', e)
       }
     }
-    
+
     fetchPrograms()
     fetchCampaignTypes()
-  }, [])
+  }, [open, inquiry?.id])
 
   // Populate form when inquiry changes
   useEffect(() => {
@@ -296,7 +313,7 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     setCampaignsLoading(true)
     try {
       // Use forInquiry=true to allow all users to see all ACTIVE campaigns
-      const response = await fetch(`/api/campaigns?type=${campaignType}&limit=100&forInquiry=true`)
+      const response = await fetch(`/api/campaigns?type=${encodeURIComponent(campaignType)}&limit=500&forInquiry=true`)
       if (response.ok) {
         const data = await response.json()
         const campaigns = data.campaigns || (Array.isArray(data) ? data : [])

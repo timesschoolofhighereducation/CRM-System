@@ -72,7 +72,28 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(campaign)
+    const [inquiryCount, registeredCount] = await Promise.all([
+      prisma.campaignSeeker.count({
+        where: {
+          campaignId: id,
+          seeker: { NOT: { isDeleted: true } },
+        },
+      }),
+      prisma.campaignSeeker.count({
+        where: {
+          campaignId: id,
+          seeker: { NOT: { isDeleted: true }, registerNow: true },
+        },
+      }),
+    ])
+
+    return NextResponse.json({
+      ...campaign,
+      inquiryAttribution: {
+        inquiryCount,
+        registeredCount,
+      },
+    })
   } catch (error) {
     console.error('Error fetching campaign:', error)
     return NextResponse.json(
