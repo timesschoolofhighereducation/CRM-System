@@ -192,22 +192,15 @@ function DashboardPageContent() {
         {/* Role-based Personalized Dashboard */}
         <RoleBasedDashboard />
 
-        {/* Legacy components for backward compatibility */}
-        <div className="hidden">
-          <DashboardStats
-            stats={dashboardData?.stats ?? null}
+        {/* Charts (legacy components). Stats cards are already shown by RoleBasedDashboard. */}
+        <DashboardReportCharts />
+        {isAdmin && (
+          <UserInquiryAnalytics
+            userInquiryStats={dashboardData?.userInquiryStats ?? null}
             loading={dashboardLoading}
             error={dashboardError}
           />
-          <DashboardReportCharts />
-          {isAdmin && (
-            <UserInquiryAnalytics
-              userInquiryStats={dashboardData?.userInquiryStats ?? null}
-              loading={dashboardLoading}
-              error={dashboardError}
-            />
-          )}
-        </div>
+        )}
       </div>
     </DashboardLayout>
   )
