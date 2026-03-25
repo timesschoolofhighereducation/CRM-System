@@ -9,6 +9,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { DashboardFilterBar } from '@/components/dashboard/dashboard-filter-bar'
 import type { DashboardFilterState, DashboardPreset } from '@/components/dashboard/dashboard-types'
+import type { DashboardStatsData } from '@/components/dashboard/dashboard-stats'
+import type { UserInquiryStat } from '@/components/dashboard/user-inquiry-analytics'
 import { safeJsonParse } from '@/lib/utils'
 import { RoleBasedDashboard } from '@/components/dashboard/role-based-dashboard'
 
@@ -61,13 +63,7 @@ function DashboardPageContent() {
 
   const [filters, setFilters] = useState<DashboardFilterState>(DEFAULT_FILTERS)
   const [dashboardData, setDashboardData] = useState<{
-    stats: {
-      totalInquiries: number
-      totalCampaigns: number
-      totalUsers: number
-      activeUsers: number
-      [key: string]: any
-    }
+    stats: DashboardStatsData | null
     activities: Array<{
       id: string
       type: string
@@ -76,12 +72,7 @@ function DashboardPageContent() {
       timestamp: string
       userName?: string
     }>
-    userInquiryStats: Array<{
-      userId: string
-      userName: string
-      totalInquiries: number
-      completedInquiries: number
-    }> | null
+    userInquiryStats: UserInquiryStat[] | null
     users: { id: string; name: string }[]
     campaigns: { id: string; name: string }[]
     isAdmin: boolean
@@ -105,9 +96,9 @@ function DashboardPageContent() {
         }
         const data = await safeJsonParse(res)
         setDashboardData({
-          stats: data.stats,
+          stats: (data.stats as DashboardStatsData) ?? null,
           activities: data.activities ?? [],
-          userInquiryStats: data.userInquiryStats ?? null,
+          userInquiryStats: (data.userInquiryStats as UserInquiryStat[]) ?? null,
           users: data.users ?? [],
           campaigns: data.campaigns ?? [],
           isAdmin: data.isAdmin ?? false,

@@ -1116,6 +1116,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
         </div>
       </CardContent>
 
+      <Card className="mt-4">
+        <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-medium text-sm flex items-center gap-2">
                 <Save className="h-4 w-4" />
@@ -1154,7 +1156,8 @@ export function InquirySearchFilter({ inquiries, programs, campaigns, onFiltered
                 </div>
               ))}
             </div>
-          </CardContent>
+        </CardContent>
+      </Card>
 
       {/* Save Filter Dialog */}
       {showSaveDialog && (

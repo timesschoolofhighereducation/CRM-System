@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     }
 
     const seeker = await prisma.seeker.create({
-      data: seekerData,
+      data: seekerData as any,
       include: {
         programInterest: true,
         preferredPrograms: {
