@@ -214,6 +214,28 @@ export default function WhatsAppCampaignPage() {
       .replaceAll('{{CounselorName}}', 'Admissions Team')
   }, [message, primaryRecipient])
 
+  const replyPreviewMessage = useMemo(() => {
+    if (!previewMessage) return ''
+
+    const lower = previewMessage.toLowerCase()
+    const preferredProgram = primaryRecipient?.preferredPrograms?.[0]?.program?.name ?? 'the program'
+    const firstName = primaryRecipient?.fullName?.split(' ')[0] ?? 'Hi'
+
+    if (lower.includes('schedule') || lower.includes('call')) {
+      return `Thanks ${firstName}! I am interested. Can we schedule a quick call tomorrow?`
+    }
+
+    if (lower.includes('fee') || lower.includes('payment') || lower.includes('cost')) {
+      return `Thank you. Could you share the fee details and payment options for ${preferredProgram}?`
+    }
+
+    if (lower.includes('intake') || lower.includes('start date') || lower.includes('start')) {
+      return `Thanks for the update. Please confirm the next intake date and required documents.`
+    }
+
+    return `Thank you for the message. I am interested in ${preferredProgram}. Please share the next steps.`
+  }, [previewMessage, primaryRecipient])
+
   const isAllFilteredSelected =
     filteredSeekers.length > 0 && selectedRecipients.length === filteredSeekers.length
 
@@ -977,8 +999,15 @@ export default function WhatsAppCampaignPage() {
                     <div className="text-xs text-muted-foreground mb-2">
                       {primaryRecipient?.fullName || 'Recipient'}
                     </div>
-                    <div className="rounded-lg bg-muted/30 p-3 text-sm whitespace-pre-wrap min-h-[140px] max-h-[220px] overflow-y-auto">
-                      {previewMessage || 'Your message preview will appear here...'}
+                    <div className="rounded-lg bg-muted/20 p-3 min-h-[160px] max-h-[260px] overflow-y-auto space-y-2">
+                      <div className="max-w-[90%] rounded-lg bg-card border border-border/60 p-3 text-sm whitespace-pre-wrap">
+                        {previewMessage || 'Your message preview will appear here...'}
+                      </div>
+                      {replyPreviewMessage && (
+                        <div className="ml-auto max-w-[90%] rounded-lg bg-green-500/15 border border-green-500/20 p-3 text-sm whitespace-pre-wrap">
+                          {replyPreviewMessage}
+                        </div>
+                      )}
                     </div>
                     {mediaFile && (
                       <div className="mt-2 text-xs text-muted-foreground">
