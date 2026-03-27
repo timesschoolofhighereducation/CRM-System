@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,21 +17,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { safeJsonParse } from '@/lib/utils'
-import { format, endOfDay, startOfDay } from 'date-fns'
-import { DateRange } from 'react-day-picker'
 import { 
   MessageSquare, 
   Send, 
   AlertCircle, 
   Search,
-  Calendar as CalendarIcon,
   Phone,
-  Mail,
   MapPin,
   Upload,
   Image,
@@ -42,10 +36,6 @@ import {
   Filter,
   X,
   History,
-  Clock,
-  CheckCircle,
-  XCircle,
-  User,
   Gift
 } from 'lucide-react'
 
@@ -119,6 +109,8 @@ interface WhatsAppTemplate {
   updatedAt: string
 }
 
+const MAX_WHATSAPP_MESSAGE_LENGTH = 1024
+
 export default function WhatsAppCampaignPage() {
   const [seekers, setSeekers] = useState<Seeker[]>([])
   const [filteredSeekers, setFilteredSeekers] = useState<Seeker[]>([])
@@ -138,9 +130,7 @@ export default function WhatsAppCampaignPage() {
   const [showProgramFilter, setShowProgramFilter] = useState(false)
   const [promotionCodeHoldersOnly, setPromotionCodeHoldersOnly] = useState(false)
   const [messageHistory, setMessageHistory] = useState<WhatsAppMessageHistory[]>([])
-  const [showHistory, setShowHistory] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
 
   // Templates
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
@@ -159,6 +149,7 @@ export default function WhatsAppCampaignPage() {
     fetchSeekers()
     fetchPrograms()
     fetchTemplates()
+    fetchHistory()
   }, [])
 
   useEffect(() => {
@@ -184,27 +175,47 @@ export default function WhatsAppCampaignPage() {
       )
     }
 
-    // Filter by created date range
-    if (dateRange?.from || dateRange?.to) {
-      const from = dateRange?.from ? startOfDay(dateRange.from) : null
-      const to = dateRange?.to ? endOfDay(dateRange.to) : null
-
-      filtered = filtered.filter(seeker => {
-        const createdAt = new Date(seeker.createdAt)
-        if (Number.isNaN(createdAt.getTime())) return false
-        if (from && createdAt < from) return false
-        if (to && createdAt > to) return false
-        return true
-      })
-    }
-
     // Filter to promotion code holders only (inquiries that have a promotion code)
     if (promotionCodeHoldersOnly) {
       filtered = filtered.filter(seeker => Boolean(seeker.promotionCodeId ?? seeker.promotionCode))
     }
 
     setFilteredSeekers(filtered)
-  }, [seekers, searchTerm, selectedPrograms, dateRange, promotionCodeHoldersOnly])
+  }, [seekers, searchTerm, selectedPrograms, promotionCodeHoldersOnly])
+
+  // Keep selection valid while filters/data change.
+  // This prevents stale hidden recipients from being sent by accident.
+  useEffect(() => {
+    setSelectedSeekers((prev) => {
+      if (prev.size === 0) return prev
+      const validIds = new Set(filteredSeekers.map((s) => s.id))
+      const next = new Set(Array.from(prev).filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredSeekers])
+
+  const selectedRecipients = useMemo(
+    () => filteredSeekers.filter((s) => selectedSeekers.has(s.id)),
+    [filteredSeekers, selectedSeekers]
+  )
+
+  const primaryRecipient = selectedRecipients[0] ?? null
+  const messageLength = message.trim().length
+  const isMessageTooLong = messageLength > MAX_WHATSAPP_MESSAGE_LENGTH
+
+  const previewMessage = useMemo(() => {
+    const baseMessage = message.trim()
+    if (!baseMessage) return ''
+    const preferredProgram = primaryRecipient?.preferredPrograms?.[0]?.program?.name ?? 'Your Program'
+    return baseMessage
+      .replaceAll('{{StudentName}}', primaryRecipient?.fullName ?? 'Student')
+      .replaceAll('{{ProgramName}}', preferredProgram)
+      .replaceAll('{{InquiryID}}', primaryRecipient?.id ?? 'INQ-0000')
+      .replaceAll('{{CounselorName}}', 'Admissions Team')
+  }, [message, primaryRecipient])
+
+  const isAllFilteredSelected =
+    filteredSeekers.length > 0 && selectedRecipients.length === filteredSeekers.length
 
   const fetchSeekers = async () => {
     try {
@@ -244,12 +255,14 @@ export default function WhatsAppCampaignPage() {
       const response = await fetch('/api/programs')
       if (response.ok) {
         const data = await safeJsonParse(response)
-        setPrograms(data)
+        setPrograms(Array.isArray(data) ? data : (Array.isArray(data?.programs) ? data.programs : []))
       } else {
         console.error('Failed to fetch programs:', response.status, response.statusText)
+        setPrograms([])
       }
     } catch (error) {
       console.error('Error fetching programs:', error)
+      setPrograms([])
     }
   }
 
@@ -259,12 +272,14 @@ export default function WhatsAppCampaignPage() {
       const response = await fetch('/api/whatsapp/history')
       if (response.ok) {
         const data = await safeJsonParse(response)
-        setMessageHistory(data.messages)
+        setMessageHistory(Array.isArray(data?.messages) ? data.messages : [])
       } else {
         console.error('Failed to fetch message history:', response.status, response.statusText)
+        setMessageHistory([])
       }
     } catch (error) {
       console.error('Error fetching message history:', error)
+      setMessageHistory([])
     } finally {
       setHistoryLoading(false)
     }
@@ -301,6 +316,8 @@ export default function WhatsAppCampaignPage() {
     const template = templates.find((t) => t.id === value)
     if (template) {
       setMessage(template.content)
+      setMediaFile(null)
+      setMediaPreview(null)
 
       // If template has an image, fetch it and attach so Send works with existing flow
       if (template.mediaFilePath && template.mediaType?.startsWith('image/')) {
@@ -410,7 +427,7 @@ export default function WhatsAppCampaignPage() {
 
 
   const handleSelectAll = () => {
-    if (selectedSeekers.size === filteredSeekers.length) {
+    if (isAllFilteredSelected) {
       setSelectedSeekers(new Set())
     } else {
       setSelectedSeekers(new Set(filteredSeekers.map(seeker => seeker.id)))
@@ -507,6 +524,14 @@ export default function WhatsAppCampaignPage() {
       return
     }
 
+    if (message.trim() && isMessageTooLong) {
+      setSendStatus({
+        type: 'error',
+        message: `Message is too long. Keep it within ${MAX_WHATSAPP_MESSAGE_LENGTH} characters.`
+      })
+      return
+    }
+
     try {
       setSending(true)
       setSendStatus(null)
@@ -536,9 +561,7 @@ export default function WhatsAppCampaignPage() {
         setMediaFile(null)
         setMediaPreview(null)
         // Refresh history after sending
-        if (showHistory) {
-          fetchHistory()
-        }
+        fetchHistory()
       } else {
         setSendStatus({
           type: 'error',
@@ -559,40 +582,223 @@ export default function WhatsAppCampaignPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border/60">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <MessageSquare className="h-6 w-6 text-green-600" />
+            <div className="p-2 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+              <MessageSquare className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-foreground">
                 WhatsApp Campaign
               </h1>
-              <p className="text-gray-600">
-                Send bulk WhatsApp messages to selected recipients. Compose once, send to many.
+              <p className="text-sm text-muted-foreground">
+                Compose once and send to selected recipients.
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowHistory(!showHistory)
-              if (!showHistory) {
-                fetchHistory()
-              }
-            }}
-            className="flex items-center space-x-2"
-          >
-            <History className="h-4 w-4" />
-            <span>View history</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-normal">
+              Selected: {selectedSeekers.size}
+            </Badge>
+            <Button
+              variant="outline"
+              onClick={fetchHistory}
+              className="flex items-center space-x-2"
+            >
+              <History className="h-4 w-4" />
+              <span>Refresh history</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Recipients */}
+          <div className="lg:col-span-4 order-2 lg:order-1">
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-base font-semibold text-foreground">Recipients</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Search, filter, and select recipients.
+                  </p>
+                </div>
+
+                {/* Search and Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter by name, phone, email, or city"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="min-w-[220px] flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowProgramFilter(!showProgramFilter)}
+                    className="flex items-center space-x-1"
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Program</span>
+                    {selectedPrograms.size > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {selectedPrograms.size}
+                      </Badge>
+                    )}
+                  </Button>
+                  <Button
+                    variant={promotionCodeHoldersOnly ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPromotionCodeHoldersOnly(!promotionCodeHoldersOnly)}
+                    className="flex items-center space-x-1"
+                  >
+                    <Gift className="h-4 w-4" />
+                    <span>Promo</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchSeekers}
+                    disabled={loading}
+                    className="flex items-center space-x-1"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </Button>
+                </div>
+
+                {/* Program Filter Dropdown */}
+                {showProgramFilter && (
+                  <div className="border border-border/60 rounded-lg p-4 bg-muted/20">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-foreground">Filter by program</h3>
+                      <div className="flex items-center space-x-2">
+                        {selectedPrograms.size > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleClearProgramFilters}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowProgramFilter(false)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                      {programs.map((program) => (
+                        <div key={program.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`program-${program.id}`}
+                            checked={selectedPrograms.has(program.id)}
+                            onCheckedChange={() => handleSelectProgram(program.id)}
+                          />
+                          <Label 
+                            htmlFor={`program-${program.id}`} 
+                            className="text-sm text-muted-foreground cursor-pointer flex-1"
+                          >
+                            {program.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant="secondary" className="font-normal">Total: {seekers.length}</Badge>
+                  <Badge variant="secondary" className="font-normal">Shown: {filteredSeekers.length}</Badge>
+                  <Badge variant="secondary" className="font-normal">Selected: {selectedRecipients.length}</Badge>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={isAllFilteredSelected}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <Label htmlFor="select-all" className="text-sm font-medium">
+                    Select all shown
+                  </Label>
+                </div>
+
+                <ScrollArea className="h-[520px]">
+                  <div className="space-y-2">
+                    {loading ? (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" aria-hidden />
+                        <span className="text-sm text-muted-foreground">Loading recipients…</span>
+                      </div>
+                    ) : filteredSeekers.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No recipients match your filters.
+                      </div>
+                    ) : (
+                      filteredSeekers.map((seeker) => (
+                        <div
+                          key={seeker.id}
+                          className="flex items-center space-x-3 p-3 border border-border/60 rounded-lg hover:bg-muted/30 transition-colors"
+                        >
+                          <Checkbox
+                            id={`seeker-${seeker.id}`}
+                            checked={selectedSeekers.has(seeker.id)}
+                            onCheckedChange={() => handleSelectSeeker(seeker.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
+                                  {seeker.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </div>
+                                <h3 className="text-sm font-medium text-foreground truncate">
+                                  {seeker.fullName}
+                                </h3>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(seeker.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4 mt-1.5 text-xs text-muted-foreground">
+                              <div className="flex items-center space-x-1">
+                                <Phone className="h-3 w-3" />
+                                <span>{seeker.whatsappNumber || seeker.phone}</span>
+                              </div>
+                              {seeker.city && (
+                                <div className="flex items-center space-x-1">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{seeker.city}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </Card>
+          </div>
+
           {/* Message Composition */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-5 order-1 lg:order-2">
             <Card className="p-6">
               <div className="space-y-6">
+                <div className="space-y-1">
+                  <h2 className="text-base font-semibold text-foreground">Message</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Choose a template, edit the text, then send.
+                  </p>
+                </div>
+
                 {/* Templates */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -653,6 +859,14 @@ export default function WhatsAppCampaignPage() {
                     onChange={(e) => setMessage(e.target.value)}
                     className="mt-2 min-h-[120px]"
                   />
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Variables: {"{{StudentName}}"}, {"{{ProgramName}}"}, {"{{InquiryID}}"}, {"{{CounselorName}}"}
+                    </span>
+                    <span className={isMessageTooLong ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                      {messageLength}/{MAX_WHATSAPP_MESSAGE_LENGTH}
+                    </span>
+                  </div>
                 </div>
                 
                 {/* Media Upload Section */}
@@ -670,7 +884,7 @@ export default function WhatsAppCampaignPage() {
                       />
                       <label
                         htmlFor="media-upload"
-                        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                        className="flex items-center space-x-2 px-3 py-2 border border-border/60 rounded-md cursor-pointer hover:bg-muted/30"
                       >
                         <Upload className="h-4 w-4" />
                         <span className="text-sm">Attach file</span>
@@ -679,13 +893,13 @@ export default function WhatsAppCampaignPage() {
 
                     {/* Media Preview */}
                     {mediaFile && (
-                      <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <div className="border border-border/60 rounded-lg p-3 bg-muted/20">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             {getFileIcon(mediaFile)}
                             <div>
                               <p className="text-sm font-medium">{mediaFile.name}</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 {(mediaFile.size / 1024 / 1024).toFixed(2)} MB
                               </p>
                             </div>
@@ -717,23 +931,28 @@ export default function WhatsAppCampaignPage() {
                 </div>
 
                 {/* Send Button */}
-                <Button
-                  onClick={handleSendMessages}
-                  disabled={sending || selectedSeekers.size === 0}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  {sending ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Sending…</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <Send className="h-4 w-4" />
-                      <span>Send to {selectedSeekers.size} recipient(s)</span>
-                    </div>
-                  )}
-                </Button>
+                <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Ready to send: <span className="font-medium text-foreground">{selectedSeekers.size}</span> recipient{selectedSeekers.size === 1 ? '' : 's'}
+                  </p>
+                  <Button
+                    onClick={handleSendMessages}
+                    disabled={sending || selectedSeekers.size === 0 || isMessageTooLong}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {sending ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Sending…</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Send className="h-4 w-4" />
+                        <span>Send WhatsApp Message</span>
+                      </div>
+                    )}
+                  </Button>
+                </div>
 
                 {/* Status Messages */}
                 {sendStatus && (
@@ -748,432 +967,68 @@ export default function WhatsAppCampaignPage() {
             </Card>
           </div>
 
-          {/* Inquiry Selection */}
-          <div className="lg:col-span-2">
-            <Card className="p-6">
-              <div className="space-y-4">
-                {/* Search and Filters */}
-                <div className="flex items-center space-x-2">
-                  <Search className="h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by name, phone, email, or city"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center space-x-1"
-                      >
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>
-                          {dateRange?.from
-                            ? dateRange?.to
-                              ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                              : format(dateRange.from, 'MMM d, yyyy')
-                            : 'Date range'}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="range"
-                        numberOfMonths={2}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        initialFocus
-                      />
-                      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
-                        <div className="text-xs text-gray-500">
-                          {dateRange?.from ? format(dateRange.from, 'MMM d, yyyy') : 'Start date'}
-                          {dateRange?.to ? ` → ${format(dateRange.to, 'MMM d, yyyy')}` : ''}
-                        </div>
-                        {(dateRange?.from || dateRange?.to) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => setDateRange(undefined)}
-                          >
-                            Clear
-                          </Button>
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowProgramFilter(!showProgramFilter)}
-                    className="flex items-center space-x-1"
-                  >
-                    <Filter className="h-4 w-4" />
-                    <span>Filter by program</span>
-                    {selectedPrograms.size > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-xs">
-                        {selectedPrograms.size}
-                      </Badge>
-                    )}
-                  </Button>
-                  <Button
-                    variant={promotionCodeHoldersOnly ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setPromotionCodeHoldersOnly(!promotionCodeHoldersOnly)}
-                    className="flex items-center space-x-1"
-                  >
-                    <Gift className="h-4 w-4" />
-                    <span>Promotion code holders</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchSeekers}
-                    disabled={loading}
-                    className="flex items-center space-x-1"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    <span>Refresh list</span>
-                  </Button>
-                </div>
-
-                {/* Program Filter Dropdown */}
-                {showProgramFilter && (
-                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-900">Filter by program</h3>
-                      <div className="flex items-center space-x-2">
-                        {selectedPrograms.size > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleClearProgramFilters}
-                            className="text-xs text-gray-500 hover:text-gray-700"
-                          >
-                            Clear filters
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowProgramFilter(false)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+          {/* Preview + Recent Campaigns */}
+          <div className="lg:col-span-3 order-3">
+            <div className="space-y-4 lg:sticky lg:top-6">
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground tracking-wide">Preview</h3>
+                  <div className="rounded-xl border border-border/60 bg-card p-3">
+                    <div className="text-xs text-muted-foreground mb-2">
+                      {primaryRecipient?.fullName || 'Recipient'}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                      {programs.map((program) => (
-                        <div key={program.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`program-${program.id}`}
-                            checked={selectedPrograms.has(program.id)}
-                            onCheckedChange={() => handleSelectProgram(program.id)}
-                          />
-                          <Label 
-                            htmlFor={`program-${program.id}`} 
-                            className="text-sm text-gray-700 cursor-pointer flex-1"
-                          >
-                            {program.name}
-                          </Label>
-                        </div>
-                      ))}
+                    <div className="rounded-lg bg-muted/30 p-3 text-sm whitespace-pre-wrap min-h-[140px] max-h-[220px] overflow-y-auto">
+                      {previewMessage || 'Your message preview will appear here...'}
                     </div>
-                    {selectedPrograms.size > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="flex flex-wrap gap-1">
-                          {Array.from(selectedPrograms).map(programId => {
-                            const program = programs.find(p => p.id === programId)
-                            return program ? (
-                              <Badge key={programId} variant="secondary" className="text-xs">
-                                {program.name}
-                                <button
-                                  onClick={() => handleSelectProgram(programId)}
-                                  className="ml-1 hover:text-red-600"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            ) : null
-                          })}
-                        </div>
+                    {mediaFile && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Attachment: {mediaFile.name}
                       </div>
                     )}
                   </div>
-                )}
-                
-                {/* Stats */}
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span><strong>Total:</strong> {seekers.length}</span>
-                  <span><strong>Shown:</strong> {filteredSeekers.length}</span>
-                  <span><strong>Selected:</strong> {selectedSeekers.size}</span>
-                  {selectedPrograms.size > 0 && (
-                    <span className="text-blue-600">
-                      {selectedPrograms.size} program{selectedPrograms.size > 1 ? 's' : ''} selected
-                    </span>
-                  )}
-                  {promotionCodeHoldersOnly && (
-                    <span className="text-amber-600 font-medium">Promotion code holders only</span>
-                  )}
                 </div>
+              </Card>
 
-                {/* Select All */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={selectedSeekers.size === filteredSeekers.length && filteredSeekers.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <Label htmlFor="select-all" className="text-sm font-medium">
-                    Select all ({filteredSeekers.length})
-                  </Label>
-                </div>
-
-                {/* Inquiry List */}
-                <ScrollArea className="h-96">
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground tracking-wide">Recent Campaigns</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={fetchHistory}
+                      disabled={historyLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${historyLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
                   <div className="space-y-2">
-                    {loading ? (
-                      <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" aria-hidden />
-                        <span className="text-sm text-gray-500">Loading…</span>
-                      </div>
-                    ) : filteredSeekers.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No recipients match your filters. Try adjusting the search or filters.
-                      </div>
+                    {historyLoading ? (
+                      <div className="text-sm text-muted-foreground py-4">Loading history...</div>
+                    ) : messageHistory.length === 0 ? (
+                      <div className="text-sm text-muted-foreground py-4">No campaign history yet.</div>
                     ) : (
-                      filteredSeekers.map((seeker) => (
-                        <div
-                          key={seeker.id}
-                          className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <Checkbox
-                            id={`seeker-${seeker.id}`}
-                            checked={selectedSeekers.has(seeker.id)}
-                            onCheckedChange={() => handleSelectSeeker(seeker.id)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <h3 className="text-sm font-medium text-gray-900 truncate">
-                                  {seeker.fullName}
-                                </h3>
-                                {seeker.whatsapp && (
-                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                                    WhatsApp
-                                  </Badge>
-                                )}
-                                {(seeker.promotionCodeId ?? seeker.promotionCode) && (
-                                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-xs gap-0.5">
-                                    <Gift className="h-3 w-3" />
-                                    {seeker.promotionCode?.code ?? 'Promo'}
-                                  </Badge>
-                                )}
-                                {seeker.preferredPrograms && seeker.preferredPrograms.length > 0 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {seeker.preferredPrograms.length} program{seeker.preferredPrograms.length > 1 ? 's' : ''}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {new Date(seeker.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                              <div className="flex items-center space-x-1">
-                                <Phone className="h-3 w-3" />
-                                <span>{seeker.whatsappNumber || seeker.phone}</span>
-                              </div>
-                              {seeker.email && (
-                                <div className="flex items-center space-x-1">
-                                  <Mail className="h-3 w-3" />
-                                  <span className="truncate max-w-32">{seeker.email}</span>
-                                </div>
-                              )}
-                              {seeker.city && (
-                                <div className="flex items-center space-x-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{seeker.city}</span>
-                                </div>
-                              )}
-                            </div>
-                            {seeker.preferredPrograms && seeker.preferredPrograms.length > 0 && (
-                              <div className="mt-2">
-                                <div className="flex flex-wrap gap-1">
-                                  {seeker.preferredPrograms.slice(0, 2).map((pref, index) => (
-                                    <span key={index} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                                      {pref.program.name}
-                                    </span>
-                                  ))}
-                                  {seeker.preferredPrograms.length > 2 && (
-                                    <span className="text-xs text-gray-500">
-                                      +{seeker.preferredPrograms.length - 2} more
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                      messageHistory.slice(0, 6).map((item) => (
+                        <div key={item.id} className="rounded-lg border border-border/60 p-3">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">
+                            {item.message || 'Untitled message'}
+                          </p>
+                          <div className="mt-1 text-xs text-muted-foreground flex items-center justify-between">
+                            <span>
+                              {item.sentCount}/{item.recipientCount} delivered
+                              {item.failedCount > 0 ? `, ${item.failedCount} failed` : ''}
+                            </span>
+                            <span>{new Date(item.sentAt).toLocaleDateString()}</span>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
-                </ScrollArea>
-              </div>
-            </Card>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
-
-        {/* Message History Section */}
-        {showHistory && (
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Message history</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchHistory}
-                  disabled={historyLoading}
-                  className="flex items-center space-x-1"
-                >
-                  <RefreshCw className={`h-4 w-4 ${historyLoading ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
-                </Button>
-              </div>
-
-              {historyLoading ? (
-                <div className="flex flex-col items-center justify-center py-8 gap-2">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" aria-hidden />
-                  <span className="text-sm text-gray-500">Loading…</span>
-                </div>
-              ) : messageHistory.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No messages sent yet.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messageHistory.map((message) => (
-                    <div key={message.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h3 className="font-medium text-gray-900">
-                              {message.message.length > 100 
-                                ? `${message.message.substring(0, 100)}...` 
-                                : message.message}
-                            </h3>
-                            {message.mediaType && (
-                              <div className="flex items-center space-x-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  {message.mediaType.split('/')[0]}
-                                </Badge>
-                                {message.mediaFilePath && (
-                                  <a
-                                    href={message.mediaFilePath}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 text-xs underline"
-                                  >
-                                    Open media
-                                  </a>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3" />
-                              <span>{new Date(message.sentAt).toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <User className="h-3 w-3" />
-                              <span>Sent by: {message.user.name}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <CheckCircle className="h-3 w-3 text-green-600" />
-                              <span>{message.sentCount} delivered</span>
-                            </div>
-                            {message.failedCount > 0 && (
-                              <div className="flex items-center space-x-1">
-                                <XCircle className="h-3 w-3 text-red-600" />
-                                <span>{message.failedCount} failed</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Media Preview */}
-                      {message.mediaFilePath && message.mediaType && (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Attachment</h4>
-                          <div className="flex items-center space-x-2">
-                            {message.mediaType.startsWith('image/') ? (
-                              <img
-                                src={message.mediaFilePath}
-                                alt={message.mediaFilename || 'Media'}
-                                className="max-w-32 max-h-32 object-cover rounded border"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none'
-                                }}
-                              />
-                            ) : (
-                              <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded border">
-                                <FileIcon className="h-4 w-4 text-gray-500" />
-                                <span className="text-sm text-gray-600">
-                                  {message.mediaFilename || 'Attachment'}
-                                </span>
-                              </div>
-                            )}
-                            <a
-                              href={message.mediaFilePath}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 text-sm underline"
-                            >
-                              Open in new tab
-                            </a>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Recipients */}
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          Recipients ({message.recipients.length})
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {message.recipients.map((recipient) => (
-                            <div key={recipient.id} className="flex items-center space-x-2 text-sm">
-                              <div className={`w-2 h-2 rounded-full ${
-                                recipient.status === 'SENT' ? 'bg-green-500' :
-                                recipient.status === 'FAILED' ? 'bg-red-500' :
-                                recipient.status === 'DELIVERED' ? 'bg-blue-500' :
-                                recipient.status === 'READ' ? 'bg-purple-500' :
-                                'bg-gray-400'
-                              }`} />
-                              <span className="text-gray-600">{recipient.seeker.fullName}</span>
-                              <span className="text-gray-400">({recipient.phoneNumber})</span>
-                              {recipient.errorMessage && (
-                                <span className="text-red-500 text-xs">
-                                  {recipient.errorMessage}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
       </div>
 
       {/* Add Template Dialog */}
@@ -1261,7 +1116,7 @@ export default function WhatsAppCampaignPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {templatesLoading ? (
-              <div className="col-span-full text-sm text-gray-500">Loading templates...</div>
+              <div className="col-span-full text-sm text-muted-foreground">Loading templates...</div>
             ) : (
               <>
                 <button
@@ -1271,22 +1126,22 @@ export default function WhatsAppCampaignPage() {
                     handleTemplateSelect('none')
                     setIsTemplateGalleryOpen(false)
                   }}
-                  className="text-left border border-gray-200 rounded-lg overflow-hidden hover:bg-gray-50 transition-colors"
+                  className="text-left border border-border/60 rounded-lg overflow-hidden hover:bg-muted/30 transition-colors"
                 >
-                  <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
-                    <div className="flex flex-col items-center justify-center text-gray-500">
+                  <div className="h-32 bg-muted/30 flex items-center justify-center overflow-hidden">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <MessageSquare className="h-8 w-8" />
                       <span className="text-xs mt-1">Start from scratch</span>
                     </div>
                   </div>
                   <div className="p-3">
-                    <div className="font-medium text-sm text-gray-900 truncate">None</div>
-                    <div className="text-xs text-gray-600 mt-1">Use empty message</div>
+                    <div className="font-medium text-sm text-foreground truncate">None</div>
+                    <div className="text-xs text-muted-foreground mt-1">Use empty message</div>
                   </div>
                 </button>
 
                 {templates.length === 0 ? (
-                  <div className="col-span-full text-sm text-gray-500">No templates yet. Create one from the &quot;Create template&quot; button.</div>
+                  <div className="col-span-full text-sm text-muted-foreground">No templates yet. Create one from the &quot;Create template&quot; button.</div>
                 ) : (
                   templates.map((t) => (
                     <button
@@ -1296,9 +1151,9 @@ export default function WhatsAppCampaignPage() {
                         handleTemplateSelect(t.id)
                         setIsTemplateGalleryOpen(false)
                       }}
-                      className="text-left border border-gray-200 rounded-lg overflow-hidden hover:bg-gray-50 transition-colors"
+                      className="text-left border border-border/60 rounded-lg overflow-hidden hover:bg-muted/30 transition-colors"
                     >
-                      <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+                      <div className="h-32 bg-muted/30 flex items-center justify-center overflow-hidden">
                         {t.mediaFilePath && t.mediaType?.startsWith('image/') ? (
                           <img
                             src={t.mediaFilePath}
@@ -1309,15 +1164,15 @@ export default function WhatsAppCampaignPage() {
                             }}
                           />
                         ) : (
-                          <div className="flex flex-col items-center justify-center text-gray-500">
+                          <div className="flex flex-col items-center justify-center text-muted-foreground">
                             <Image className="h-8 w-8" />
                             <span className="text-xs mt-1">No image</span>
                           </div>
                         )}
                       </div>
                       <div className="p-3">
-                        <div className="font-medium text-sm text-gray-900 truncate">{t.name}</div>
-                        <div className="text-xs text-gray-600 line-clamp-2 mt-1 whitespace-pre-wrap">
+                        <div className="font-medium text-sm text-foreground truncate">{t.name}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">
                           {t.content}
                         </div>
                       </div>

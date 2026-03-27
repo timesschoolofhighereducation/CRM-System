@@ -167,16 +167,16 @@ function DashboardPageContent() {
           compactMode ? 'space-y-4' : 'space-y-6'
         )}
       >
-        <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="pb-4 border-b border-border/60">
           <h1
             className={cn(
-              'font-bold text-gray-900 dark:text-gray-100 mb-1',
+              'font-bold text-foreground mb-1',
               compactMode ? 'text-xl' : 'text-2xl sm:text-3xl'
             )}
           >
             Dashboard
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Welcome to your Education CRM dashboard. Use filters for quick analysis.
           </p>
         </div>

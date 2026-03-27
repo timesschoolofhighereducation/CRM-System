@@ -113,13 +113,13 @@ export default function GamesPage() {
     <DashboardLayout>
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar Menu */}
-        <div className="w-64 border-r bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
+        <div className="w-64 border-r border-border/60 bg-muted/20 p-4 flex-shrink-0 overflow-y-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
               <Gamepad2 className="h-6 w-6" />
               Mini Games
             </h1>
-            <p className="text-sm text-gray-600">Brain training games</p>
+            <p className="text-sm text-muted-foreground">Brain training games</p>
           </div>
 
           <div className="space-y-2">
@@ -150,9 +150,9 @@ export default function GamesPage() {
           {currentGame === null ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <Gamepad2 className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                <h2 className="text-2xl font-bold text-gray-600 mb-2">Select a Game</h2>
-                <p className="text-gray-500">Choose a game from the sidebar to start playing!</p>
+                <Gamepad2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h2 className="text-2xl font-bold text-foreground mb-2">Select a Game</h2>
+                <p className="text-muted-foreground">Choose a game from the sidebar to start playing!</p>
               </div>
             </div>
           ) : (

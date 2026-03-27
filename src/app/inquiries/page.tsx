@@ -47,8 +47,8 @@ export default function InquiriesPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-          <p className="mt-2 text-gray-600">Please sign in to access inquiries.</p>
+          <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>
+          <p className="mt-2 text-muted-foreground">Please sign in to access inquiries.</p>
         </div>
       </div>
     )
@@ -58,13 +58,13 @@ export default function InquiriesPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Professional Header */}
-        <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+        <div className="flex justify-between items-center pb-4 border-b border-border/60">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Inquiries</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Inquiries</h1>
+            <p className="text-sm text-muted-foreground">
               Manage all student inquiries and leads
               {canCreateInquiry && (
-                <span className="ml-2 text-xs text-gray-500">
+                <span className="ml-2 text-xs text-muted-foreground">
                   • Press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">⌘↵</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Ctrl↵</kbd> to create new inquiry
                 </span>
               )}
