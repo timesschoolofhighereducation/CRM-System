@@ -35,7 +35,13 @@ export async function GET(request: NextRequest) {
       // Non-admin users can only see inquiries they created
       where.createdById = _user.id
     }
-    
+
+    // Optional: only inquiries linked to a promotion code (e.g. WhatsApp campaign "Promo" filter)
+    const hasPromotionCodeParam = searchParams.get('hasPromotionCode')
+    if (hasPromotionCodeParam === 'true' || hasPromotionCodeParam === '1') {
+      where.promotionCodeId = { not: null }
+    }
+
     // Use transaction to fetch data and count in parallel for better performance
     const [seekers, totalInquiries] = await prisma.$transaction([
       prisma.seeker.findMany({

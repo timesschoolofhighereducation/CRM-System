@@ -113,6 +113,29 @@ interface WhatsAppTemplate {
 
 const MAX_WHATSAPP_MESSAGE_LENGTH = 1024
 
+async function fetchAllInquiryPages(hasPromotionCode: boolean): Promise<Seeker[]> {
+  const allInquiries: Seeker[] = []
+  const limit = 100
+  let page = 1
+  let hasMore = true
+  const promoQs = hasPromotionCode ? '&hasPromotionCode=true' : ''
+
+  while (hasMore) {
+    const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}${promoQs}`)
+    if (!response.ok) {
+      console.error('Failed to fetch inquiries:', response.status, response.statusText)
+      break
+    }
+    const data = await safeJsonParse(response)
+    const inquiries: Seeker[] = Array.isArray(data) ? data : (data.inquiries || [])
+    allInquiries.push(...inquiries)
+    const pagination = data?.pagination
+    hasMore = pagination?.hasMore === true && inquiries.length === limit
+    page += 1
+  }
+  return allInquiries
+}
+
 export default function WhatsAppCampaignPage() {
   const [seekers, setSeekers] = useState<Seeker[]>([])
   const [filteredSeekers, setFilteredSeekers] = useState<Seeker[]>([])
@@ -151,11 +174,37 @@ export default function WhatsAppCampaignPage() {
   const templateMediaLoadSeq = useRef(0)
 
   useEffect(() => {
-    fetchSeekers()
     fetchPrograms()
     fetchTemplates()
     fetchHistory()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadSeekers = async () => {
+      try {
+        setLoading(true)
+        const allInquiries = await fetchAllInquiryPages(promotionCodeHoldersOnly)
+        if (cancelled) return
+
+        const whatsappInquiries = allInquiries.filter(
+          (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
+        )
+        setSeekers(whatsappInquiries)
+      } catch (error) {
+        console.error('Error fetching seekers:', error)
+        if (!cancelled) setSeekers([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadSeekers()
+    return () => {
+      cancelled = true
+    }
+  }, [promotionCodeHoldersOnly])
 
   useEffect(() => {
     let filtered = seekers
@@ -167,7 +216,8 @@ export default function WhatsAppCampaignPage() {
         seeker.phone.includes(searchTerm) ||
         seeker.whatsappNumber?.includes(searchTerm) ||
         seeker.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        seeker.city?.toLowerCase().includes(searchTerm.toLowerCase())
+        seeker.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        seeker.promotionCode?.code?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -180,13 +230,10 @@ export default function WhatsAppCampaignPage() {
       )
     }
 
-    // Filter to promotion code holders only (inquiries that have a promotion code)
-    if (promotionCodeHoldersOnly) {
-      filtered = filtered.filter(seeker => Boolean(seeker.promotionCodeId ?? seeker.promotionCode))
-    }
+    // Promotion code holders: server filters via hasPromotionCode when the Promo toggle is on
 
     setFilteredSeekers(filtered)
-  }, [seekers, searchTerm, selectedPrograms, promotionCodeHoldersOnly])
+  }, [seekers, searchTerm, selectedPrograms])
 
   // Keep selection valid while filters/data change.
   // This prevents stale hidden recipients from being sent by accident.
@@ -247,31 +294,14 @@ export default function WhatsAppCampaignPage() {
   const fetchSeekers = async () => {
     try {
       setLoading(true)
-      const allInquiries: Seeker[] = []
-      const limit = 100
-      let page = 1
-      let hasMore = true
-
-      while (hasMore) {
-        const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}`)
-        if (!response.ok) {
-          console.error('Failed to fetch inquiries:', response.status, response.statusText)
-          break
-        }
-        const data = await safeJsonParse(response)
-        const inquiries: Seeker[] = Array.isArray(data) ? data : (data.inquiries || [])
-        allInquiries.push(...inquiries)
-        const pagination = data?.pagination
-        hasMore = pagination?.hasMore === true && inquiries.length === limit
-        page += 1
-      }
-
-      // Only show WhatsApp-enabled inquiries (otherwise bulk-send will fail / send to wrong numbers)
-      const whatsappInquiries = allInquiries.filter((s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone))
+      const allInquiries = await fetchAllInquiryPages(promotionCodeHoldersOnly)
+      const whatsappInquiries = allInquiries.filter(
+        (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
+      )
       setSeekers(whatsappInquiries)
     } catch (error) {
       console.error('Error fetching seekers:', error)
-      setSeekers([]) // Ensure seekers is always an array on error
+      setSeekers([])
     } finally {
       setLoading(false)
     }
@@ -691,7 +721,7 @@ export default function WhatsAppCampaignPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Filter by name, phone, email, or city"
+                    placeholder="Filter by name, phone, email, city, or promo code"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="min-w-[220px] flex-1"
@@ -715,6 +745,7 @@ export default function WhatsAppCampaignPage() {
                     size="sm"
                     onClick={() => setPromotionCodeHoldersOnly(!promotionCodeHoldersOnly)}
                     className="flex items-center space-x-1"
+                    title="Show only inquiries that have a promotion code linked (WhatsApp number shown for messaging)"
                   >
                     <Gift className="h-4 w-4" />
                     <span>Promo</span>
@@ -802,8 +833,10 @@ export default function WhatsAppCampaignPage() {
                         <span className="text-sm text-muted-foreground">Loading recipients…</span>
                       </div>
                     ) : filteredSeekers.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No recipients match your filters.
+                      <div className="text-center py-8 text-muted-foreground text-sm px-2">
+                        {promotionCodeHoldersOnly
+                          ? 'No WhatsApp-enabled inquiries have a promotion code linked, or none match your search/program filters. Link a code on the inquiry (Promotion code field) to include them here.'
+                          : 'No recipients match your filters.'}
                       </div>
                     ) : (
                       filteredSeekers.map((seeker) => (
@@ -830,11 +863,18 @@ export default function WhatsAppCampaignPage() {
                                 {new Date(seeker.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-4 mt-1.5 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                               <div className="flex items-center space-x-1">
-                                <Phone className="h-3 w-3" />
-                                <span>{seeker.whatsappNumber || seeker.phone}</span>
+                                <Phone className="h-3 w-3 shrink-0" />
+                                <span className="font-medium text-foreground/90">
+                                  {seeker.whatsappNumber || seeker.phone}
+                                </span>
                               </div>
+                              {(seeker.promotionCode?.code || seeker.promotionCodeId) && (
+                                <Badge variant="outline" className="text-[10px] font-normal h-5 px-1.5">
+                                  Promo: {seeker.promotionCode?.code ?? '—'}
+                                </Badge>
+                              )}
                               {seeker.city && (
                                 <div className="flex items-center space-x-1">
                                   <MapPin className="h-3 w-3" />
