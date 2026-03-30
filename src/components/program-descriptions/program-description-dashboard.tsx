@@ -23,6 +23,8 @@ export function ProgramDescriptionDashboard() {
   const [selectedProgramId, setSelectedProgramId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [imageDecoding, setImageDecoding] = useState(false)
+  const [imageDecodeError, setImageDecodeError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPrograms()
@@ -58,6 +60,13 @@ export function ProgramDescriptionDashboard() {
   }
 
   const selectedProgram = programs.find(p => p.id === selectedProgramId)
+  const selectedImageUrl = selectedProgram?.imageUrl
+    ? (selectedProgram.imageUrl.startsWith('/') ||
+       selectedProgram.imageUrl.startsWith('http') ||
+       selectedProgram.imageUrl.startsWith('data:')
+        ? selectedProgram.imageUrl
+        : `/${selectedProgram.imageUrl}`)
+    : null
 
   return (
     <div className="space-y-6">
@@ -120,58 +129,45 @@ export function ProgramDescriptionDashboard() {
                     <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Program Image</span>
                   </div>
                   <div className="relative">
-                    {(() => {
-                      // Format image URL properly
-                      const imageUrl = selectedProgram.imageUrl.startsWith('/') || 
-                                       selectedProgram.imageUrl.startsWith('http') || 
-                                       selectedProgram.imageUrl.startsWith('data:')
-                        ? selectedProgram.imageUrl 
-                        : `/${selectedProgram.imageUrl}`
-                      
-                      return (
-                        <>
-                          <img 
-                            src={imageUrl} 
-                            alt={selectedProgram.name}
-                            className="w-full max-w-md h-auto rounded-lg border border-purple-200 dark:border-purple-800 object-contain"
-                            onError={(e) => {
-                              console.error('Image load error for URL:', imageUrl)
-                              const target = e.currentTarget
-                              const parent = target.parentElement
-                              if (parent) {
-                                const errorDiv = document.createElement('div')
-                                errorDiv.className = 'p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400'
-                                errorDiv.textContent = 'Failed to load image.'
-                                const link = document.createElement('a')
-                                link.href = imageUrl.startsWith('http://') || imageUrl.startsWith('https://') ? imageUrl : '#'
-                                link.target = '_blank'
-                                link.rel = 'noopener noreferrer'
-                                link.className = 'underline mt-2 inline-block'
-                                link.textContent = 'Try opening in new tab'
-                                errorDiv.appendChild(document.createElement('br'))
-                                errorDiv.appendChild(link)
-                                parent.replaceChild(errorDiv, target)
-                              }
-                            }}
-                            onLoad={() => {
-                              console.log('Image loaded successfully:', imageUrl)
-                            }}
-                          />
-                          <div className="mt-2 flex items-center gap-2 flex-wrap">
-                            <a 
-                              href={imageUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
-                            >
-                              View full image
-                            </a>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-500 break-all">{imageUrl}</span>
-                          </div>
-                        </>
-                      )
-                    })()}
+                    {imageDecoding && (
+                      <div className="mb-2 text-xs text-indigo-600">Decoding image preview...</div>
+                    )}
+                    {imageDecodeError && (
+                      <div className="mb-2 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
+                        {imageDecodeError}
+                      </div>
+                    )}
+                    {selectedImageUrl && (
+                      <>
+                        <img
+                          src={selectedImageUrl}
+                          alt={selectedProgram.name}
+                          className="w-full max-w-md h-auto rounded-lg border border-purple-200 dark:border-purple-800 object-contain"
+                          onLoadStart={() => {
+                            setImageDecoding(true)
+                            setImageDecodeError(null)
+                          }}
+                          onError={() => {
+                            setImageDecoding(false)
+                            setImageDecodeError('Failed to decode image. Please re-upload.')
+                          }}
+                          onLoad={() => {
+                            setImageDecoding(false)
+                            setImageDecodeError(null)
+                          }}
+                        />
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <a
+                            href={selectedImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            View full image
+                          </a>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -180,11 +176,11 @@ export function ProgramDescriptionDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Description</span>
+                    <span className="text-sm font-bold underline text-purple-900 dark:text-purple-100">Description</span>
                   </div>
                   <SanitizedHtml
                     html={selectedProgram.description}
-                    className="prose prose-sm max-w-none dark:prose-invert text-purple-800 dark:text-purple-200"
+                    className="prose prose-sm max-w-none dark:prose-invert text-purple-800 dark:text-purple-200 prose-headings:font-bold prose-headings:underline"
                   />
                 </div>
               ) : (
