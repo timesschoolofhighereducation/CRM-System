@@ -592,6 +592,8 @@ model WhatsAppTemplate {
   mediaType     String?
   mediaFilename String?
   mediaFilePath String?
+  /// Inline image as data URL (data:image/...;base64,...) for serverless-friendly storage
+  mediaBase64   String?  @db.Text
   mediaSize     Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

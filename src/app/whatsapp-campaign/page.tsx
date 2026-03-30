@@ -103,6 +103,8 @@ interface WhatsAppTemplate {
   mediaType?: string
   mediaFilename?: string
   mediaFilePath?: string
+  /** Data URL (data:image/...;base64,...) when image is stored in the database */
+  mediaBase64?: string | null
   mediaSize?: number
   userId: string
   createdAt: string
@@ -341,22 +343,39 @@ export default function WhatsAppCampaignPage() {
       setMediaFile(null)
       setMediaPreview(null)
 
-      // If template has an image, fetch it and attach so Send works with existing flow
-      if (template.mediaFilePath && template.mediaType?.startsWith('image/')) {
-        const mediaPath = template.mediaFilePath
-        ;(async () => {
-          try {
-            const res = await fetch(mediaPath)
-            if (!res.ok) return
-            const blob = await res.blob()
-            const fileName = template.mediaFilename || 'template-image'
-            const file = new File([blob], fileName, { type: template.mediaType || blob.type })
-            setMediaFile(file)
-            setMediaPreview(mediaPath)
-          } catch (e) {
-            console.error('Failed to load template image:', e)
-          }
-        })()
+      // If template has an image, load it and attach so Send works with existing flow
+      if (template.mediaType?.startsWith('image/')) {
+        const dataUrl = template.mediaBase64
+        const path = template.mediaFilePath
+        if (dataUrl) {
+          ;(async () => {
+            try {
+              const res = await fetch(dataUrl)
+              if (!res.ok) return
+              const blob = await res.blob()
+              const fileName = template.mediaFilename || 'template-image'
+              const file = new File([blob], fileName, { type: template.mediaType || blob.type })
+              setMediaFile(file)
+              setMediaPreview(dataUrl)
+            } catch (e) {
+              console.error('Failed to load template image:', e)
+            }
+          })()
+        } else if (path) {
+          ;(async () => {
+            try {
+              const res = await fetch(path)
+              if (!res.ok) return
+              const blob = await res.blob()
+              const fileName = template.mediaFilename || 'template-image'
+              const file = new File([blob], fileName, { type: template.mediaType || blob.type })
+              setMediaFile(file)
+              setMediaPreview(path)
+            } catch (e) {
+              console.error('Failed to load template image:', e)
+            }
+          })()
+        }
       }
     }
   }
@@ -423,18 +442,21 @@ export default function WhatsAppCampaignPage() {
       if (result?.template?.id) {
         setSelectedTemplateId(result.template.id)
         setMessage(result.template.content)
-        if (result.template.mediaFilePath && result.template.mediaType?.startsWith('image/')) {
-          try {
-            const res = await fetch(result.template.mediaFilePath)
-            if (res.ok) {
-              const blob = await res.blob()
-              const fileName = result.template.mediaFilename || 'template-image'
-              const file = new File([blob], fileName, { type: result.template.mediaType || blob.type })
-              setMediaFile(file)
-              setMediaPreview(result.template.mediaFilePath)
+        if (result.template.mediaType?.startsWith('image/')) {
+          const src = result.template.mediaBase64 || result.template.mediaFilePath
+          if (src) {
+            try {
+              const res = await fetch(src)
+              if (res.ok) {
+                const blob = await res.blob()
+                const fileName = result.template.mediaFilename || 'template-image'
+                const file = new File([blob], fileName, { type: result.template.mediaType || blob.type })
+                setMediaFile(file)
+                setMediaPreview(src)
+              }
+            } catch (e) {
+              console.error('Failed to load saved template image:', e)
             }
-          } catch (e) {
-            console.error('Failed to load saved template image:', e)
           }
         }
       }
@@ -1183,9 +1205,9 @@ export default function WhatsAppCampaignPage() {
                       className="text-left border border-border/60 rounded-lg overflow-hidden hover:bg-muted/30 transition-colors"
                     >
                       <div className="h-32 bg-muted/30 flex items-center justify-center overflow-hidden">
-                        {t.mediaFilePath && t.mediaType?.startsWith('image/') ? (
+                        {(t.mediaBase64 || t.mediaFilePath) && t.mediaType?.startsWith('image/') ? (
                           <img
-                            src={t.mediaFilePath}
+                            src={t.mediaBase64 || t.mediaFilePath || ''}
                             alt={t.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
