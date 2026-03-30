@@ -14,8 +14,8 @@ const MAX_HISTORY_ITEMS = 20
 const MAX_HISTORY_MESSAGE_LENGTH = 2000
 const CHAT_RATE_LIMIT = { limit: 30, windowSeconds: 60 }
 
-const DEFAULT_MODELS = [process.env.GEMINI_PRIMARY_MODEL, process.env.GEMINI_FALLBACK_MODEL, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'].filter(
-  Boolean
+const DEFAULT_MODELS: string[] = [process.env.GEMINI_PRIMARY_MODEL, process.env.GEMINI_FALLBACK_MODEL, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'].filter(
+  (m): m is string => Boolean(m)
 )
 
 type ModelCache = {
@@ -82,11 +82,11 @@ async function discoverGeminiModels(apiKey: string) {
   }
 }
 
-function buildModelPolicy(availableModels: string[]) {
+function buildModelPolicy(availableModels: string[]): string[] {
   if (!availableModels.length) return DEFAULT_MODELS
-  const prioritized = DEFAULT_MODELS.filter((m) => m && availableModels.includes(m))
+  const prioritized = DEFAULT_MODELS.filter((m) => availableModels.includes(m))
   const remaining = availableModels.filter((m) => !prioritized.includes(m))
-  return [...prioritized, ...remaining].filter(Boolean)
+  return [...prioritized, ...remaining]
 }
 
 function normalizeHistory(history: unknown) {
