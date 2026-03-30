@@ -36,7 +36,8 @@ import {
   Filter,
   X,
   History,
-  Gift
+  Gift,
+  Pencil
 } from 'lucide-react'
 
 /** Inquiry (WhatsApp-enabled) or a promotion-code promoter row */
@@ -215,6 +216,10 @@ export default function WhatsAppCampaignPage() {
   const [templateImagePreview, setTemplateImagePreview] = useState<string | null>(null)
   const [templateSaving, setTemplateSaving] = useState(false)
   const [templateError, setTemplateError] = useState<string | null>(null)
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
+  /** Whether the template being edited had an image before opening the dialog */
+  const [editingHadImage, setEditingHadImage] = useState(false)
+  const [templateRemoveImage, setTemplateRemoveImage] = useState(false)
 
   /** Ignore stale async fetches when the user switches templates quickly */
   const templateMediaLoadSeq = useRef(0)
@@ -460,13 +465,64 @@ export default function WhatsAppCampaignPage() {
     }
   }
 
+  const resetTemplateDialog = () => {
+    setEditingTemplateId(null)
+    setEditingHadImage(false)
+    setTemplateRemoveImage(false)
+  }
+
   const handleOpenTemplateDialog = () => {
+    resetTemplateDialog()
     setTemplateError(null)
     setTemplateName('')
     setTemplateContent(message || '')
     setTemplateImageFile(null)
     setTemplateImagePreview(null)
     setIsTemplateDialogOpen(true)
+  }
+
+  const handleOpenEditTemplate = (t: WhatsAppTemplate) => {
+    resetTemplateDialog()
+    setTemplateError(null)
+    setEditingTemplateId(t.id)
+    const had =
+      Boolean(t.mediaBase64?.trim()) ||
+      Boolean(t.mediaFilePath && t.mediaType?.startsWith('image/'))
+    setEditingHadImage(had)
+    setTemplateRemoveImage(false)
+    setTemplateName(t.name)
+    setTemplateContent(t.content)
+    setTemplateImageFile(null)
+    const preview =
+      t.mediaBase64?.trim() ||
+      (t.mediaFilePath && t.mediaType?.startsWith('image/') ? t.mediaFilePath : null)
+    setTemplateImagePreview(preview)
+    setIsTemplateGalleryOpen(false)
+    setIsTemplateDialogOpen(true)
+  }
+
+  const handleDeleteTemplate = async (t: WhatsAppTemplate) => {
+    if (!window.confirm(`Delete template “${t.name}”? This cannot be undone.`)) {
+      return
+    }
+    try {
+      const response = await fetch(`/api/whatsapp/templates/${t.id}`, { method: 'DELETE' })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setSendStatus({
+          type: 'error',
+          message: result.error || 'Could not delete template.',
+        })
+        return
+      }
+      if (selectedTemplateId === t.id) {
+        setSelectedTemplateId('none')
+      }
+      await fetchTemplates()
+    } catch (e) {
+      console.error(e)
+      setSendStatus({ type: 'error', message: 'Could not delete template.' })
+    }
   }
 
   const handleTemplateImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -485,6 +541,7 @@ export default function WhatsAppCampaignPage() {
       return
     }
     setTemplateImageFile(file)
+    setTemplateRemoveImage(false)
     const reader = new FileReader()
     reader.onload = (e) => setTemplateImagePreview(e.target?.result as string)
     reader.readAsDataURL(file)
@@ -509,8 +566,16 @@ export default function WhatsAppCampaignPage() {
       formData.append('name', name)
       formData.append('content', content)
       if (templateImageFile) formData.append('media', templateImageFile)
+      if (editingTemplateId && templateRemoveImage && !templateImageFile) {
+        formData.append('clearImage', 'true')
+      }
 
-      const response = await fetch('/api/whatsapp/templates', { method: 'POST', body: formData })
+      const response = editingTemplateId
+        ? await fetch(`/api/whatsapp/templates/${editingTemplateId}`, {
+            method: 'PATCH',
+            body: formData,
+          })
+        : await fetch('/api/whatsapp/templates', { method: 'POST', body: formData })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
         setTemplateError(result.error || 'Could not save template. Please try again.')
@@ -551,6 +616,7 @@ export default function WhatsAppCampaignPage() {
           }
         }
       }
+      resetTemplateDialog()
       setIsTemplateDialogOpen(false)
     } catch (error) {
       console.error('Error saving template:', error)
@@ -1215,13 +1281,23 @@ export default function WhatsAppCampaignPage() {
         </div>
       </div>
 
-      {/* Add Template Dialog */}
-      <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+      {/* Add / Edit Template Dialog */}
+      <Dialog
+        open={isTemplateDialogOpen}
+        onOpenChange={(open) => {
+          setIsTemplateDialogOpen(open)
+          if (!open) resetTemplateDialog()
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create message template</DialogTitle>
+            <DialogTitle>
+              {editingTemplateId ? 'Edit message template' : 'Create message template'}
+            </DialogTitle>
             <DialogDescription>
-              Reusable messages save time. Create once, then select from the template list when composing.
+              {editingTemplateId
+                ? 'Update the name, text, or image. Save to apply changes.'
+                : 'Reusable messages save time. Create once, then select from the template list when composing.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1255,12 +1331,40 @@ export default function WhatsAppCampaignPage() {
                 accept="image/*"
                 onChange={handleTemplateImageChange}
               />
-              {templateImagePreview && (
+              {templateImagePreview && !templateRemoveImage && (
                 <img
                   src={templateImagePreview}
                   alt="Template preview"
                   className="max-w-full h-32 object-cover rounded border"
                 />
+              )}
+              {editingTemplateId && editingHadImage && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="template-remove-image"
+                    checked={templateRemoveImage}
+                    onCheckedChange={(checked) => {
+                      setTemplateRemoveImage(checked === true)
+                      if (checked === true) {
+                        setTemplateImageFile(null)
+                        setTemplateImagePreview(null)
+                      } else if (editingTemplateId) {
+                        const t = templates.find((x) => x.id === editingTemplateId)
+                        if (t) {
+                          const preview =
+                            t.mediaBase64?.trim() ||
+                            (t.mediaFilePath && t.mediaType?.startsWith('image/')
+                              ? t.mediaFilePath
+                              : null)
+                          setTemplateImagePreview(preview)
+                        }
+                      }
+                    }}
+                  />
+                  <Label htmlFor="template-remove-image" className="text-sm font-normal cursor-pointer">
+                    Remove image from template
+                  </Label>
+                </div>
               )}
             </div>
 
@@ -1282,7 +1386,7 @@ export default function WhatsAppCampaignPage() {
               Cancel
             </Button>
             <Button type="button" onClick={handleSaveTemplate} disabled={templateSaving}>
-              {templateSaving ? 'Saving…' : 'Save template'}
+              {templateSaving ? 'Saving…' : editingTemplateId ? 'Update template' : 'Save template'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1328,39 +1432,65 @@ export default function WhatsAppCampaignPage() {
                   <div className="col-span-full text-sm text-muted-foreground">No templates yet. Create one from the &quot;Create template&quot; button.</div>
                 ) : (
                   templates.map((t) => (
-                    <button
+                    <div
                       key={t.id}
-                      type="button"
-                      onClick={() => {
-                        handleTemplateSelect(t.id)
-                        setIsTemplateGalleryOpen(false)
-                      }}
-                      className="text-left border border-border/60 rounded-lg overflow-hidden hover:bg-muted/30 transition-colors"
+                      className="flex flex-col border border-border/60 rounded-lg overflow-hidden bg-card"
                     >
-                      <div className="h-32 bg-muted/30 flex items-center justify-center overflow-hidden">
-                        {(t.mediaBase64 || t.mediaFilePath) && t.mediaType?.startsWith('image/') ? (
-                          <img
-                            src={t.mediaBase64 || t.mediaFilePath || ''}
-                            alt={t.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none'
-                            }}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-muted-foreground">
-                            <Image className="h-8 w-8" />
-                            <span className="text-xs mt-1">No image</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <div className="font-medium text-sm text-foreground truncate">{t.name}</div>
-                        <div className="text-xs text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">
-                          {t.content}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleTemplateSelect(t.id)
+                          setIsTemplateGalleryOpen(false)
+                        }}
+                        className="text-left flex-1 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="h-32 bg-muted/30 flex items-center justify-center overflow-hidden">
+                          {(t.mediaBase64 || t.mediaFilePath) &&
+                          (t.mediaType?.startsWith('image/') || t.mediaBase64?.startsWith('data:image/')) ? (
+                            <img
+                              src={t.mediaBase64 || t.mediaFilePath || ''}
+                              alt={t.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground">
+                              <Image className="h-8 w-8" />
+                              <span className="text-xs mt-1">No image</span>
+                            </div>
+                          )}
                         </div>
+                        <div className="p-3">
+                          <div className="font-medium text-sm text-foreground truncate">{t.name}</div>
+                          <div className="text-xs text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">
+                            {t.content}
+                          </div>
+                        </div>
+                      </button>
+                      <div className="flex gap-1 p-2 border-t border-border/60 bg-muted/20">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-8"
+                          onClick={() => handleOpenEditTemplate(t)}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteTemplate(t)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                    </button>
+                    </div>
                   ))
                 )}
               </>
