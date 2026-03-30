@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { safeJsonParse } from '@/lib/utils'
+import { safeJsonParse, dataUrlToFile } from '@/lib/utils'
 import { 
   MessageSquare, 
   Send, 
@@ -146,6 +146,9 @@ export default function WhatsAppCampaignPage() {
   const [templateImagePreview, setTemplateImagePreview] = useState<string | null>(null)
   const [templateSaving, setTemplateSaving] = useState(false)
   const [templateError, setTemplateError] = useState<string | null>(null)
+
+  /** Ignore stale async fetches when the user switches templates quickly */
+  const templateMediaLoadSeq = useRef(0)
 
   useEffect(() => {
     fetchSeekers()
@@ -343,39 +346,45 @@ export default function WhatsAppCampaignPage() {
       setMediaFile(null)
       setMediaPreview(null)
 
-      // If template has an image, load it and attach so Send works with existing flow
-      if (template.mediaType?.startsWith('image/')) {
-        const dataUrl = template.mediaBase64
-        const path = template.mediaFilePath
-        if (dataUrl) {
-          ;(async () => {
-            try {
-              const res = await fetch(dataUrl)
-              if (!res.ok) return
-              const blob = await res.blob()
-              const fileName = template.mediaFilename || 'template-image'
-              const file = new File([blob], fileName, { type: template.mediaType || blob.type })
-              setMediaFile(file)
-              setMediaPreview(dataUrl)
-            } catch (e) {
-              console.error('Failed to load template image:', e)
-            }
-          })()
-        } else if (path) {
-          ;(async () => {
-            try {
-              const res = await fetch(path)
-              if (!res.ok) return
-              const blob = await res.blob()
-              const fileName = template.mediaFilename || 'template-image'
-              const file = new File([blob], fileName, { type: template.mediaType || blob.type })
-              setMediaFile(file)
-              setMediaPreview(path)
-            } catch (e) {
-              console.error('Failed to load template image:', e)
-            }
-          })()
+      const dataUrl = template.mediaBase64?.trim() || ''
+      const path = template.mediaFilePath
+      const isImageMime = template.mediaType?.startsWith('image/')
+      const isDataImage = dataUrl.startsWith('data:image/')
+
+      // DB-stored template image: build File synchronously so Send always gets a real attachment
+      if (isDataImage) {
+        try {
+          const file = dataUrlToFile(
+            dataUrl,
+            template.mediaFilename || 'template-image',
+            template.mediaType || undefined
+          )
+          setMediaFile(file)
+          setMediaPreview(dataUrl)
+        } catch (e) {
+          console.error('Failed to decode template image:', e)
         }
+        return
+      }
+
+      // Legacy: image served from URL path
+      if (isImageMime && path) {
+        const loadId = ++templateMediaLoadSeq.current
+        ;(async () => {
+          try {
+            const res = await fetch(path)
+            if (loadId !== templateMediaLoadSeq.current) return
+            if (!res.ok) return
+            const blob = await res.blob()
+            const fileName = template.mediaFilename || 'template-image'
+            const file = new File([blob], fileName, { type: template.mediaType || blob.type })
+            if (loadId !== templateMediaLoadSeq.current) return
+            setMediaFile(file)
+            setMediaPreview(path)
+          } catch (e) {
+            console.error('Failed to load template image:', e)
+          }
+        })()
       }
     }
   }
@@ -442,21 +451,32 @@ export default function WhatsAppCampaignPage() {
       if (result?.template?.id) {
         setSelectedTemplateId(result.template.id)
         setMessage(result.template.content)
-        if (result.template.mediaType?.startsWith('image/')) {
-          const src = result.template.mediaBase64 || result.template.mediaFilePath
-          if (src) {
-            try {
-              const res = await fetch(src)
-              if (res.ok) {
-                const blob = await res.blob()
-                const fileName = result.template.mediaFilename || 'template-image'
-                const file = new File([blob], fileName, { type: result.template.mediaType || blob.type })
-                setMediaFile(file)
-                setMediaPreview(src)
-              }
-            } catch (e) {
-              console.error('Failed to load saved template image:', e)
+        const saved = result.template
+        const savedDataUrl = saved.mediaBase64?.trim() || ''
+        if (savedDataUrl.startsWith('data:image/')) {
+          try {
+            const file = dataUrlToFile(
+              savedDataUrl,
+              saved.mediaFilename || 'template-image',
+              saved.mediaType || undefined
+            )
+            setMediaFile(file)
+            setMediaPreview(savedDataUrl)
+          } catch (e) {
+            console.error('Failed to load saved template image:', e)
+          }
+        } else if (saved.mediaType?.startsWith('image/') && saved.mediaFilePath) {
+          try {
+            const res = await fetch(saved.mediaFilePath)
+            if (res.ok) {
+              const blob = await res.blob()
+              const fileName = saved.mediaFilename || 'template-image'
+              const file = new File([blob], fileName, { type: saved.mediaType || blob.type })
+              setMediaFile(file)
+              setMediaPreview(saved.mediaFilePath)
             }
+          } catch (e) {
+            console.error('Failed to load saved template image:', e)
           }
         }
       }
@@ -1022,6 +1042,15 @@ export default function WhatsAppCampaignPage() {
                       {primaryRecipient?.fullName || 'Recipient'}
                     </div>
                     <div className="rounded-lg bg-muted/20 p-3 min-h-[160px] max-h-[260px] overflow-y-auto space-y-2">
+                      {mediaPreview && mediaFile?.type.startsWith('image/') && (
+                        <div className="max-w-[90%] rounded-lg overflow-hidden border border-border/60 bg-card">
+                          <img
+                            src={mediaPreview}
+                            alt="Template or attachment preview"
+                            className="w-full max-h-36 object-cover"
+                          />
+                        </div>
+                      )}
                       <div className="max-w-[90%] rounded-lg bg-card border border-border/60 p-3 text-sm whitespace-pre-wrap">
                         {previewMessage || 'Your message preview will appear here...'}
                       </div>
@@ -1033,7 +1062,9 @@ export default function WhatsAppCampaignPage() {
                     </div>
                     {mediaFile && (
                       <div className="mt-2 text-xs text-muted-foreground">
-                        Attachment: {mediaFile.name}
+                        {mediaFile.type.startsWith('image/')
+                          ? `Image attached — will send with your message (${mediaFile.name}).`
+                          : `Attachment: ${mediaFile.name}`}
                       </div>
                     )}
                   </div>
