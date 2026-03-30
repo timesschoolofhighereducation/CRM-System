@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, AuthenticationError } from '@/lib/auth'
 
 // GET /api/notifications - Get user's notifications
 export async function GET(request: NextRequest) {
@@ -47,6 +47,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching notifications:', error)
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch notifications' },
       { status: 500 }
