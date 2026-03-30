@@ -39,7 +39,8 @@ import {
   Gift
 } from 'lucide-react'
 
-interface Seeker {
+/** Inquiry (WhatsApp-enabled) or a promotion-code promoter row */
+interface CampaignRecipient {
   id: string
   fullName: string
   phone: string
@@ -52,6 +53,9 @@ interface Seeker {
   promotionCodeId?: string | null
   promotionCode?: { id: string; code: string } | null
   createdAt: string
+  source: 'inquiry' | 'promotion'
+  /** When source is promotion: the code string (e.g. A0001) */
+  promoCodeLabel?: string
   preferredPrograms?: Array<{
     program: {
       id: string
@@ -113,32 +117,74 @@ interface WhatsAppTemplate {
 
 const MAX_WHATSAPP_MESSAGE_LENGTH = 1024
 
-async function fetchAllInquiryPages(hasPromotionCode: boolean): Promise<Seeker[]> {
-  const allInquiries: Seeker[] = []
+async function fetchAllInquiryRecipients(): Promise<CampaignRecipient[]> {
+  const allInquiries: CampaignRecipient[] = []
   const limit = 100
   let page = 1
   let hasMore = true
-  const promoQs = hasPromotionCode ? '&hasPromotionCode=true' : ''
 
   while (hasMore) {
-    const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}${promoQs}`)
+    const response = await fetch(`/api/inquiries?page=${page}&limit=${limit}`)
     if (!response.ok) {
       console.error('Failed to fetch inquiries:', response.status, response.statusText)
       break
     }
     const data = await safeJsonParse(response)
-    const inquiries: Seeker[] = Array.isArray(data) ? data : (data.inquiries || [])
-    allInquiries.push(...inquiries)
+    const inquiries: CampaignRecipient[] = Array.isArray(data) ? data : (data.inquiries || [])
+    allInquiries.push(
+      ...inquiries.map((row) => ({ ...row, source: 'inquiry' as const }))
+    )
     const pagination = data?.pagination
     hasMore = pagination?.hasMore === true && inquiries.length === limit
     page += 1
   }
-  return allInquiries
+
+  return allInquiries.filter(
+    (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
+  )
+}
+
+async function fetchAllPromotionRecipients(): Promise<CampaignRecipient[]> {
+  const list: CampaignRecipient[] = []
+  const limit = 100
+  let page = 1
+  let totalPages = 1
+
+  while (page <= totalPages) {
+    const response = await fetch(`/api/promotion-codes?page=${page}&limit=${limit}`)
+    if (!response.ok) {
+      console.error('Failed to fetch promotion codes:', response.status, response.statusText)
+      break
+    }
+    const data = await safeJsonParse(response)
+    const codes = Array.isArray(data?.promotionCodes) ? data.promotionCodes : []
+    totalPages = Math.max(1, data?.pagination?.totalPages ?? 1)
+
+    for (const c of codes) {
+      const phone = (c.promoterPhone as string)?.trim() || ''
+      if (!phone) continue
+      list.push({
+        id: c.id as string,
+        fullName: (c.promoterName as string) || 'Promoter',
+        phone,
+        whatsappNumber: phone,
+        whatsapp: true,
+        marketingSource: 'PROMOTION_CODE',
+        createdAt: (c.createdAt as string) || new Date().toISOString(),
+        source: 'promotion',
+        promoCodeLabel: c.code as string,
+        promotionCodeId: c.id as string,
+      })
+    }
+    page += 1
+  }
+
+  return list
 }
 
 export default function WhatsAppCampaignPage() {
-  const [seekers, setSeekers] = useState<Seeker[]>([])
-  const [filteredSeekers, setFilteredSeekers] = useState<Seeker[]>([])
+  const [seekers, setSeekers] = useState<CampaignRecipient[]>([])
+  const [filteredSeekers, setFilteredSeekers] = useState<CampaignRecipient[]>([])
   const [selectedSeekers, setSelectedSeekers] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [message, setMessage] = useState('')
@@ -185,15 +231,13 @@ export default function WhatsAppCampaignPage() {
     const loadSeekers = async () => {
       try {
         setLoading(true)
-        const allInquiries = await fetchAllInquiryPages(promotionCodeHoldersOnly)
+        const rows = promotionCodeHoldersOnly
+          ? await fetchAllPromotionRecipients()
+          : await fetchAllInquiryRecipients()
         if (cancelled) return
-
-        const whatsappInquiries = allInquiries.filter(
-          (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
-        )
-        setSeekers(whatsappInquiries)
+        setSeekers(rows)
       } catch (error) {
-        console.error('Error fetching seekers:', error)
+        console.error('Error fetching recipients:', error)
         if (!cancelled) setSeekers([])
       } finally {
         if (!cancelled) setLoading(false)
@@ -209,31 +253,29 @@ export default function WhatsAppCampaignPage() {
   useEffect(() => {
     let filtered = seekers
 
-    // Filter by search term
     if (searchTerm.trim()) {
-      filtered = filtered.filter(seeker =>
-        seeker.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        seeker.phone.includes(searchTerm) ||
-        seeker.whatsappNumber?.includes(searchTerm) ||
-        seeker.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        seeker.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        seeker.promotionCode?.code?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Filter by selected programs
-    if (selectedPrograms.size > 0) {
-      filtered = filtered.filter(seeker =>
-        seeker.preferredPrograms?.some(pref => 
-          selectedPrograms.has(pref.program.id)
+      const q = searchTerm.toLowerCase()
+      filtered = filtered.filter((r) => {
+        const codeStr = (r.promoCodeLabel || r.promotionCode?.code || '').toLowerCase()
+        return (
+          r.fullName.toLowerCase().includes(q) ||
+          r.phone.includes(searchTerm) ||
+          r.whatsappNumber?.includes(searchTerm) ||
+          r.email?.toLowerCase().includes(q) ||
+          r.city?.toLowerCase().includes(q) ||
+          codeStr.includes(q)
         )
-      )
+      })
     }
 
-    // Promotion code holders: server filters via hasPromotionCode when the Promo toggle is on
+    if (selectedPrograms.size > 0 && !promotionCodeHoldersOnly) {
+      filtered = filtered.filter((r) =>
+        r.preferredPrograms?.some((pref) => selectedPrograms.has(pref.program.id))
+      )
+    }
 
     setFilteredSeekers(filtered)
-  }, [seekers, searchTerm, selectedPrograms])
+  }, [seekers, searchTerm, selectedPrograms, promotionCodeHoldersOnly])
 
   // Keep selection valid while filters/data change.
   // This prevents stale hidden recipients from being sent by accident.
@@ -294,13 +336,12 @@ export default function WhatsAppCampaignPage() {
   const fetchSeekers = async () => {
     try {
       setLoading(true)
-      const allInquiries = await fetchAllInquiryPages(promotionCodeHoldersOnly)
-      const whatsappInquiries = allInquiries.filter(
-        (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
-      )
-      setSeekers(whatsappInquiries)
+      const rows = promotionCodeHoldersOnly
+        ? await fetchAllPromotionRecipients()
+        : await fetchAllInquiryRecipients()
+      setSeekers(rows)
     } catch (error) {
-      console.error('Error fetching seekers:', error)
+      console.error('Error fetching recipients:', error)
       setSeekers([])
     } finally {
       setLoading(false)
@@ -630,9 +671,18 @@ export default function WhatsAppCampaignPage() {
       setSending(true)
       setSendStatus(null)
 
-      const selectedSeekersData = seekers.filter(seeker => selectedSeekers.has(seeker.id))
-      
-      // Create FormData for file upload
+      const selectedSeekersData = selectedRecipients.map((r) => ({
+        id: r.id,
+        fullName: r.fullName,
+        phone: r.phone,
+        whatsappNumber: r.whatsappNumber || r.phone,
+        whatsapp: r.whatsapp,
+        marketingSource: r.marketingSource,
+        recipientSource: r.source === 'promotion' ? ('promotion' as const) : ('inquiry' as const),
+        promotionCodeId: r.source === 'promotion' ? r.id : undefined,
+        promotionCode: r.promoCodeLabel || r.promotionCode?.code,
+      }))
+
       const formData = new FormData()
       formData.append('seekers', JSON.stringify(selectedSeekersData))
       formData.append('message', message.trim())
@@ -713,7 +763,9 @@ export default function WhatsAppCampaignPage() {
                 <div className="space-y-1">
                   <h2 className="text-base font-semibold text-foreground">Recipients</h2>
                   <p className="text-xs text-muted-foreground">
-                    Search, filter, and select recipients.
+                    {promotionCodeHoldersOnly
+                      ? 'Promotion codes: each row is a promoter’s phone and code. Select who to message on WhatsApp.'
+                      : 'Search, filter, and select inquiry recipients.'}
                   </p>
                 </div>
 
@@ -721,7 +773,11 @@ export default function WhatsAppCampaignPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Filter by name, phone, email, city, or promo code"
+                    placeholder={
+                      promotionCodeHoldersOnly
+                        ? 'Filter by promoter name, phone, or code'
+                        : 'Filter by name, phone, email, city, or promo code'
+                    }
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="min-w-[220px] flex-1"
@@ -730,7 +786,13 @@ export default function WhatsAppCampaignPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowProgramFilter(!showProgramFilter)}
+                    disabled={promotionCodeHoldersOnly}
                     className="flex items-center space-x-1"
+                    title={
+                      promotionCodeHoldersOnly
+                        ? 'Program filter applies to inquiries only. Turn off Promo to filter by program.'
+                        : undefined
+                    }
                   >
                     <Filter className="h-4 w-4" />
                     <span>Program</span>
@@ -745,7 +807,7 @@ export default function WhatsAppCampaignPage() {
                     size="sm"
                     onClick={() => setPromotionCodeHoldersOnly(!promotionCodeHoldersOnly)}
                     className="flex items-center space-x-1"
-                    title="Show only inquiries that have a promotion code linked (WhatsApp number shown for messaging)"
+                    title="List all promotion codes: promoter phone and code (not inquiries). Use these numbers for WhatsApp."
                   >
                     <Gift className="h-4 w-4" />
                     <span>Promo</span>
@@ -835,7 +897,7 @@ export default function WhatsAppCampaignPage() {
                     ) : filteredSeekers.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground text-sm px-2">
                         {promotionCodeHoldersOnly
-                          ? 'No WhatsApp-enabled inquiries have a promotion code linked, or none match your search/program filters. Link a code on the inquiry (Promotion code field) to include them here.'
+                          ? 'No promotion codes found, or none match your search. Add codes under Promotion codes in the sidebar.'
                           : 'No recipients match your filters.'}
                       </div>
                     ) : (
@@ -870,9 +932,9 @@ export default function WhatsAppCampaignPage() {
                                   {seeker.whatsappNumber || seeker.phone}
                                 </span>
                               </div>
-                              {(seeker.promotionCode?.code || seeker.promotionCodeId) && (
+                              {(seeker.promoCodeLabel || seeker.promotionCode?.code) && (
                                 <Badge variant="outline" className="text-[10px] font-normal h-5 px-1.5">
-                                  Promo: {seeker.promotionCode?.code ?? '—'}
+                                  Code: {seeker.promoCodeLabel ?? seeker.promotionCode?.code}
                                 </Badge>
                               )}
                               {seeker.city && (
