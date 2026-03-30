@@ -113,10 +113,10 @@ export function ProgramDescriptionDashboard() {
               <div className="flex items-center gap-2 mb-3">
                 <GraduationCap className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 <div>
-                  <p className="font-semibold text-purple-900 dark:text-purple-100">
+                  <p className="text-xl font-bold text-purple-900 dark:text-purple-100 leading-snug">
                     {selectedProgram.name}
                   </p>
-                  <p className="text-sm text-purple-700 dark:text-purple-300">
+                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
                     {selectedProgram.level || 'N/A'} • {selectedProgram.campus}
                   </p>
                 </div>
@@ -176,12 +176,16 @@ export function ProgramDescriptionDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm font-bold underline text-purple-900 dark:text-purple-100">Description</span>
+                    <span className="text-base font-bold underline text-purple-900 dark:text-purple-100">
+                      Description
+                    </span>
                   </div>
-                  <SanitizedHtml
-                    html={selectedProgram.description}
-                    className="prose prose-sm max-w-none dark:prose-invert text-purple-800 dark:text-purple-200 prose-headings:font-bold prose-headings:underline"
-                  />
+                  <div className="rounded-md border border-purple-200/70 dark:border-purple-800/70 bg-white/70 dark:bg-purple-950/30 p-4">
+                    <SanitizedHtml
+                      html={selectedProgram.description}
+                      className="prose max-w-none dark:prose-invert text-purple-900 dark:text-purple-100 prose-p:my-2 prose-p:text-base prose-strong:font-bold prose-li:my-1 prose-headings:font-bold prose-headings:underline prose-headings:text-purple-900 dark:prose-headings:text-purple-100"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="text-sm text-purple-600 dark:text-purple-400 italic">
