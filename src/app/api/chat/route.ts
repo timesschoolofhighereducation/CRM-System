@@ -13,18 +13,80 @@ const MAX_MESSAGE_LENGTH = 4000
 const MAX_HISTORY_ITEMS = 20
 const MAX_HISTORY_MESSAGE_LENGTH = 2000
 const CHAT_RATE_LIMIT = { limit: 30, windowSeconds: 60 }
-const DEFAULT_MODELS = [
-  process.env.GEMINI_PRIMARY_MODEL || 'gemini-1.5-flash-002',
-  process.env.GEMINI_FALLBACK_MODEL || 'gemini-1.5-pro-002',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-].filter(Boolean)
+
+const DEFAULT_MODELS = [process.env.GEMINI_PRIMARY_MODEL, process.env.GEMINI_FALLBACK_MODEL, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'].filter(
+  Boolean
+)
+
+type ModelCache = {
+  fetchedAt: number
+  generateModels: string[]
+  streamModels: string[]
+}
+
+const MODEL_CACHE_TTL_MS = 10 * 60 * 1000
+let modelCache: ModelCache | null = null
+
+async function discoverGeminiModels(apiKey: string) {
+  // Best-effort model discovery; the result is cached in-memory.
+  // In serverless, the cache may reset, but it still prevents repeated network calls.
+  const now = Date.now()
+  if (modelCache && now - modelCache.fetchedAt < MODEL_CACHE_TTL_MS) {
+    return modelCache
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      { signal: controller.signal }
+    )
+    clearTimeout(timeout)
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      console.warn('chat.model_discovery_failed', { status: response.status, text: text.slice(0, 200) })
+      const empty: ModelCache = { fetchedAt: now, generateModels: [], streamModels: [] }
+      modelCache = empty
+      return empty
+    }
+
+    const data = await response.json()
+    const models: any[] = Array.isArray(data?.models) ? data.models : []
+
+    const generateModels = models
+      .filter((m) => Array.isArray(m?.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m) => String(m.name).replace('models/', ''))
+
+    const streamModels = models
+      .filter(
+        (m) =>
+          Array.isArray(m?.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes('streamGenerateContent')
+      )
+      .map((m) => String(m.name).replace('models/', ''))
+
+    const cache: ModelCache = {
+      fetchedAt: now,
+      generateModels,
+      streamModels,
+    }
+    modelCache = cache
+    return cache
+  } catch (e: any) {
+    console.warn('chat.model_discovery_exception', { message: e?.message || String(e) })
+    const empty: ModelCache = { fetchedAt: now, generateModels: [], streamModels: [] }
+    modelCache = empty
+    return empty
+  }
+}
 
 function buildModelPolicy(availableModels: string[]) {
   if (!availableModels.length) return DEFAULT_MODELS
-  const prioritized = DEFAULT_MODELS.filter((m) => availableModels.includes(m))
+  const prioritized = DEFAULT_MODELS.filter((m) => m && availableModels.includes(m))
   const remaining = availableModels.filter((m) => !prioritized.includes(m))
-  return [...prioritized, ...remaining]
+  return [...prioritized, ...remaining].filter(Boolean)
 }
 
 function normalizeHistory(history: unknown) {
@@ -120,9 +182,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const availableModels = process.env.GEMINI_AVAILABLE_MODELS
+    const streamRequested = !!stream
+    const envModels = process.env.GEMINI_AVAILABLE_MODELS
       ? process.env.GEMINI_AVAILABLE_MODELS.split(',').map((m) => m.trim()).filter(Boolean)
       : []
+
+    // If env is not set, discover compatible models.
+    const discovered = envModels.length ? null : await discoverGeminiModels(apiKey)
+
+    const availableModels = envModels.length
+      ? envModels
+      : streamRequested
+        ? discovered?.streamModels?.length
+          ? discovered.streamModels
+          : discovered?.generateModels || []
+        : discovered?.generateModels || []
 
     // Safety settings
     const safetySettings: SafetySetting[] = [
@@ -170,18 +244,51 @@ export async function POST(request: NextRequest) {
         })
 
         if (stream) {
-          const result = await chat.sendMessageStream(message)
           const encoder = new TextEncoder()
+
+          // If streaming is not supported for this specific model, fall back to
+          // non-stream generation while still returning SSE events.
+          let resultStream: any = null
+          try {
+            resultStream = await chat.sendMessageStream(message)
+          } catch (streamInitError: any) {
+            const result = await chat.sendMessage(message)
+            const response2 = await result.response
+            const text2 = response2.text()
+
+            const streamBody = new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: text2 })}\n\n`))
+                controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+                controller.close()
+                console.info('chat.stream.fallback_to_non_stream', {
+                  userId: user.id,
+                  model: modelName,
+                  latencyMs: Date.now() - requestStart,
+                  historyItems: chatHistory.length,
+                })
+              },
+            })
+
+            return new NextResponse(streamBody, {
+              headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache, no-transform',
+                Connection: 'keep-alive',
+                'X-Model-Used': modelName,
+              },
+            })
+          }
+
           const streamBody = new ReadableStream({
             async start(controller) {
               let fullText = ''
               try {
-                for await (const chunk of result.stream) {
+                for await (const chunk of resultStream.stream) {
                   const chunkText = chunk.text()
                   fullText += chunkText
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: chunkText })}\n\n`))
                 }
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, message: fullText })}\n\n`))
                 controller.enqueue(encoder.encode('data: [DONE]\n\n'))
               } catch (streamError: any) {
                 controller.enqueue(
