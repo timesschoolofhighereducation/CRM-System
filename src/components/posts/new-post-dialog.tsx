@@ -111,7 +111,11 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   const fetchPrograms = async () => {
     try {
       const response = await fetch('/api/programs')
-      if (response.ok) setPrograms(await response.json())
+      if (response.ok) {
+        setPrograms(await response.json())
+      } else if (response.status === 401) {
+        setUploadError('Session expired. Please sign in again.')
+      }
     } catch (error) {
       console.error('Error fetching programs:', error)
     }
@@ -123,6 +127,8 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
       if (response.ok) {
         const data = await response.json()
         setCampaigns(data.campaigns || [])
+      } else if (response.status === 401) {
+        setUploadError('Session expired. Please sign in again.')
       }
     } catch (error) {
       console.error('Error fetching campaigns:', error)
@@ -132,7 +138,11 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/users')
-      if (response.ok) setUsers(await response.json())
+      if (response.ok) {
+        setUsers(await response.json())
+      } else if (response.status === 401) {
+        setUploadError('Session expired. Please sign in again.')
+      }
     } catch (error) {
       console.error('Error fetching users:', error)
     }
@@ -401,7 +411,11 @@ export function NewPostDialog({ open, onOpenChange, onPostCreated }: NewPostDial
         resetForm()
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Failed to create post')
+        if (response.status === 401) {
+          toast.error('Session expired. Please sign in again.')
+        } else {
+          toast.error(error.error || 'Failed to create post')
+        }
       }
     } catch (error) {
       console.error('Error creating post:', error)
