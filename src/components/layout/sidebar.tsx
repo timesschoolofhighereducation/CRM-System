@@ -164,7 +164,7 @@ const navigation: NavigationItem[] = [
     permissions: ['READ_PROGRAM']
   },
   { 
-    name: 'AI Chat', 
+    name: 'AI Assistant', 
     href: '/chat', 
     icon: Sparkles,
     permissions: [] // Available to all authenticated users

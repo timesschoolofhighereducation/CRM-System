@@ -14,7 +14,7 @@ export default function ChatPage() {
       <div className="space-y-6">
         <div className="pb-4 border-b border-border/60">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-            AI Chat Assistant
+            AI Assistant
           </h1>
           <p className="text-sm text-muted-foreground">
             Get instant help and answers from our AI assistant powered by Gemini
