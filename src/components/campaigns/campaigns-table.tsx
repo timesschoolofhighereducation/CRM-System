@@ -49,6 +49,7 @@ interface Campaign {
   _count: {
     seekers: number
   }
+  registeredCount?: number
 }
 
 interface CampaignsTableProps {
@@ -463,7 +464,9 @@ export function CampaignsTable({ onViewCampaign }: CampaignsTableProps) {
                 <TableHead className="min-w-[100px]">Status</TableHead>
                 <TableHead className="min-w-[200px] max-w-[300px]">Target Audience</TableHead>
                 <TableHead className="min-w-[180px] whitespace-nowrap">Duration</TableHead>
-                <TableHead className="min-w-[100px]">Budget</TableHead>
+                <TableHead className="min-w-[100px] whitespace-nowrap">Budget</TableHead>
+                <TableHead className="min-w-[90px] whitespace-nowrap">Inquiries</TableHead>
+                <TableHead className="min-w-[90px] whitespace-nowrap">Registered</TableHead>
                 <TableHead className="min-w-[100px]">Reach</TableHead>
                 <TableHead className="min-w-[120px]">Analytics</TableHead>
                 <TableHead className="min-w-[120px] whitespace-nowrap">Created</TableHead>
@@ -527,6 +530,12 @@ export function CampaignsTable({ onViewCampaign }: CampaignsTableProps) {
                   </TableCell>
                   <TableCell className="min-w-[100px] whitespace-nowrap">
                     {campaign.budget ? `$${campaign.budget.toLocaleString()}` : '-'}
+                  </TableCell>
+                  <TableCell className="min-w-[90px] whitespace-nowrap text-sm text-gray-800">
+                    {campaign._count?.seekers ?? 0}
+                  </TableCell>
+                  <TableCell className="min-w-[90px] whitespace-nowrap text-sm text-gray-800">
+                    {campaign.registeredCount ?? 0}
                   </TableCell>
                   <TableCell className="min-w-[100px]">
                     <div className="flex items-center space-x-1">

@@ -34,6 +34,7 @@ interface Campaign {
   _count: {
     seekers: number
   }
+  registeredCount?: number
 }
 
 export function CampaignsDashboard() {

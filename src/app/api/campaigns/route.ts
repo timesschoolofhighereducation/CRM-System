@@ -89,8 +89,34 @@ export async function GET(request: NextRequest) {
       take: limit
     })
 
+    // Compute registered (registerNow=true) inquiries per campaign
+    const campaignIds = campaigns.map((c) => c.id)
+    const registrations =
+      campaignIds.length === 0
+        ? []
+        : await prisma.seeker.groupBy({
+            by: ['campaignId'],
+            where: {
+              campaignId: { in: campaignIds },
+              registerNow: true,
+            },
+            _count: { _all: true },
+          })
+
+    const registeredMap = new Map<string, number>()
+    for (const row of registrations) {
+      if (row.campaignId) {
+        registeredMap.set(row.campaignId, row._count._all)
+      }
+    }
+
+    const campaignsWithRegistered = campaigns.map((c) => ({
+      ...c,
+      registeredCount: registeredMap.get(c.id) ?? 0,
+    }))
+
     return NextResponse.json({
-      campaigns,
+      campaigns: campaignsWithRegistered,
       pagination: {
         page,
         limit,
