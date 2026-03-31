@@ -228,6 +228,7 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
                 value={imageUrl}
                 onChange={setImageUrl}
                 disabled={isLoading}
+                storageMode="base64"
               />
             </div>
 
