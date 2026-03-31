@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
       unreadCount,
     })
   } catch (error) {
-    console.error('Error fetching notifications:', error)
     if (error instanceof AuthenticationError) {
       return NextResponse.json({ error: error.message }, { status: 401 })
     }
+    console.error('Error fetching notifications:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch notifications' },
       { status: 500 }
