@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, AuthenticationError } from '@/lib/auth'
-import { Prisma } from '@prisma/client'
-
-function isMissingSavedFiltersTableError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2021' &&
-    String(error.meta?.table || '').includes('saved_filters')
-  )
-}
+import { requireAuth } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,13 +18,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ filters })
   } catch (error) {
-    if (error instanceof AuthenticationError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
-    }
-    if (isMissingSavedFiltersTableError(error)) {
-      // Gracefully degrade until DB migration is applied.
-      return NextResponse.json({ filters: [] })
-    }
     console.error('Error fetching saved filters:', error)
     return NextResponse.json(
       { error: 'Failed to fetch saved filters' },
@@ -89,15 +73,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ filter: savedFilter })
   } catch (error) {
-    if (error instanceof AuthenticationError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
-    }
-    if (isMissingSavedFiltersTableError(error)) {
-      return NextResponse.json(
-        { error: 'Saved filters table is not initialized yet' },
-        { status: 503 }
-      )
-    }
     console.error('Error saving filter:', error)
     return NextResponse.json(
       { error: 'Failed to save filter' },
@@ -128,12 +103,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    if (error instanceof AuthenticationError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
-    }
-    if (isMissingSavedFiltersTableError(error)) {
-      return NextResponse.json({ success: true })
-    }
     console.error('Error deleting filter:', error)
     return NextResponse.json(
       { error: 'Failed to delete filter' },

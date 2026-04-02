@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, AuthenticationError } from '@/lib/auth'
 import * as XLSX from 'xlsx'
-import { logUserActivity } from '@/lib/activity-logger'
 
 const IMPORT_PASSWORD = 'Tshe@2026'
 const TEMPLATE_HEADERS = [
@@ -64,19 +63,6 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
 
     if (password !== IMPORT_PASSWORD) {
-      await logUserActivity({
-        userId: user.id,
-        activityType: 'CREATE_INQUIRY',
-        request,
-        isSuccessful: false,
-        failureReason: 'Invalid import password',
-        metadata: {
-          action: 'inquiry_import_excel',
-          fileName: file?.name || null,
-          campaignId: campaignId || null,
-          marketingSource: marketingSource || null,
-        },
-      }).catch(() => null)
       return NextResponse.json({ error: 'Invalid import password' }, { status: 403 })
     }
     if (!campaignId) {
@@ -115,10 +101,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const totalBefore = await prisma.seeker.count({
-      where: { NOT: { isDeleted: true } },
-    })
 
     const dataRows = rows.slice(1)
     const imported: string[] = []
@@ -171,34 +153,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const totalAfter = await prisma.seeker.count({
-      where: { NOT: { isDeleted: true } },
-    })
-
-    await logUserActivity({
-      userId: user.id,
-      activityType: 'CREATE_INQUIRY',
-      request,
-      isSuccessful: true,
-      metadata: {
-        action: 'inquiry_import_excel',
-        fileName: file.name,
-        campaignId,
-        marketingSource,
-        importedCount: imported.length,
-        failedCount: errors.length,
-        totalBefore,
-        totalAfter,
-      },
-    }).catch(() => null)
-
     return NextResponse.json({
       importedCount: imported.length,
       failedCount: errors.length,
       errors,
-      mode: 'append_only',
-      totalBefore,
-      totalAfter,
     })
   } catch (error) {
     if (error instanceof AuthenticationError) {
