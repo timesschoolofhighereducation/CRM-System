@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole } from '@/lib/auth'
+import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,6 +77,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ seekers })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
     console.error('Error searching seekers:', error)
     return NextResponse.json(
       { error: 'Failed to search seekers' },

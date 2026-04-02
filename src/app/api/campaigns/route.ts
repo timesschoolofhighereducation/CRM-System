@@ -272,14 +272,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(campaign, { status: 201 })
   } catch (error) {
-    console.error('Error creating campaign:', error)
-    
     if (error instanceof AuthenticationError) {
       return NextResponse.json(
         { error: error.message },
         { status: 401 }
       )
     }
+
+    console.error('Error creating campaign:', error)
     
     if (error instanceof Error) {
       // Check for unique constraint violations

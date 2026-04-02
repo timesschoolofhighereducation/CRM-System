@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole } from '@/lib/auth'
+import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
 import { logUserActivity } from '@/lib/activity-logger'
 
 export async function GET(request: NextRequest) {
@@ -397,19 +397,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(seeker, { status: 201 })
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
     console.error('Error creating inquiry:', error)
-    
+
     // Return proper JSON error response
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to create inquiry' },
-      { status: 500 }
-    )
+
+    return NextResponse.json({ error: 'Failed to create inquiry' }, { status: 500 })
   }
 }
