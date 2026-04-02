@@ -15,7 +15,7 @@ export interface Notification {
   read: boolean
   actionUrl?: string
   actionText?: string
-  entityType?: 'task' | 'project' | 'deal' | 'meeting' | 'comment' | 'mention' | 'inquiry'
+  entityType?: 'task' | 'project' | 'deal' | 'meeting' | 'comment' | 'mention' | 'inquiry' | 'note'
   entityId?: string
   fromUser?: {
     id: string
