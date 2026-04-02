@@ -21,7 +21,12 @@ const campaignSchema = z.object({
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional(),
   budget: z.string().optional(),
-  imageUrl: z.string().optional(),
+  // URL entered manually (optional)
+  imageUrl: z
+    .string()
+    .url('Please enter a valid image URL')
+    .optional()
+    .or(z.literal('')),
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED']),
   coordinatorId: z.string().optional().nullable(),
 }).refine((data) => {
@@ -60,7 +65,8 @@ interface UserOption {
 export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaignDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [campaignTypes, setCampaignTypes] = useState<CampaignType[]>([])
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  // Stores uploaded image (base64 / storage output)
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
   
   const form = useForm<CampaignFormData>({
@@ -111,12 +117,18 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
     setIsLoading(true)
     try {
       // Convert dates to ISO strings and handle budget
+      // Prefer a manually entered URL when present; otherwise fall back to uploaded image
+      const finalImageUrl =
+        data.imageUrl && data.imageUrl.trim() !== ''
+          ? data.imageUrl.trim()
+          : uploadedImage || null
+
       const submitData = {
         ...data,
         startDate: new Date(data.startDate).toISOString(),
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         budget: data.budget && data.budget !== '' ? Number(data.budget) : null,
-        imageUrl: imageUrl || null,
+        imageUrl: finalImageUrl,
         coordinatorId: data.coordinatorId || null,
       }
       
@@ -159,7 +171,7 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
 
       toast.success('Campaign created successfully')
       form.reset()
-      setImageUrl(null)
+      setUploadedImage(null)
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
@@ -265,12 +277,36 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <ImageUpload
-                value={imageUrl}
-                onChange={setImageUrl}
-                disabled={isLoading}
-                storageMode="base64"
-              />
+              <Label>Campaign Image</Label>
+              <p className="text-xs text-muted-foreground mb-1">
+                You can either upload an image file or paste a direct image URL. If both are provided, the URL will be used.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Upload image</Label>
+                  <ImageUpload
+                    value={uploadedImage}
+                    onChange={setUploadedImage}
+                    disabled={isLoading}
+                    storageMode="base64"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="imageUrl" className="text-xs">
+                    Or paste image URL
+                  </Label>
+                  <Input
+                    id="imageUrl"
+                    placeholder="https://example.com/your-image.jpg"
+                    {...form.register('imageUrl')}
+                  />
+                  {form.formState.errors.imageUrl && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.imageUrl.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
