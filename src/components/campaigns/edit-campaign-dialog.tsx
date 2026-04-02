@@ -24,6 +24,7 @@ const campaignSchema = z.object({
   reach: z.string().optional(),
   imageUrl: z.string().optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED']),
+  coordinatorId: z.string().optional().nullable(),
 }).refine((data) => {
   if (data.endDate && data.startDate) {
     return new Date(data.endDate) >= new Date(data.startDate)
@@ -48,6 +49,7 @@ interface Campaign {
   reach?: number
   imageUrl?: string
   status: string
+  coordinatorId?: string | null
 }
 
 interface EditCampaignDialogProps {
@@ -66,10 +68,17 @@ interface CampaignType {
   isActive: boolean
 }
 
+interface UserOption {
+  id: string
+  name: string | null
+  email: string | null
+}
+
 export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: EditCampaignDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [campaignTypes, setCampaignTypes] = useState<CampaignType[]>([])
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [users, setUsers] = useState<UserOption[]>([])
   
   const form = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -89,6 +98,7 @@ export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: 
   useEffect(() => {
     if (open) {
       fetchCampaignTypes()
+      fetchUsers()
     }
   }, [open])
 
@@ -101,6 +111,18 @@ export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: 
       }
     } catch (error) {
       console.error('Error fetching campaign types:', error)
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/users?role=COORDINATOR')
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data)
+      }
+    } catch (error) {
+      console.error('Error fetching users for coordinators:', error)
     }
   }
 
@@ -118,6 +140,7 @@ export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: 
         reach: campaign.reach?.toString() || '',
         imageUrl: campaign.imageUrl || '',
         status: campaign.status as any,
+        coordinatorId: campaign.coordinatorId || null,
       })
       setImageUrl(campaign.imageUrl || null)
     }
@@ -139,6 +162,7 @@ export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: 
         budget: data.budget && data.budget !== '' ? Number(data.budget) : null,
         reach: data.reach && data.reach !== '' ? Number(data.reach) : null,
         imageUrl: imageUrl || null,
+        coordinatorId: data.coordinatorId || null,
       }
       
       const response = await fetch(`/api/campaigns/${campaign.id}`, {
@@ -248,6 +272,25 @@ export function EditCampaignDialog({ open, onOpenChange, campaign, onSuccess }: 
               {form.formState.errors.targetAudience && (
                 <p className="text-sm text-red-600">{form.formState.errors.targetAudience.message}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="coordinatorId">Coordinator</Label>
+              <Select
+                value={form.watch('coordinatorId') ?? undefined}
+                onValueChange={(value) => form.setValue('coordinatorId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select coordinator (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name || user.email || 'Unnamed user'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

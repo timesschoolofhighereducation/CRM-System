@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
+import { notifyCampaignStarted } from '@/lib/notification-service'
 
 // GET /api/campaigns - Get all campaigns
 // Accessible to all authenticated users
@@ -75,6 +76,13 @@ export async function GET(request: NextRequest) {
             color: true,
             icon: true
           }
+        },
+        coordinator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
         _count: {
           select: {
@@ -165,7 +173,8 @@ export async function POST(request: NextRequest) {
       endDate,
       budget,
       imageUrl,
-      status = 'DRAFT'
+      status = 'DRAFT',
+      coordinatorId,
     } = body
 
     // Validate required fields
@@ -209,6 +218,7 @@ export async function POST(request: NextRequest) {
         imageUrl: imageUrl || null,
         status,
         createdById: user.id,
+        coordinatorId: coordinatorId || null,
         // Initialize analytics fields
         views: 0,
         netFollows: 0,
@@ -229,6 +239,13 @@ export async function POST(request: NextRequest) {
             email: true
           }
         },
+        coordinator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         campaignType: {
           select: {
             id: true,
@@ -244,6 +261,14 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    if (campaign.coordinatorId && campaign.status === 'ACTIVE') {
+      await notifyCampaignStarted(
+        campaign.coordinatorId,
+        campaign.id,
+        campaign.name
+      )
+    }
 
     return NextResponse.json(campaign, { status: 201 })
   } catch (error) {
