@@ -141,11 +141,9 @@ async function fetchAllInquiryRecipients(): Promise<CampaignRecipient[]> {
     page += 1
   }
 
-  // Include every inquiry with a usable phone (not only WhatsApp-opt-in rows)
-  return allInquiries.filter((s) => {
-    const num = (s.whatsappNumber || s.phone || '').trim()
-    return Boolean(num)
-  })
+  return allInquiries.filter(
+    (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
+  )
 }
 
 function seekerSearchRowToRecipient(s: {
@@ -435,6 +433,10 @@ export default function WhatsAppCampaignPage() {
   const handleAddExistingInquiry = (
     row: Parameters<typeof seekerSearchRowToRecipient>[0]
   ) => {
+    if (!row.whatsapp) {
+      toast.error('This inquiry is not marked as WhatsApp-enabled.')
+      return
+    }
     const rec = seekerSearchRowToRecipient(row)
     if (!rec) {
       toast.error('That inquiry has no phone number on file.')
@@ -946,7 +948,7 @@ export default function WhatsAppCampaignPage() {
                   <p className="text-xs text-muted-foreground">
                     {promotionCodeHoldersOnly
                       ? 'Promotion codes: each row is a promoter’s phone and code. Select who to message on WhatsApp.'
-                      : 'All inquiries with a phone number are listed (WhatsApp opt-in is not required). Search below to add another existing inquiry by name or phone.'}
+                      : 'Search, filter, and select inquiry recipients (WhatsApp-enabled inquiries only). Use “Add existing inquiry” to pull in another opted-in lead by name or phone.'}
                   </p>
                 </div>
 
@@ -1011,7 +1013,7 @@ export default function WhatsAppCampaignPage() {
                       Add existing inquiry
                     </Label>
                     <p className="text-[11px] text-muted-foreground">
-                      Type at least 2 characters to search by name or phone, then pick a row to add it to this list.
+                      Type at least 2 characters to search by name or phone. Only inquiries already marked for WhatsApp can be sent from this campaign.
                     </p>
                     <div className="relative">
                       <Input
@@ -1163,14 +1165,6 @@ export default function WhatsAppCampaignPage() {
                                   {seeker.whatsappNumber || seeker.phone}
                                 </span>
                               </div>
-                              {seeker.source === 'inquiry' && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] font-normal h-5 px-1.5"
-                                >
-                                  {seeker.whatsapp ? 'WhatsApp' : 'Phone'}
-                                </Badge>
-                              )}
                               {(seeker.promoCodeLabel || seeker.promotionCode?.code) && (
                                 <Badge variant="outline" className="text-[10px] font-normal h-5 px-1.5">
                                   Code: {seeker.promoCodeLabel ?? seeker.promotionCode?.code}

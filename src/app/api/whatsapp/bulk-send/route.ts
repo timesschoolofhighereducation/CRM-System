@@ -153,6 +153,20 @@ export async function POST(request: NextRequest) {
       try {
         const isPromotion = seeker.recipientSource === 'promotion'
 
+        if (!isPromotion && !seeker?.whatsapp) {
+          results.failedCount++
+          const errorMessage = 'This inquiry is not marked as WhatsApp-enabled'
+          results.errors.push(`Failed to send to ${seeker.fullName}: ${errorMessage}`)
+          recipientLogs.push({
+            seekerId: seeker.id,
+            promotionCodeId: null,
+            phoneNumber: seeker.whatsappNumber || seeker.phone || '',
+            status: 'FAILED',
+            errorMessage,
+          })
+          continue
+        }
+
         const phoneNumber = seeker.whatsappNumber || seeker.phone
         if (!phoneNumber?.trim()) {
           results.failedCount++
