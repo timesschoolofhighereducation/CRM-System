@@ -20,6 +20,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { safeJsonParse, dataUrlToFile } from '@/lib/utils'
+import { toast } from 'sonner'
 import { 
   MessageSquare, 
   Send, 
@@ -140,9 +141,42 @@ async function fetchAllInquiryRecipients(): Promise<CampaignRecipient[]> {
     page += 1
   }
 
-  return allInquiries.filter(
-    (s) => Boolean(s.whatsapp) && Boolean(s.whatsappNumber || s.phone)
-  )
+  // Include every inquiry with a usable phone (not only WhatsApp-opt-in rows)
+  return allInquiries.filter((s) => {
+    const num = (s.whatsappNumber || s.phone || '').trim()
+    return Boolean(num)
+  })
+}
+
+function seekerSearchRowToRecipient(s: {
+  id: string
+  fullName: string | null
+  phone: string | null
+  whatsapp?: boolean
+  whatsappNumber?: string | null
+  email?: string | null
+  city?: string | null
+  marketingSource?: string | null
+  createdAt?: string
+  preferredPrograms?: CampaignRecipient['preferredPrograms']
+}): CampaignRecipient | null {
+  const phone = (s.phone || '').trim()
+  const wa = (s.whatsappNumber || '').trim()
+  const num = wa || phone
+  if (!num) return null
+  return {
+    id: s.id,
+    fullName: s.fullName?.trim() || 'Inquiry',
+    phone: phone || wa,
+    whatsapp: Boolean(s.whatsapp),
+    whatsappNumber: wa || phone,
+    email: s.email || undefined,
+    city: s.city || undefined,
+    marketingSource: s.marketingSource?.trim() || '—',
+    createdAt: s.createdAt || new Date().toISOString(),
+    source: 'inquiry',
+    preferredPrograms: s.preferredPrograms,
+  }
 }
 
 async function fetchAllPromotionRecipients(): Promise<CampaignRecipient[]> {
@@ -184,7 +218,17 @@ async function fetchAllPromotionRecipients(): Promise<CampaignRecipient[]> {
 }
 
 export default function WhatsAppCampaignPage() {
-  const [seekers, setSeekers] = useState<CampaignRecipient[]>([])
+  /** Loaded from API (inquiries or promotion list) */
+  const [fetchedSeekers, setFetchedSeekers] = useState<CampaignRecipient[]>([])
+  /** Inquiries added via “Add existing inquiry” search (merged when not in Promo mode) */
+  const [extraInquiryRecipients, setExtraInquiryRecipients] = useState<CampaignRecipient[]>([])
+  const [existingInquirySearch, setExistingInquirySearch] = useState('')
+  const [existingInquiryResults, setExistingInquiryResults] = useState<
+    Array<Parameters<typeof seekerSearchRowToRecipient>[0]>
+  >([])
+  const [existingInquirySearching, setExistingInquirySearching] = useState(false)
+  const existingSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [filteredSeekers, setFilteredSeekers] = useState<CampaignRecipient[]>([])
   const [selectedSeekers, setSelectedSeekers] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
@@ -203,6 +247,14 @@ export default function WhatsAppCampaignPage() {
   const [promotionCodeHoldersOnly, setPromotionCodeHoldersOnly] = useState(false)
   const [messageHistory, setMessageHistory] = useState<WhatsAppMessageHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  const seekers = useMemo(() => {
+    if (promotionCodeHoldersOnly) return fetchedSeekers
+    const map = new Map<string, CampaignRecipient>()
+    for (const r of fetchedSeekers) map.set(r.id, r)
+    for (const r of extraInquiryRecipients) map.set(r.id, r)
+    return Array.from(map.values())
+  }, [promotionCodeHoldersOnly, fetchedSeekers, extraInquiryRecipients])
 
   // Templates
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
@@ -240,10 +292,10 @@ export default function WhatsAppCampaignPage() {
           ? await fetchAllPromotionRecipients()
           : await fetchAllInquiryRecipients()
         if (cancelled) return
-        setSeekers(rows)
+        setFetchedSeekers(rows)
       } catch (error) {
         console.error('Error fetching recipients:', error)
-        if (!cancelled) setSeekers([])
+        if (!cancelled) setFetchedSeekers([])
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -256,6 +308,48 @@ export default function WhatsAppCampaignPage() {
   }, [promotionCodeHoldersOnly])
 
   useEffect(() => {
+    if (promotionCodeHoldersOnly) {
+      setExtraInquiryRecipients([])
+      setExistingInquirySearch('')
+      setExistingInquiryResults([])
+    }
+  }, [promotionCodeHoldersOnly])
+
+  useEffect(() => {
+    if (promotionCodeHoldersOnly || existingInquirySearch.trim().length < 2) {
+      setExistingInquiryResults([])
+      return
+    }
+    if (existingSearchTimeoutRef.current) {
+      clearTimeout(existingSearchTimeoutRef.current)
+    }
+    existingSearchTimeoutRef.current = setTimeout(async () => {
+      setExistingInquirySearching(true)
+      try {
+        const q = existingInquirySearch.trim()
+        const response = await fetch(
+          `/api/seekers/search?q=${encodeURIComponent(q)}&limit=12`
+        )
+        if (!response.ok) {
+          setExistingInquiryResults([])
+          return
+        }
+        const data = await safeJsonParse(response)
+        setExistingInquiryResults(Array.isArray(data?.seekers) ? data.seekers : [])
+      } catch {
+        setExistingInquiryResults([])
+      } finally {
+        setExistingInquirySearching(false)
+      }
+    }, 400)
+    return () => {
+      if (existingSearchTimeoutRef.current) {
+        clearTimeout(existingSearchTimeoutRef.current)
+      }
+    }
+  }, [existingInquirySearch, promotionCodeHoldersOnly])
+
+  useEffect(() => {
     let filtered = seekers
 
     if (searchTerm.trim()) {
@@ -263,7 +357,7 @@ export default function WhatsAppCampaignPage() {
       filtered = filtered.filter((r) => {
         const codeStr = (r.promoCodeLabel || r.promotionCode?.code || '').toLowerCase()
         return (
-          r.fullName.toLowerCase().includes(q) ||
+          (r.fullName || '').toLowerCase().includes(q) ||
           r.phone.includes(searchTerm) ||
           r.whatsappNumber?.includes(searchTerm) ||
           r.email?.toLowerCase().includes(q) ||
@@ -338,16 +432,37 @@ export default function WhatsAppCampaignPage() {
   const isAllFilteredSelected =
     filteredSeekers.length > 0 && selectedRecipients.length === filteredSeekers.length
 
+  const handleAddExistingInquiry = (
+    row: Parameters<typeof seekerSearchRowToRecipient>[0]
+  ) => {
+    const rec = seekerSearchRowToRecipient(row)
+    if (!rec) {
+      toast.error('That inquiry has no phone number on file.')
+      return
+    }
+    setExtraInquiryRecipients((prev) => {
+      if (prev.some((p) => p.id === rec.id)) {
+        return prev
+      }
+      return [...prev, rec]
+    })
+    setExistingInquirySearch('')
+    setExistingInquiryResults([])
+    toast.success('Added to recipient list', {
+      description: `${rec.fullName} · ${rec.whatsappNumber || rec.phone}`,
+    })
+  }
+
   const fetchSeekers = async () => {
     try {
       setLoading(true)
       const rows = promotionCodeHoldersOnly
         ? await fetchAllPromotionRecipients()
         : await fetchAllInquiryRecipients()
-      setSeekers(rows)
+      setFetchedSeekers(rows)
     } catch (error) {
       console.error('Error fetching recipients:', error)
-      setSeekers([])
+      setFetchedSeekers([])
     } finally {
       setLoading(false)
     }
@@ -831,7 +946,7 @@ export default function WhatsAppCampaignPage() {
                   <p className="text-xs text-muted-foreground">
                     {promotionCodeHoldersOnly
                       ? 'Promotion codes: each row is a promoter’s phone and code. Select who to message on WhatsApp.'
-                      : 'Search, filter, and select inquiry recipients.'}
+                      : 'All inquiries with a phone number are listed (WhatsApp opt-in is not required). Search below to add another existing inquiry by name or phone.'}
                   </p>
                 </div>
 
@@ -889,6 +1004,51 @@ export default function WhatsAppCampaignPage() {
                     <span>Refresh</span>
                   </Button>
                 </div>
+
+                {!promotionCodeHoldersOnly && (
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/15 p-3">
+                    <Label className="text-xs font-medium text-foreground">
+                      Add existing inquiry
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Type at least 2 characters to search by name or phone, then pick a row to add it to this list.
+                    </p>
+                    <div className="relative">
+                      <Input
+                        placeholder="Search name or phone…"
+                        value={existingInquirySearch}
+                        onChange={(e) => setExistingInquirySearch(e.target.value)}
+                        className="text-sm"
+                        disabled={loading}
+                      />
+                      {existingInquirySearching && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                          …
+                        </span>
+                      )}
+                      {existingInquiryResults.length > 0 && (
+                        <div className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                          {existingInquiryResults.map((row) => {
+                            const phone = (row.phone || row.whatsappNumber || '').trim()
+                            return (
+                              <button
+                                key={row.id}
+                                type="button"
+                                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/80"
+                                onClick={() => handleAddExistingInquiry(row)}
+                              >
+                                <span className="font-medium">
+                                  {row.fullName?.trim() || 'Inquiry'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{phone || 'No phone'}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Program Filter Dropdown */}
                 {showProgramFilter && (
@@ -981,7 +1141,12 @@ export default function WhatsAppCampaignPage() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
-                                  {seeker.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  {(seeker.fullName || '?')
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
                                 </div>
                                 <h3 className="text-sm font-medium text-foreground truncate">
                                   {seeker.fullName}
@@ -998,6 +1163,14 @@ export default function WhatsAppCampaignPage() {
                                   {seeker.whatsappNumber || seeker.phone}
                                 </span>
                               </div>
+                              {seeker.source === 'inquiry' && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] font-normal h-5 px-1.5"
+                                >
+                                  {seeker.whatsapp ? 'WhatsApp' : 'Phone'}
+                                </Badge>
+                              )}
                               {(seeker.promoCodeLabel || seeker.promotionCode?.code) && (
                                 <Badge variant="outline" className="text-[10px] font-normal h-5 px-1.5">
                                   Code: {seeker.promoCodeLabel ?? seeker.promotionCode?.code}

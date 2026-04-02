@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         phone: true,
         whatsapp: true,
         whatsappNumber: true,
+        createdAt: true,
         email: true,
         city: true,
         ageBand: true,
