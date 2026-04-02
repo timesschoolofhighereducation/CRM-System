@@ -106,6 +106,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     setNotifications(prev => [newNotification, ...prev])
 
+    // Persist to API-backed notifications so it survives refresh/login/device.
+    // Fire-and-forget to keep UI snappy; failures should not block local UX.
+    if (typeof window !== 'undefined') {
+      fetch('/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: notification.title,
+          message: notification.message,
+          entityType: notification.entityType,
+          postId: undefined,
+        }),
+      }).catch((error) => {
+        console.error('Failed to persist notification:', error)
+      })
+    }
+
     // Show browser notification when side panel shows notification (only in browser environment)
     if (isClient && isNotificationSupported) {
       // Always try to show browser notification when notification appears
