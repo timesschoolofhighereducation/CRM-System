@@ -62,6 +62,7 @@ model User {
   createdNotebooks      Notebook[]      @relation("NotebookCreatedBy")
   createdNotes          Note[]          @relation("NoteCreatedBy")
   createdPromotionCodes PromotionCode[] @relation("PromotionCodeCreatedBy")
+  coordinatedCampaigns  Campaign[]      @relation("CampaignCoordinator")
 
   // Saved filters
   savedFilters SavedFilter[] @relation("UserSavedFilters")
@@ -418,6 +419,7 @@ model Campaign {
   reach          Int? // Number of people reached by the campaign
   imageUrl       String? // S3 image URL
   status         CampaignStatus @default(DRAFT)
+  coordinatorId  String?
   isDeleted      Boolean        @default(false)
   deletedAt      DateTime?
 
@@ -446,6 +448,7 @@ model Campaign {
   updatedAt       DateTime          @updatedAt
   createdById     String?
   createdBy       User?             @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  coordinator     User?             @relation("CampaignCoordinator", fields: [coordinatorId], references: [id])
   seekers         CampaignSeeker[]
   campaignType    CampaignType?     @relation(fields: [type], references: [name])
   SocialMediaPost SocialMediaPost[]
