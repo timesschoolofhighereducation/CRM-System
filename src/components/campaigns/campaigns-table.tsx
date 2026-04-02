@@ -50,6 +50,11 @@ interface Campaign {
     seekers: number
   }
   registeredCount?: number
+  coordinator?: {
+    id: string
+    name: string | null
+    email: string | null
+  } | null
 }
 
 interface CampaignsTableProps {
@@ -463,6 +468,7 @@ export function CampaignsTable({ onViewCampaign }: CampaignsTableProps) {
                 <TableHead className="min-w-[120px]">Type</TableHead>
                 <TableHead className="min-w-[100px]">Status</TableHead>
                 <TableHead className="min-w-[200px] max-w-[300px]">Target Audience</TableHead>
+                <TableHead className="min-w-[160px]">Coordinator</TableHead>
                 <TableHead className="min-w-[180px] whitespace-nowrap">Duration</TableHead>
                 <TableHead className="min-w-[100px] whitespace-nowrap">Budget</TableHead>
                 <TableHead className="min-w-[90px] whitespace-nowrap">Inquiries</TableHead>
@@ -519,6 +525,22 @@ export function CampaignsTable({ onViewCampaign }: CampaignsTableProps) {
                     <div className="truncate" title={campaign.targetAudience}>
                       {campaign.targetAudience}
                     </div>
+                  </TableCell>
+                  <TableCell className="min-w-[160px]">
+                    {campaign.coordinator ? (
+                      <div className="text-sm">
+                        <div className="font-medium truncate">
+                          {campaign.coordinator.name || campaign.coordinator.email || '—'}
+                        </div>
+                        {campaign.coordinator.email && (
+                          <div className="text-xs text-gray-500 truncate">
+                            {campaign.coordinator.email}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">Not assigned</span>
+                    )}
                   </TableCell>
                   <TableCell className="min-w-[180px] whitespace-nowrap">
                     <div className="text-sm">

@@ -61,6 +61,11 @@ interface Campaign {
     inquiryCount: number
     registeredCount: number
   }
+  coordinator?: {
+    id: string
+    name: string | null
+    email: string | null
+  } | null
 }
 
 interface CampaignViewDialogProps {
@@ -229,6 +234,14 @@ export function CampaignViewDialog({ open, onOpenChange, campaignId }: CampaignV
                         <span className="text-sm text-gray-500">
                           Created {formatDate(campaign.createdAt)}
                         </span>
+                        {campaign.coordinator && (
+                          <span className="text-xs sm:text-sm text-gray-600">
+                            Coordinator:{' '}
+                            <span className="font-medium">
+                              {campaign.coordinator.name || campaign.coordinator.email}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -263,6 +276,18 @@ export function CampaignViewDialog({ open, onOpenChange, campaignId }: CampaignV
                       <label className="text-sm font-medium text-gray-500">End Date</label>
                       <p className="mt-1 text-sm">{campaign.endDate ? formatDate(campaign.endDate) : 'No end date'}</p>
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Coordinator</label>
+                    <p className="mt-1 text-sm">
+                      {campaign.coordinator
+                        ? `${campaign.coordinator.name || campaign.coordinator.email || ''}${
+                            campaign.coordinator.email && campaign.coordinator.name
+                              ? ` (${campaign.coordinator.email})`
+                              : ''
+                          }`
+                        : 'Not assigned'}
+                    </p>
                   </div>
                   {campaign.budget && (
                     <div>
