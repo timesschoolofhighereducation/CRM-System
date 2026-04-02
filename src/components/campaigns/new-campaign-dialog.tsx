@@ -67,6 +67,8 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
   const [campaignTypes, setCampaignTypes] = useState<CampaignType[]>([])
   // Stores uploaded image (base64 / storage output)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  // Local preview for URL-based image (so we can show a live preview even before submit)
+  const [urlPreview, setUrlPreview] = useState<string | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
   
   const form = useForm<CampaignFormData>({
@@ -172,6 +174,7 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
       toast.success('Campaign created successfully')
       form.reset()
       setUploadedImage(null)
+      setUrlPreview(null)
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
@@ -299,11 +302,33 @@ export function NewCampaignDialog({ open, onOpenChange, onSuccess }: NewCampaign
                     id="imageUrl"
                     placeholder="https://example.com/your-image.jpg"
                     {...form.register('imageUrl')}
+                    onChange={(e) => {
+                      form.setValue('imageUrl', e.target.value)
+                      const v = e.target.value.trim()
+                      // Basic check to avoid showing broken preview on empty/obviously invalid values
+                      if (!v) {
+                        setUrlPreview(null)
+                      } else if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:')) {
+                        setUrlPreview(v)
+                      } else {
+                        setUrlPreview(null)
+                      }
+                    }}
                   />
                   {form.formState.errors.imageUrl && (
                     <p className="text-sm text-red-600">
                       {form.formState.errors.imageUrl.message}
                     </p>
+                  )}
+                  {urlPreview && (
+                    <div className="mt-2 border rounded-md overflow-hidden">
+                      <img
+                        src={urlPreview}
+                        alt="Campaign image preview"
+                        className="w-full h-40 object-cover"
+                        onError={() => setUrlPreview(null)}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
