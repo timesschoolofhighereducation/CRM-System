@@ -13,6 +13,7 @@ const ReactQuill = dynamic(
   },
   { ssr: false, loading: () => <div className="min-h-[200px] animate-pulse rounded-md bg-muted" /> }
 )
+const ReactQuillAny = ReactQuill as any
 
 export interface NoteQuillEditorProps {
   value: string
@@ -72,7 +73,7 @@ export function NoteQuillEditor({
       data-note-quill-editor
     >
       <div className={cn(editorMinHeightClass, '[&_.ql-container]:min-h-[inherit] [&_.ql-editor]:min-h-[inherit]')}>
-        <ReactQuill
+        <ReactQuillAny
           ref={quillRef as any}
           theme="snow"
           value={value}

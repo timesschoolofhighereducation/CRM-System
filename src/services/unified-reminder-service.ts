@@ -363,7 +363,7 @@ export function useUnifiedReminderService() {
       }
       clearTimeout(initialTimeout)
     }
-  }, [user])
+  }, [user, checkAllReminders])
 
   return {
     checkAllReminders
