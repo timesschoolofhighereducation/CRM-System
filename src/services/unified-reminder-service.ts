@@ -309,7 +309,7 @@ export function useUnifiedReminderService() {
                 ? `/notebooks/${note.notebookId}/notes/${note.id}`
                 : `/notebooks`,
               actionText: 'View Note',
-              entityType: 'meeting', // Using meeting as placeholder, could add 'note' type
+              entityType: 'note',
               entityId: note.id
             })
 
