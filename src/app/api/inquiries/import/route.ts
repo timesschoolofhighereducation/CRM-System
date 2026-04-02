@@ -102,6 +102,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const totalBefore = await prisma.seeker.count({
+      where: { NOT: { isDeleted: true } },
+    })
+
     const dataRows = rows.slice(1)
     const imported: string[] = []
     const errors: string[] = []
@@ -153,10 +157,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const totalAfter = await prisma.seeker.count({
+      where: { NOT: { isDeleted: true } },
+    })
+
     return NextResponse.json({
       importedCount: imported.length,
       failedCount: errors.length,
       errors,
+      mode: 'append_only',
+      totalBefore,
+      totalAfter,
     })
   } catch (error) {
     if (error instanceof AuthenticationError) {

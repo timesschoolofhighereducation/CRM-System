@@ -122,7 +122,9 @@ export function InquiriesTable() {
   } = useQuery({
     queryKey: ['inquiries'],
     queryFn: async () => {
-      const response = await fetch('/api/inquiries?page=1&limit=50')
+      // Load a large page so newly imported rows do not hide old rows in the table.
+      // Import is append-only; this avoids the false impression that old data was replaced.
+      const response = await fetch('/api/inquiries?page=1&limit=5000')
       if (!response.ok) throw new Error('Failed to fetch inquiries')
       return safeJsonParse(response)
     },
@@ -453,7 +455,7 @@ export function InquiriesTable() {
       }
 
       toast.success(
-        `Imported ${result.importedCount} inquiries. Failed: ${result.failedCount}.`
+        `Imported ${result.importedCount} inquiries (append only). Failed: ${result.failedCount}. Total: ${result.totalBefore} -> ${result.totalAfter}.`
       )
       if (Array.isArray(result.errors) && result.errors.length > 0) {
         toast.warning(result.errors.slice(0, 3).join(' | '))
