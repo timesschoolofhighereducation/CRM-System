@@ -19,15 +19,6 @@ import { usePermissions } from '@/hooks/use-permissions'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 
 interface Inquiry {
   id: string
@@ -97,13 +88,6 @@ export function InquiriesTable() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
-  const [importDialogOpen, setImportDialogOpen] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importPassword, setImportPassword] = useState('')
-  const [importCampaignId, setImportCampaignId] = useState('')
-  const [importMarketingSource, setImportMarketingSource] = useState('')
-  const [importing, setImporting] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
   const fetchInquiriesAbortController = useRef<AbortController | null>(null)
@@ -159,24 +143,10 @@ export function InquiriesTable() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: campaignTypesData } = useQuery({
-    queryKey: ['campaign-types', 'for-inquiry'],
-    queryFn: async () => {
-      const res = await fetch('/api/campaign-types?forInquiry=true')
-      return safeJsonParse(res)
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
   React.useEffect(() => {
     if (programsData) setPrograms(programsData)
     if (campaignsData?.campaigns) setCampaigns(campaignsData.campaigns)
   }, [programsData, campaignsData])
-
-  const campaignTypes = React.useMemo(() => {
-    if (!Array.isArray(campaignTypesData)) return []
-    return campaignTypesData.filter((type: any) => type?.isActive !== false)
-  }, [campaignTypesData])
 
   // Replaced with TanStack Query - the main data is now handled by useQuery above
   // Infinite scroll can be added later with useInfiniteQuery if needed
@@ -388,90 +358,6 @@ export function InquiriesTable() {
     }
   }
 
-  const handleDownloadImportTemplate = async () => {
-    try {
-      setDownloadingTemplate(true)
-      const response = await fetch('/api/inquiries/import/template')
-      if (!response.ok) {
-        const error = await safeJsonParse(response)
-        toast.error(error?.error || 'Failed to download template')
-        return
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'inquiry-import-template.xlsx'
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      a.remove()
-
-      toast.success('Template downloaded')
-    } catch {
-      toast.error('Failed to download template')
-    } finally {
-      setDownloadingTemplate(false)
-    }
-  }
-
-  const handleImportInquiries = async () => {
-    if (!importFile) {
-      toast.error('Please upload the template file')
-      return
-    }
-    if (!importPassword) {
-      toast.error('Please enter import password')
-      return
-    }
-    if (!importCampaignId) {
-      toast.error('Please select a campaign')
-      return
-    }
-    if (!importMarketingSource) {
-      toast.error('Please select a marketing source')
-      return
-    }
-
-    try {
-      setImporting(true)
-      const body = new FormData()
-      body.append('file', importFile)
-      body.append('password', importPassword)
-      body.append('campaignId', importCampaignId)
-      body.append('marketingSource', importMarketingSource)
-
-      const response = await fetch('/api/inquiries/import', {
-        method: 'POST',
-        body,
-      })
-      const result = await safeJsonParse(response)
-      if (!response.ok) {
-        toast.error(result?.error || 'Import failed')
-        return
-      }
-
-      toast.success(
-        `Imported ${result.importedCount} inquiries. Failed: ${result.failedCount}.`
-      )
-      if (Array.isArray(result.errors) && result.errors.length > 0) {
-        toast.warning(result.errors.slice(0, 3).join(' | '))
-      }
-
-      setImportDialogOpen(false)
-      setImportFile(null)
-      setImportPassword('')
-      setImportCampaignId('')
-      setImportMarketingSource('')
-      refetchInquiries()
-    } catch {
-      toast.error('Import failed')
-    } finally {
-      setImporting(false)
-    }
-  }
-
   if (isInquiriesLoading && allInquiries.length === 0) {
     return (
       <Card className="shadow-sm">
@@ -589,29 +475,6 @@ export function InquiriesTable() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${isInquiriesLoading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
                 <span className="sm:hidden">Refresh</span>
-              </Button>
-              <Button
-                onClick={handleDownloadImportTemplate}
-                variant="outline"
-                size="sm"
-                disabled={downloadingTemplate}
-                className="w-full sm:w-auto"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">
-                  {downloadingTemplate ? 'Downloading...' : 'Download Template'}
-                </span>
-                <span className="sm:hidden">Template</span>
-              </Button>
-              <Button
-                onClick={() => setImportDialogOpen(true)}
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Import Excel</span>
-                <span className="sm:hidden">Import</span>
               </Button>
               <Button
                 onClick={() => handleExport('excel')}
@@ -1180,85 +1043,6 @@ export function InquiriesTable() {
           }}
         />
       )}
-
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Import Inquiries from Excel</DialogTitle>
-            <DialogDescription>
-              Upload only the downloaded template file. Non-template files are rejected.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Template File (.xlsx)</Label>
-              <Input
-                type="file"
-                accept=".xlsx"
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setImportFile(e.target.files?.[0] || null)
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Import Password</Label>
-              <Input
-                type="password"
-                value={importPassword}
-                onChange={(e) => setImportPassword(e.target.value)}
-                placeholder="Enter password"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Marketing Source</Label>
-              <Select onValueChange={setImportMarketingSource} value={importMarketingSource}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select marketing source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaignTypes.map((type: any) => (
-                    <SelectItem key={type.id} value={type.name}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Campaign</Label>
-              <Select onValueChange={setImportCampaignId} value={importCampaignId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select campaign" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaigns.map((campaign: any) => (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setImportDialogOpen(false)}
-              disabled={importing}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleImportInquiries} disabled={importing}>
-              {importing ? 'Importing...' : 'Import Data'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
