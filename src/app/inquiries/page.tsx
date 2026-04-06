@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { NewInquiryButton } from '@/components/inquiries/new-inquiry-button'
+import { ImportInquiriesToolbar } from '@/components/inquiries/import-inquiries-toolbar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // Lazy-load heavy tables to reduce INP and initial bundle (target INP ≤200ms)
@@ -70,7 +71,12 @@ export default function InquiriesPage() {
               )}
             </p>
           </div>
-          {canCreateInquiry && <NewInquiryButton />}
+          {canCreateInquiry && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ImportInquiriesToolbar />
+              <NewInquiryButton />
+            </div>
+          )}
         </div>
 
         {!canReadInquiries ? (

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { DashboardStats } from './dashboard-stats'
 import { UserInquiryAnalytics } from './user-inquiry-analytics'
+import { FollowUpComplianceCard } from './follow-up-compliance-card'
 import type { DashboardStatsData } from './dashboard-stats'
 import type { UserInquiryStat } from './user-inquiry-analytics'
 
@@ -107,32 +108,35 @@ export function RoleBasedDashboard({
 
             {/* Team Overview for Admins */}
             {(isAdmin() || canManageUsers()) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Team Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <div className="text-sm text-gray-500 mb-1">Active Coordinators</div>
-                      <div className="text-4xl font-semibold text-gray-900">12</div>
-                      <div className="text-emerald-600 text-sm flex items-center gap-1 mt-2">
-                        <TrendingUp className="h-4 w-4" /> +2 this month
+              <>
+                <FollowUpComplianceCard />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Team Overview
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-50 rounded-xl p-6">
+                        <div className="text-sm text-gray-500 mb-1">Active Coordinators</div>
+                        <div className="text-4xl font-semibold text-gray-900">12</div>
+                        <div className="text-emerald-600 text-sm flex items-center gap-1 mt-2">
+                          <TrendingUp className="h-4 w-4" /> +2 this month
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-6">
+                        <div className="text-sm text-gray-500 mb-1">Avg. Conversion Rate</div>
+                        <div className="text-4xl font-semibold text-gray-900">24%</div>
+                        <div className="text-emerald-600 text-sm flex items-center gap-1 mt-2">
+                          <TrendingUp className="h-4 w-4" /> +3% from last month
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-xl p-6">
-                      <div className="text-sm text-gray-500 mb-1">Avg. Conversion Rate</div>
-                      <div className="text-4xl font-semibold text-gray-900">24%</div>
-                      <div className="text-emerald-600 text-sm flex items-center gap-1 mt-2">
-                        <TrendingUp className="h-4 w-4" /> +3% from last month
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
 

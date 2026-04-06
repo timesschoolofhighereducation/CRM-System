@@ -113,6 +113,14 @@ export function InquiriesTable() {
     staleTime: 30 * 1000,
   })
 
+  useEffect(() => {
+    const onImported = () => {
+      void refetchInquiries()
+    }
+    window.addEventListener('inquiries-imported', onImported)
+    return () => window.removeEventListener('inquiries-imported', onImported)
+  }, [refetchInquiries])
+
   // Sync query data to local state (for backward compatibility with existing filters and UI)
   React.useEffect(() => {
     if (inquiriesData) {
