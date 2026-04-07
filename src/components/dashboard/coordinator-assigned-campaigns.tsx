@@ -130,61 +130,45 @@ export function CoordinatorAssignedCampaigns({
               </span>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-2.5">
+          <CardContent className="px-4 pb-4 space-y-2">
             <div>
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                 Insights
               </p>
-              <div className="grid grid-cols-2 gap-1.5 text-xs">
-                <div className="rounded-md bg-muted/60 px-2 py-1.5">
-                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-                    <Eye className="h-3 w-3 shrink-0" />
-                    Views
-                  </div>
-                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.views)}</div>
-                </div>
-                <div className="rounded-md bg-muted/60 px-2 py-1.5">
-                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-                    <Users className="h-3 w-3 shrink-0" />
-                    Reach
-                  </div>
-                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.reach)}</div>
-                </div>
-                <div className="rounded-md bg-muted/60 px-2 py-1.5">
-                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-                    <MousePointerClick className="h-3 w-3 shrink-0" />
-                    Interactions
-                  </div>
-                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.totalInteractions)}</div>
-                </div>
-                <div className="rounded-md bg-muted/60 px-2 py-1.5">
-                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-                    <Users className="h-3 w-3 shrink-0" />
-                    In CRM
-                  </div>
-                  <div className="font-semibold tabular-nums text-sm">{c.seekersCount.toLocaleString()}</div>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-[10px] text-muted-foreground border-t border-border/60 pt-1.5 mt-1.5">
-                <span className="inline-flex items-center gap-0.5">
-                  <Heart className="h-2.5 w-2.5" />
-                  {formatInt(c.reactions)}
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-background to-transparent z-10" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-background to-transparent z-10" />
+                <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <Eye className="h-2.5 w-2.5" /> Views {formatInt(c.views)}
                 </span>
-                <span className="inline-flex items-center gap-0.5">
-                  <MessageCircle className="h-2.5 w-2.5" />
-                  {formatInt(c.comments)}
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <Users className="h-2.5 w-2.5" /> Reach {formatInt(c.reach)}
                 </span>
-                <span className="inline-flex items-center gap-0.5">
-                  <Share2 className="h-2.5 w-2.5" />
-                  {formatInt(c.shares)}
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <MousePointerClick className="h-2.5 w-2.5" /> Interactions {formatInt(c.totalInteractions)}
                 </span>
-                <span className="inline-flex items-center gap-0.5">
-                  <MousePointerClick className="h-2.5 w-2.5" />
-                  {formatInt(c.linkClicks)} clicks
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <Users className="h-2.5 w-2.5" /> In CRM {c.seekersCount.toLocaleString()}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <Heart className="h-2.5 w-2.5" /> {formatInt(c.reactions)}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <MessageCircle className="h-2.5 w-2.5" /> {formatInt(c.comments)}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <Share2 className="h-2.5 w-2.5" /> {formatInt(c.shares)}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                  <MousePointerClick className="h-2.5 w-2.5" /> Clicks {formatInt(c.linkClicks)}
                 </span>
                 {c.netFollows != null && (
-                  <span>Net follows {formatInt(c.netFollows)}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1 text-[10px]">
+                    Net follows {formatInt(c.netFollows)}
+                  </span>
                 )}
+              </div>
               </div>
             </div>
             <Link
