@@ -61,9 +61,9 @@ export function CoordinatorAssignedCampaigns({
 }: CoordinatorAssignedCampaignsProps) {
   if (loading) {
     return (
-      <div className={cn('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4', className)}>
+      <div className={cn('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3', className)}>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-72 rounded-xl border border-border bg-muted/40 animate-pulse" />
+          <div key={i} className="h-64 rounded-xl border border-border bg-muted/40 animate-pulse" />
         ))}
       </div>
     )
@@ -81,10 +81,10 @@ export function CoordinatorAssignedCampaigns({
   }
 
   return (
-    <div className={cn('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4', className)}>
+    <div className={cn('grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3', className)}>
       {campaigns.map((c) => (
-        <Card key={c.id} className="pt-0 gap-0 shadow-sm hover:shadow-md transition-shadow">
-          <div className="relative h-36">
+        <Card key={c.id} className="pt-0 gap-0 shadow-sm hover:shadow-md transition-all duration-200 border-border/70">
+          <div className="relative h-28">
             <div className="absolute inset-0 overflow-hidden rounded-t-xl bg-muted">
               {c.imageUrl ? (
                 <img
@@ -100,7 +100,7 @@ export function CoordinatorAssignedCampaigns({
             </div>
             <div
               className={cn(
-                'pointer-events-none absolute right-0 top-0 z-10 translate-x-[28%] -translate-y-1 rotate-45 px-10 py-1 text-[10px] font-bold uppercase tracking-wider shadow-md',
+                'pointer-events-none absolute right-0 top-0 z-10 translate-x-[32%] -translate-y-1 rotate-45 px-9 py-0.5 text-[9px] font-semibold uppercase tracking-wider shadow-sm',
                 statusRibbonClass(c.status)
               )}
               title={c.status.replace(/_/g, ' ')}
@@ -108,13 +108,13 @@ export function CoordinatorAssignedCampaigns({
               {c.status.replace(/_/g, ' ')}
             </div>
           </div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg leading-snug line-clamp-2">{c.name}</CardTitle>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Badge variant="secondary" className="text-xs font-normal">
+          <CardHeader className="px-4 pt-3 pb-1">
+            <CardTitle className="text-sm leading-snug line-clamp-2">{c.name}</CardTitle>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal">
                 {c.type}
               </Badge>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {new Date(c.startDate).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -130,56 +130,56 @@ export function CoordinatorAssignedCampaigns({
               </span>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-2.5">
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                 Insights
               </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <Eye className="h-3.5 w-3.5 shrink-0" />
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                <div className="rounded-md bg-muted/60 px-2 py-1.5">
+                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
+                    <Eye className="h-3 w-3 shrink-0" />
                     Views
                   </div>
-                  <div className="font-semibold tabular-nums">{formatInt(c.views)}</div>
+                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.views)}</div>
                 </div>
-                <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <Users className="h-3.5 w-3.5 shrink-0" />
+                <div className="rounded-md bg-muted/60 px-2 py-1.5">
+                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
+                    <Users className="h-3 w-3 shrink-0" />
                     Reach
                   </div>
-                  <div className="font-semibold tabular-nums">{formatInt(c.reach)}</div>
+                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.reach)}</div>
                 </div>
-                <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                <div className="rounded-md bg-muted/60 px-2 py-1.5">
+                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
+                    <MousePointerClick className="h-3 w-3 shrink-0" />
                     Interactions
                   </div>
-                  <div className="font-semibold tabular-nums">{formatInt(c.totalInteractions)}</div>
+                  <div className="font-semibold tabular-nums text-sm">{formatInt(c.totalInteractions)}</div>
                 </div>
-                <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <Users className="h-3.5 w-3.5 shrink-0" />
+                <div className="rounded-md bg-muted/60 px-2 py-1.5">
+                  <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
+                    <Users className="h-3 w-3 shrink-0" />
                     In CRM
                   </div>
-                  <div className="font-semibold tabular-nums">{c.seekersCount.toLocaleString()}</div>
+                  <div className="font-semibold tabular-nums text-sm">{c.seekersCount.toLocaleString()}</div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
+              <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-[10px] text-muted-foreground border-t border-border/60 pt-1.5 mt-1.5">
                 <span className="inline-flex items-center gap-0.5">
-                  <Heart className="h-3 w-3" />
+                  <Heart className="h-2.5 w-2.5" />
                   {formatInt(c.reactions)}
                 </span>
                 <span className="inline-flex items-center gap-0.5">
-                  <MessageCircle className="h-3 w-3" />
+                  <MessageCircle className="h-2.5 w-2.5" />
                   {formatInt(c.comments)}
                 </span>
                 <span className="inline-flex items-center gap-0.5">
-                  <Share2 className="h-3 w-3" />
+                  <Share2 className="h-2.5 w-2.5" />
                   {formatInt(c.shares)}
                 </span>
                 <span className="inline-flex items-center gap-0.5">
-                  <MousePointerClick className="h-3 w-3" />
+                  <MousePointerClick className="h-2.5 w-2.5" />
                   {formatInt(c.linkClicks)} clicks
                 </span>
                 {c.netFollows != null && (
@@ -189,7 +189,7 @@ export function CoordinatorAssignedCampaigns({
             </div>
             <Link
               href="/campaigns"
-              className="inline-flex text-sm font-medium text-primary hover:underline"
+              className="inline-flex text-xs font-medium text-primary hover:underline"
             >
               Open campaigns
             </Link>
