@@ -13,16 +13,28 @@ import { createNotification } from '@/lib/notification-service'
 /** Do not re-notify admins if the same breach count was already alerted within this window. */
 const DEDUPE_WINDOW_MS = 4 * 60 * 60 * 1000
 
+/**
+ * Vercel sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set in the project.
+ * @see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs
+ * Manual runs may use `x-cron-secret` instead.
+ */
 function verifyCronSecret(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET?.trim()
   if (!secret) {
     return false
   }
   const auth = request.headers.get('authorization')
+  // Exact match as recommended by Vercel (avoids parsing edge cases).
+  if (auth === `Bearer ${secret}`) {
+    return true
+  }
   const bearer = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : ''
   const header = request.headers.get('x-cron-secret')?.trim()
   return bearer === secret || header === secret
 }
+
+/** Cron must not be statically cached; Vercel invokes this as a serverless function. */
+export const dynamic = 'force-dynamic'
 
 async function runComplianceNotifications(request: NextRequest) {
   if (!verifyCronSecret(request)) {
