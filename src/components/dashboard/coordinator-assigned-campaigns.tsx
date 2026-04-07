@@ -60,6 +60,10 @@ function formatInt(n: number | null | undefined): string {
   return n.toLocaleString()
 }
 
+function formatStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (s) => s.toUpperCase())
+}
+
 interface CoordinatorAssignedCampaignsProps {
   campaigns: CoordinatorAssignedCampaign[]
   loading?: boolean
@@ -147,12 +151,12 @@ export function CoordinatorAssignedCampaigns({
               </div>
               <div
                 className={cn(
-                  'pointer-events-none absolute right-0 top-0 z-10 translate-x-[28%] -translate-y-1 rotate-45 px-10 py-1 text-[10px] font-bold uppercase tracking-wider shadow-md',
+                  'pointer-events-none absolute left-3 top-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm',
                   statusRibbonClass(c.status)
                 )}
-                title={c.status.replace(/_/g, ' ')}
+                title={formatStatusLabel(c.status)}
               >
-                {c.status.replace(/_/g, ' ')}
+                {formatStatusLabel(c.status)}
               </div>
             </div>
             <CardHeader className="pb-2">
