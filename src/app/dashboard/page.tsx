@@ -11,6 +11,7 @@ import { DashboardFilterBar } from '@/components/dashboard/dashboard-filter-bar'
 import type { DashboardFilterState, DashboardPreset } from '@/components/dashboard/dashboard-types'
 import type { DashboardStatsData } from '@/components/dashboard/dashboard-stats'
 import type { UserInquiryStat } from '@/components/dashboard/user-inquiry-analytics'
+import type { CoordinatorAssignedCampaign } from '@/components/dashboard/coordinator-assigned-campaigns'
 import { safeJsonParse } from '@/lib/utils'
 import { RoleBasedDashboard } from '@/components/dashboard/role-based-dashboard'
 
@@ -75,6 +76,7 @@ function DashboardPageContent() {
     userInquiryStats: UserInquiryStat[] | null
     users: { id: string; name: string }[]
     campaigns: { id: string; name: string }[]
+    assignedCampaigns: CoordinatorAssignedCampaign[]
     isAdmin: boolean
   } | null>(null)
   const [dashboardLoading, setDashboardLoading] = useState(true)
@@ -101,6 +103,7 @@ function DashboardPageContent() {
           userInquiryStats: (data.userInquiryStats as UserInquiryStat[]) ?? null,
           users: data.users ?? [],
           campaigns: data.campaigns ?? [],
+          assignedCampaigns: (data.assignedCampaigns as CoordinatorAssignedCampaign[]) ?? [],
           isAdmin: data.isAdmin ?? false,
         })
       } catch {
@@ -193,6 +196,7 @@ function DashboardPageContent() {
         <RoleBasedDashboard
           stats={dashboardData?.stats ?? null}
           userInquiryStats={dashboardData?.userInquiryStats ?? null}
+          assignedCampaigns={dashboardData?.assignedCampaigns ?? []}
           loading={dashboardLoading}
           error={dashboardError}
         />

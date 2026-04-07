@@ -5,25 +5,30 @@ import { useAuth } from '@/hooks/use-auth'
 import { usePermissions } from '@/hooks/use-permissions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Users, 
-  UserCheck, 
-  Target, 
-  TrendingUp, 
-  Clock, 
+import {
+  Users,
+  UserCheck,
+  Target,
+  TrendingUp,
+  Clock,
   CheckCircle2,
-  AlertCircle 
+  Megaphone,
 } from 'lucide-react'
 import { DashboardStats } from './dashboard-stats'
 import { UserInquiryAnalytics } from './user-inquiry-analytics'
 import { FollowUpComplianceCard } from './follow-up-compliance-card'
 import type { DashboardStatsData } from './dashboard-stats'
 import type { UserInquiryStat } from './user-inquiry-analytics'
+import {
+  CoordinatorAssignedCampaigns,
+  type CoordinatorAssignedCampaign,
+} from './coordinator-assigned-campaigns'
 
 interface RoleBasedDashboardProps {
   className?: string
   stats?: DashboardStatsData | null
   userInquiryStats?: UserInquiryStat[] | null
+  assignedCampaigns?: CoordinatorAssignedCampaign[] | null
   loading?: boolean
   error?: string | null
 }
@@ -32,6 +37,7 @@ export function RoleBasedDashboard({
   className,
   stats,
   userInquiryStats,
+  assignedCampaigns,
   loading,
   error,
 }: RoleBasedDashboardProps) {
@@ -81,6 +87,23 @@ export function RoleBasedDashboard({
 
       {/* Role-specific Dashboard Content */}
       <div className="space-y-8">
+        {role === 'COORDINATOR' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold text-gray-900">My assigned campaigns</h2>
+            </div>
+            <p className="text-sm text-gray-600">
+              Campaigns where you are set as coordinator. Each card shows status, creative, and key
+              analytics.
+            </p>
+            <CoordinatorAssignedCampaigns
+              campaigns={assignedCampaigns ?? []}
+              loading={loading}
+            />
+          </div>
+        )}
+
         {/* Core Stats - Available to all roles */}
         <DashboardStats stats={stats} loading={loading} error={error} />
 
