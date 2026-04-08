@@ -108,16 +108,18 @@ export async function PUT(
     }
     
     // Never allow clients to spoof ownership/deletion fields or change contact phones (edit form locks these)
-    const {
-      createdById: _ignoredCreatedById,
-      deletedById: _ignoredDeletedById,
-      isDeleted: _ignoredIsDeleted,
-      deletedAt: _ignoredDeletedAt,
-      phone: _ignoredPhone,
-      whatsappNumber: _ignoredWhatsappNumber,
-      whatsapp: _ignoredWhatsapp,
-      ...safeBody
-    } = (body || {}) as Record<string, unknown>
+    const safeBody = { ...((body || {}) as Record<string, unknown>) }
+    for (const key of [
+      'createdById',
+      'deletedById',
+      'isDeleted',
+      'deletedAt',
+      'phone',
+      'whatsappNumber',
+      'whatsapp',
+    ] as const) {
+      delete safeBody[key]
+    }
 
     const seeker = await prisma.seeker.update({
       where: {
@@ -186,18 +188,15 @@ export async function PATCH(
       )
     }
     
-    // Handle relationships; ignore phone / WhatsApp — not editable via inquiry edit
-    const {
-      preferredProgramIds,
-      campaignId,
-      phone: _omitPhone,
-      whatsappNumber: _omitWhatsappNumber,
-      whatsapp: _omitWhatsapp,
-      ...updateData
-    } = body || {}
-    
-    // Build update data with nested operations for relations
-    const dataToUpdate: any = updateData
+    // Handle relationships; strip phone / WhatsApp — not editable via inquiry edit
+    const bodyPayload = body || {}
+    const { preferredProgramIds, campaignId } = bodyPayload
+    const dataToUpdate: any = { ...bodyPayload }
+    delete dataToUpdate.preferredProgramIds
+    delete dataToUpdate.campaignId
+    delete dataToUpdate.phone
+    delete dataToUpdate.whatsappNumber
+    delete dataToUpdate.whatsapp
     
     // Handle preferred programs if provided
     if (preferredProgramIds !== undefined && Array.isArray(preferredProgramIds)) {

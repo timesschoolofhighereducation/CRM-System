@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,8 +17,6 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { CampaignViewDialog } from '@/components/campaigns/campaign-view-dialog'
-import { CampaignHoverPreview } from '@/components/campaigns/campaign-hover-preview'
 
 export interface CoordinatorAssignedCampaign {
   id: string
@@ -77,9 +76,6 @@ export function CoordinatorAssignedCampaigns({
   className,
 }: CoordinatorAssignedCampaignsProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const [hoverCampaignId, setHoverCampaignId] = useState<string | null>(null)
-  const [viewDialogOpen, setViewDialogOpen] = useState(false)
-  const [viewCampaignId, setViewCampaignId] = useState<string | null>(null)
 
   const scrollCards = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return
@@ -113,15 +109,6 @@ export function CoordinatorAssignedCampaigns({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <CampaignViewDialog
-        open={viewDialogOpen}
-        onOpenChange={(open) => {
-          setViewDialogOpen(open)
-          if (!open) setViewCampaignId(null)
-        }}
-        campaignId={viewCampaignId}
-      />
-
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
@@ -147,138 +134,118 @@ export function CoordinatorAssignedCampaigns({
         className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
       >
         {campaigns.map((c) => (
-          <div
-            key={c.id}
-            className={cn(
-              'flex shrink-0 items-stretch overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow',
-              hoverCampaignId === c.id && 'shadow-md'
-            )}
-            onMouseEnter={() => setHoverCampaignId(c.id)}
-            onMouseLeave={() => setHoverCampaignId(null)}
-          >
-            <Card className="min-w-[320px] max-w-[360px] shrink-0 border-0 shadow-none rounded-none pt-0 gap-0">
-              <div className="relative h-36">
-                <div className="absolute inset-0 overflow-hidden bg-muted">
-                  {c.imageUrl ? (
-                    <img
-                      src={c.imageUrl}
-                      alt={c.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-                      <Megaphone className="h-12 w-12 text-muted-foreground/50" aria-hidden />
-                    </div>
-                  )}
-                </div>
-                <div
-                  className={cn(
-                    'pointer-events-none absolute left-3 top-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm',
-                    statusRibbonClass(c.status)
-                  )}
-                  title={formatStatusLabel(c.status)}
-                >
-                  {formatStatusLabel(c.status)}
-                </div>
+          <Card key={c.id} className="pt-0 gap-0 shadow-sm hover:shadow-md transition-shadow min-w-[320px] max-w-[360px] shrink-0">
+            <div className="relative h-36">
+              <div className="absolute inset-0 overflow-hidden rounded-t-xl bg-muted">
+                {c.imageUrl ? (
+                  <img
+                    src={c.imageUrl}
+                    alt={c.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                    <Megaphone className="h-12 w-12 text-muted-foreground/50" aria-hidden />
+                  </div>
+                )}
               </div>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg leading-snug line-clamp-2">{c.name}</CardTitle>
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    {c.type}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(c.startDate).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                    {c.endDate
-                      ? ` – ${new Date(c.endDate).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}`
-                      : ''}
+              <div
+                className={cn(
+                  'pointer-events-none absolute left-3 top-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm',
+                  statusRibbonClass(c.status)
+                )}
+                title={formatStatusLabel(c.status)}
+              >
+                {formatStatusLabel(c.status)}
+              </div>
+            </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg leading-snug line-clamp-2">{c.name}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {c.type}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(c.startDate).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                  {c.endDate
+                    ? ` – ${new Date(c.endDate).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}`
+                    : ''}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Insights
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      <Eye className="h-3.5 w-3.5 shrink-0" />
+                      Views
+                    </div>
+                    <div className="font-semibold tabular-nums">{formatInt(c.views)}</div>
+                  </div>
+                  <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      Reach
+                    </div>
+                    <div className="font-semibold tabular-nums">{formatInt(c.reach)}</div>
+                  </div>
+                  <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                      Interactions
+                    </div>
+                    <div className="font-semibold tabular-nums">{formatInt(c.totalInteractions)}</div>
+                  </div>
+                  <div className="rounded-lg bg-muted/60 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      In CRM
+                    </div>
+                    <div className="font-semibold tabular-nums">{c.seekersCount.toLocaleString()}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
+                  <span className="inline-flex items-center gap-0.5">
+                    <Heart className="h-3 w-3" />
+                    {formatInt(c.reactions)}
                   </span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <MessageCircle className="h-3 w-3" />
+                    {formatInt(c.comments)}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <Share2 className="h-3 w-3" />
+                    {formatInt(c.shares)}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <MousePointerClick className="h-3 w-3" />
+                    {formatInt(c.linkClicks)} clicks
+                  </span>
+                  {c.netFollows != null && (
+                    <span>Net follows {formatInt(c.netFollows)}</span>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                    Insights
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                        <Eye className="h-3.5 w-3.5 shrink-0" />
-                        Views
-                      </div>
-                      <div className="font-semibold tabular-nums">{formatInt(c.views)}</div>
-                    </div>
-                    <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                        <Users className="h-3.5 w-3.5 shrink-0" />
-                        Reach
-                      </div>
-                      <div className="font-semibold tabular-nums">{formatInt(c.reach)}</div>
-                    </div>
-                    <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                        <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
-                        Interactions
-                      </div>
-                      <div className="font-semibold tabular-nums">{formatInt(c.totalInteractions)}</div>
-                    </div>
-                    <div className="rounded-lg bg-muted/60 px-2.5 py-2">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                        <Users className="h-3.5 w-3.5 shrink-0" />
-                        In CRM
-                      </div>
-                      <div className="font-semibold tabular-nums">{c.seekersCount.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
-                    <span className="inline-flex items-center gap-0.5">
-                      <Heart className="h-3 w-3" />
-                      {formatInt(c.reactions)}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5">
-                      <MessageCircle className="h-3 w-3" />
-                      {formatInt(c.comments)}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5">
-                      <Share2 className="h-3 w-3" />
-                      {formatInt(c.shares)}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5">
-                      <MousePointerClick className="h-3 w-3" />
-                      {formatInt(c.linkClicks)} clicks
-                    </span>
-                    {c.netFollows != null && (
-                      <span>Net follows {formatInt(c.netFollows)}</span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="inline-flex text-sm font-medium text-primary hover:underline"
-                  onClick={() => {
-                    setViewCampaignId(c.id)
-                    setViewDialogOpen(true)
-                    setHoverCampaignId(null)
-                  }}
-                >
-                  View campaign
-                </button>
-              </CardContent>
-            </Card>
-            {hoverCampaignId === c.id ? (
-              <div className="hidden md:flex w-[min(400px,42vw)] shrink-0 flex-col border-l border-border bg-card p-4 overflow-y-auto max-h-[min(520px,72vh)]">
-                <CampaignHoverPreview campaignId={c.id} />
               </div>
-            ) : null}
-          </div>
+              <Link
+                href="/campaigns"
+                className="inline-flex text-sm font-medium text-primary hover:underline"
+              >
+                Open campaigns
+              </Link>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
