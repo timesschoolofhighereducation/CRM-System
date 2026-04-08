@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
+import { requireAuth, AuthenticationError } from '@/lib/auth'
 import { createInquiryFromBody } from '@/lib/inquiry-create-internal'
+import { canViewAllInquiries } from '@/lib/inquiry-visibility'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,17 +23,14 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // Build where clause based on user role
-    // Only ADMIN/ADMINISTRATOR/DEVELOPER can see all inquiries
-    // Other users can only see inquiries they created
+    // Build where clause: admins (role or permission-based) see all inquiries; others only their own
     // Treat legacy rows where isDeleted might be NULL as "not deleted"
     // (Some older DB rows may have NULL even if Prisma schema is non-nullable)
     const where: Record<string, any> = {
       NOT: { isDeleted: true },
     }
     
-    if (!isAdminRole(_user.role)) {
-      // Non-admin users can only see inquiries they created
+    if (!(await canViewAllInquiries(_user.id, _user.role))) {
       where.createdById = _user.id
     }
 

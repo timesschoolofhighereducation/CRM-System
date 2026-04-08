@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
+import { requireAuth, AuthenticationError } from '@/lib/auth'
+import { canViewAllInquiries } from '@/lib/inquiry-visibility'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,8 +23,7 @@ export async function GET(request: NextRequest) {
       ],
     }
 
-    // If not admin, only show seekers created by current user
-    if (!isAdminRole(_user.role)) {
+    if (!(await canViewAllInquiries(_user.id, _user.role))) {
       where.createdById = _user.id
     }
 

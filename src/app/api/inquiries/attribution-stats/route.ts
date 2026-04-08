@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, isAdminRole, AuthenticationError } from '@/lib/auth'
+import { requireAuth, AuthenticationError } from '@/lib/auth'
+import { canViewAllInquiries } from '@/lib/inquiry-visibility'
 
 /**
  * GET /api/inquiries/attribution-stats
@@ -13,9 +14,10 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request)
 
+    const viewAll = await canViewAllInquiries(user.id, user.role)
     const seekerBase: Prisma.SeekerWhereInput = {
       NOT: { isDeleted: true },
-      ...(isAdminRole(user.role) ? {} : { createdById: user.id }),
+      ...(viewAll ? {} : { createdById: user.id }),
     }
 
     const [
