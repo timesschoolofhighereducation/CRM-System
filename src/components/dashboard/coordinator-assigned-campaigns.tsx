@@ -1,7 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
-import Link from 'next/link'
+import { useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +16,8 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CampaignViewDialog } from '@/components/campaigns/campaign-view-dialog'
+import { CampaignHoverPreview } from '@/components/campaigns/campaign-hover-preview'
 
 export interface CoordinatorAssignedCampaign {
   id: string
@@ -76,6 +77,9 @@ export function CoordinatorAssignedCampaigns({
   className,
 }: CoordinatorAssignedCampaignsProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [hoverCampaignId, setHoverCampaignId] = useState<string | null>(null)
+  const [viewDialogOpen, setViewDialogOpen] = useState(false)
+  const [viewCampaignId, setViewCampaignId] = useState<string | null>(null)
 
   const scrollCards = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return
@@ -109,6 +113,15 @@ export function CoordinatorAssignedCampaigns({
 
   return (
     <div className={cn('space-y-3', className)}>
+      <CampaignViewDialog
+        open={viewDialogOpen}
+        onOpenChange={(open) => {
+          setViewDialogOpen(open)
+          if (!open) setViewCampaignId(null)
+        }}
+        campaignId={viewCampaignId}
+      />
+
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"

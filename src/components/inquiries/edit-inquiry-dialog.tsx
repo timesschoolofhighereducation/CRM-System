@@ -344,23 +344,6 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
     }
   }, [form.watch('marketingSource')])
 
-  // Auto-copy phone number to WhatsApp number when WhatsApp checkbox is checked
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Auto-fill WhatsApp number when:
-      // 1. Phone field changes
-      // 2. WhatsApp checkbox is checked
-      // 3. WhatsApp number field is empty (don't overwrite manual entries)
-      if (name === 'phone' && form.getValues('whatsapp') && value.phone) {
-        const currentWhatsAppNumber = form.getValues('whatsappNumber')
-        if (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '') {
-          form.setValue('whatsappNumber', value.phone)
-        }
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [form])
-
   // Close district dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -443,10 +426,9 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         return String(value).trim() || undefined
       }
 
-      // Prepare update data
+      // Prepare update data (phone / WhatsApp fields are display-only; API ignores them)
       const updateData = {
         fullName: safeTrim(data.fullName) || '',
-        phone: safeTrim(data.phone) || '',
         email: safeTrim(data.email),
         city: safeTrim(data.district),
         ageBand: (data.age !== undefined && data.age !== null && typeof data.age === 'number' && data.age > 0) ? data.age.toString() : undefined,
@@ -458,13 +440,10 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
         followUpDate: safeTrim(data.followUpDate),
         followUpTime: safeTrim(data.followUpTime),
         description: safeTrim(data.description),
-        whatsapp: data.whatsapp,
         notAnswering: data.notAnswering ?? false,
         emailNotAnswering: data.emailNotAnswering ?? false,
         consent: data.consent,
         preferredProgramIds: selectedProgramIds,
-        // Always send whatsappNumber if it has a value (even if checkbox is unchecked)
-        whatsappNumber: safeTrim(data.whatsappNumber) || null,
         stage: data.stage || 'NEW',
         preferredStatus: data.preferredStatus || undefined,
         promotionCodeId: data.promotionCodeId || undefined,
@@ -530,42 +509,34 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                 )}
               </div>
 
-              {/* Phone */}
+              {/* Phone (read-only — identity / dedup key) */}
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs sm:text-sm font-medium">Phone Number *</Label>
+                <Label htmlFor="phone" className="text-xs sm:text-sm font-medium">Phone Number</Label>
                 <Input
                   id="phone"
                   {...form.register('phone')}
+                  readOnly
+                  aria-readonly="true"
+                  title="Phone number cannot be changed when editing an inquiry"
                   placeholder="Enter phone number"
                   onKeyDown={handleEnterAdvance}
-                  className="w-full"
+                  className="w-full bg-muted/60 cursor-not-allowed"
                 />
                 {form.formState.errors.phone && (
                   <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.phone.message}</p>
                 )}
               </div>
 
-              {/* WhatsApp Checkbox */}
+              {/* WhatsApp (read-only with phone) */}
               <div className="space-y-1.5 flex items-end">
-                <div className="flex items-center space-x-2 h-9 sm:h-10">
+                <div className="flex items-center space-x-2 h-9 sm:h-10 opacity-80">
                   <Checkbox
                     id="whatsapp"
                     checked={form.watch('whatsapp')}
-                    onCheckedChange={(checked) => {
-                      form.setValue('whatsapp', checked as boolean)
-                      // When checkbox is checked, auto-fill WhatsApp number with phone number
-                      // Only if WhatsApp number is empty (don't overwrite manual entries)
-                      if (checked) {
-                        const phoneNumber = form.getValues('phone')
-                        const currentWhatsAppNumber = form.getValues('whatsappNumber')
-                        if (phoneNumber && (!currentWhatsAppNumber || currentWhatsAppNumber.trim() === '')) {
-                          form.setValue('whatsappNumber', phoneNumber)
-                        }
-                      }
-                      // When unchecked, don't clear the WhatsApp number - let user keep it if they want
-                    }}
+                    disabled
+                    aria-readonly="true"
                   />
-                  <Label htmlFor="whatsapp" className="text-sm font-normal cursor-pointer">
+                  <Label htmlFor="whatsapp" className="text-sm font-normal text-muted-foreground cursor-default">
                     Has WhatsApp
                   </Label>
                 </div>
@@ -576,15 +547,13 @@ export function EditInquiryDialog({ inquiry, open, onOpenChange, onSuccess }: Ed
                 <Label htmlFor="whatsappNumber" className="text-xs sm:text-sm font-medium">WhatsApp Number</Label>
                 <Input
                   id="whatsappNumber"
-                  {...form.register('whatsappNumber', {
-                    onChange: (e) => {
-                      // Allow manual entry - don't auto-overwrite if user is typing
-                      form.setValue('whatsappNumber', e.target.value, { shouldValidate: true })
-                    }
-                  })}
+                  {...form.register('whatsappNumber')}
+                  readOnly
+                  aria-readonly="true"
+                  title="WhatsApp number cannot be changed when editing an inquiry"
                   placeholder="WhatsApp number"
                   onKeyDown={handleEnterAdvance}
-                  className="w-full"
+                  className="w-full bg-muted/60 cursor-not-allowed"
                 />
                 {form.formState.errors.whatsappNumber && (
                   <p className="text-xs sm:text-sm text-red-600 mt-1">{form.formState.errors.whatsappNumber.message}</p>

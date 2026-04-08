@@ -108,12 +108,15 @@ export async function PUT(
       )
     }
     
-    // Never allow clients to spoof ownership/deletion fields
+    // Never allow clients to spoof ownership/deletion fields or change contact phones (edit form locks these)
     const {
       createdById: _ignoredCreatedById,
       deletedById: _ignoredDeletedById,
       isDeleted: _ignoredIsDeleted,
       deletedAt: _ignoredDeletedAt,
+      phone: _ignoredPhone,
+      whatsappNumber: _ignoredWhatsappNumber,
+      whatsapp: _ignoredWhatsapp,
       ...safeBody
     } = (body || {}) as Record<string, unknown>
 
@@ -185,8 +188,15 @@ export async function PATCH(
       )
     }
     
-    // Handle relationships
-    const { preferredProgramIds, campaignId, ...updateData } = body
+    // Handle relationships; ignore phone / WhatsApp — not editable via inquiry edit
+    const {
+      preferredProgramIds,
+      campaignId,
+      phone: _omitPhone,
+      whatsappNumber: _omitWhatsappNumber,
+      whatsapp: _omitWhatsapp,
+      ...updateData
+    } = body || {}
     
     // Build update data with nested operations for relations
     const dataToUpdate: any = updateData
